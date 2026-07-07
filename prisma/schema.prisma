@@ -1,0 +1,190 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../backend/node_modules/.prisma/client"
+}
+
+model Settings {
+  id                    String   @id @default("default")
+  name                  String
+  targetExam            String   @default("GATE")
+  targetYear            Int      @default(2027)
+  dailyAvailableHours   Float    @default(4.0)
+  preferredLanguage     String   @default("hinglish")
+  timezone              String   @default("Asia/Kolkata")
+  wakeTime              String   @default("06:00")
+  sleepTime             String   @default("22:00")
+  exerciseGoal          String?
+  otherGoals            Json?    // Array of strings or object
+  prepLevel             String   @default("Beginner")
+  scoreWeights          Json?    // { study: 60, exercise: 15, reading: 10, routine: 15 }
+  pushSubscription      Json?    // Web Push subscription details
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Subject {
+  subjectId       Int                  @id
+  subjectName     String
+  importanceLevel Float
+  topics          Json                 // Array of topic names/ids
+  progressRatings ProgressRating[]
+  tasks           Task[]
+  topicStatuses   TopicStatus[]
+  explanations    ConceptExplanation[]
+}
+
+model Journal {
+  journalId       String   @id @default(uuid())
+  date            DateTime @unique @db.Date // Pure calendar date
+  entryText       String
+  mood            String?
+  tags            Json?    // Array of tags
+  aiFeedback      String?
+  tomorrowTask    String?
+  patternDetected String?
+  studyDone       Boolean  @default(false)
+  exerciseDone    Boolean  @default(false)
+  readingDone     Boolean  @default(false)
+  helpfulness     Int?     // 1-5 rating from user
+  createdAt       DateTime @default(now())
+  editedAt        DateTime @updatedAt
+  lockedAt        DateTime?
+}
+
+model RoutinePlan {
+  planId             String   @id @default(uuid())
+  date               DateTime @unique @db.Date // Pure calendar date
+  greeting           String
+  planText           String
+  mainPriority       String
+  totalEstimatedMin  Int      @default(0)
+  isWeekend          Boolean  @default(false)
+  generatedAt        DateTime @default(now())
+  tasks              Task[]
+}
+
+model Task {
+  taskId       String      @id @default(uuid())
+  date         DateTime    @db.Date             // Pure calendar date
+  planId       String
+  plan         RoutinePlan @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  title        String
+  taskType     String      // "study" | "exercise" | "reading" | "routine"
+  subjectId    Int?
+  subject      Subject?    @relation(fields: [subjectId], references: [subjectId])
+  topicId      String?
+  durationMin  Int
+  status       String      @default("NOT") // "COMPLETED" | "PARTIAL" | "NOT"
+  isPriority   Boolean     @default(false)
+  isCarryover  Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  finalizedAt  DateTime?
+}
+
+model ProgressRating {
+  ratingId        String   @id @default(uuid())
+  subjectId       Int
+  subject         Subject  @relation(fields: [subjectId], references: [subjectId])
+  weekStartDate   DateTime @db.Date // Pure calendar date (Monday)
+  selfRating      Int      // 1-5
+  hoursStudied    Float    @default(0.0)
+  questionsSolved Int      @default(0)
+  confidenceLevel Int      @default(3) // 1-5
+  revisionStatus  String   @default("NOT_STARTED")
+  notes           String?
+  aiRecommendation String?
+  createdAt       DateTime @default(now())
+
+  @@unique([subjectId, weekStartDate])
+}
+
+model TopicStatus {
+  topicStatusId     String   @id @default(uuid())
+  subjectId         Int
+  subject           Subject  @relation(fields: [subjectId], references: [subjectId])
+  topicId           String
+  status            String   @default("NOT_STARTED") // "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED"
+  lastExplanationId String?
+  lastScore         Int?
+  updatedAt         DateTime @updatedAt
+
+  @@unique([subjectId, topicId])
+}
+
+model WeeklyReport {
+  reportId           String   @id @default(uuid())
+  weekStartDate      DateTime @unique @db.Date // Pure calendar date (Sunday/Monday)
+  avgDailyScore      Float
+  totalStudyHours    Float
+  completedTasks     Int
+  missedTasks        Int
+  streaksSummary     Json     // JSON mapping streaks
+  biggestImprovement String
+  biggestProblem     String
+  aiSummary          String
+  generatedAt        DateTime @default(now())
+}
+
+model AiCallLog {
+  logId           String   @id @default(uuid())
+  surface         String   // "journal" | "routine_plan" | "progress" | "interview"
+  latencyMs       Int
+  success         Boolean
+  errorMessage    String?
+  promptPreview   String?
+  responsePreview String?
+  createdAt       DateTime @default(now())
+}
+
+model AiProviderCredential {
+  provider        String   @id // "openrouter" | "nvidia"
+  encryptedApiKey String
+  encryptionIv    String
+  authTag         String
+  keyHint         String
+  model           String
+  isActive        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model ConceptExplanation {
+  explanationId      String   @id @default(uuid())
+  topicInput         String
+  normalizedTopic    String
+  subjectId          Int?
+  subject            Subject? @relation(fields: [subjectId], references: [subjectId])
+  mode               String   // "detailed" | "compact"
+  difficulty         String   @default("Medium")
+  explanationText    String   // The JSON string returned by AI (structured representation)
+  questions          Json?    // Optional questions
+  finalScore         Int?
+  topicStatusSet     Boolean  @default(false)
+  formulaGuardPassed Boolean  @default(true)
+  createdAt          DateTime @default(now())
+}
+
+model InterviewAttempt {
+  attemptId           String   @id @default(uuid())
+  sessionId           String   // UUID to group the 5 questions of a mock session
+  company             String
+  mode                String
+  questionIndex       Int
+  questionText        String
+  userAnswer          String
+  skipped             Boolean  @default(false)
+  score               Int      // 0-10
+  dimensions          Json?    // Rubric breakdown
+  missingPoints       Json?    // Missing points
+  improvedAnswer      String?
+  improvedAnswerViewed Boolean @default(false)
+  createdAt           DateTime @default(now())
+}
