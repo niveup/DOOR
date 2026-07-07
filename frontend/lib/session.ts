@@ -5,8 +5,19 @@ export interface SessionData {
   isLoggedIn?: boolean;
 }
 
+// Secrets must never fall back to a public default. A default password shipped
+// in the repo means anyone can forge a valid session cookie, and (because the
+// AI credential encryption key is derived from SESSION_SECRET) it also weakens
+// the encryption protecting stored provider API keys. Fail loud instead.
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret || sessionSecret.length < 32) {
+  throw new Error(
+    "SESSION_SECRET must be set and at least 32 characters long."
+  );
+}
+
 export const sessionOptions = {
-  password: process.env.SESSION_SECRET || "complex_password_at_least_32_characters_long",
+  password: sessionSecret,
   cookieName: "jujum_session",
   cookieOptions: {
     secure: process.env.NODE_ENV === "production",
