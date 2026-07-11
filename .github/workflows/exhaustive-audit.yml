@@ -1,0 +1,46 @@
+name: Exhaustive codebase audit
+
+on:
+  push:
+    branches: [audit/exhaustive-codebase-2026-07-11]
+    paths: [.github/workflows/exhaustive-audit.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/exhaustive-codebase-2026-07-11
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Frontend typecheck
+        continue-on-error: true
+        run: |
+          cd frontend
+          npm install --legacy-peer-deps --no-audit --no-fund >/tmp/frontend-install.txt 2>&1
+          npx tsc --noEmit >/tmp/frontend-tsc.txt 2>&1
+          echo $? >/tmp/frontend-tsc.code
+      - name: Backend typecheck
+        continue-on-error: true
+        run: |
+          cd backend
+          npm install --legacy-peer-deps --no-audit --no-fund >/tmp/backend-install.txt 2>&1
+          npm run prisma:generate >/tmp/backend-prisma.txt 2>&1
+          npx tsc --noEmit >/tmp/backend-tsc.txt 2>&1
+          echo $? >/tmp/backend-tsc.code
+      - name: Read every file and generate report
+        run: python3 scripts/exhaustive_audit.py
+      - name: Commit report only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/exhaustive-audit.yml scripts/exhaustive_audit.py
+          git add AUDIT_REPORT.md
+          git commit -m "docs: add exhaustive codebase audit report"
+          git push
