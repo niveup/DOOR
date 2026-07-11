@@ -29,12 +29,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: python3 scripts/apply_markdown_consistency.py
       - working-directory: frontend
-        run: npm ci
+        run: npm install --legacy-peer-deps --no-audit --no-fund
       - working-directory: frontend
         run: npm run build
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- frontend/package-lock.json
           git add frontend/app/journal/page.tsx frontend/app/tracker/page.tsx frontend/app/interview/page.tsx
           git commit -m "feat(ui): render AI feedback consistently with AiMarkdown"
           git push
