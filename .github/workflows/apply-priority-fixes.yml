@@ -1,0 +1,57 @@
+name: Apply priority fixes
+
+on:
+  push:
+    branches: [feat/editorial-study-workspace-ui]
+    paths:
+      - scripts/apply-priority-fixes.py
+      - .github/workflows/apply-priority-fixes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/editorial-study-workspace-ui
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Apply minimal patches
+        run: python3 scripts/apply-priority-fixes.py
+      - name: Build backend
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/db
+          DIRECT_URL: postgresql://user:pass@localhost:5432/db
+          SESSION_SECRET: ci-only-session-secret-at-least-32-characters
+          APP_PASSCODE: ci-only-passcode
+        run: |
+          npm ci
+          npm run prisma:generate
+          npm run build
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          SESSION_SECRET: ci-only-session-secret-at-least-32-characters
+          APP_PASSCODE: ci-only-passcode
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+        run: |
+          npm ci
+          npm run build
+      - name: Commit verified patch and remove one-shot runner
+        run: |
+          rm -f scripts/apply-priority-fixes.py .github/workflows/apply-priority-fixes.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: AI interview evaluation, markdown consistency, empty states, mobile tabs"
+          git push origin HEAD:feat/editorial-study-workspace-ui
