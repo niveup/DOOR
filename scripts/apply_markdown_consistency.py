@@ -17,7 +17,9 @@ path = Path("frontend/app/journal/page.tsx")
 text = path.read_text(encoding="utf-8-sig")
 text = replace_once(text, 'import { AiSelection, ModelSelector } from "@/components/ModelSelector";', 'import { AiSelection, ModelSelector } from "@/components/ModelSelector";\nimport { AiMarkdown } from "@/components/AiMarkdown";', "journal import")
 text = replace_once(text, ' const [lastSavedTask, setLastSavedTask] = useState("");', ' const [lastSavedTask, setLastSavedTask] = useState("");\n const [mentorFeedback, setMentorFeedback] = useState("");', "journal state")
-text = replace_once(text, ' setLastSavedTask("");\n\n try {', ' setLastSavedTask("");\n setMentorFeedback("");\n\n try {', "journal clear")
+text, count = re.subn(r'(setLastSavedTask\(""\);\s*)(try \{)', r'\1setMentorFeedback("");\n\n \2', text, count=1)
+if count != 1:
+    fail(f"journal clear: expected one match, got {count}")
 text = replace_once(text, ' setLastSavedTask(data.journal.tomorrowTask || "Saved. Dashboard can now build the plan.");', ' setLastSavedTask(data.journal.tomorrowTask || "Saved. Dashboard can now build the plan.");\n setMentorFeedback(data.rawAiOutput || data.journal.aiFeedback || "");', "journal response")
 opening = re.search(r'<AppShell\b[^>]*>', text)
 if not opening:
