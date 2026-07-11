@@ -8,7 +8,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: security-cleanup
+  group: security-cleanup-final
   cancel-in-progress: true
 jobs:
   patch:
