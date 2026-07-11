@@ -471,7 +471,7 @@ export default function Dashboard() {
     return Math.round(earnedScore / activeWeight);
   }, [plan]);
 
-  const visibleTasks = plan?.tasks?.length ? plan.tasks : sampleTasks;
+  const visibleTasks = plan?.tasks || [];
   const completedCount = plan?.tasks.filter((task) => task.status === "COMPLETED").length || 0;
   const totalMinutes = visibleTasks.reduce((sum, task) => sum + task.durationMin, 0);
   const completedMinutes = plan?.tasks.reduce(
