@@ -58,12 +58,127 @@ export default function TrackerPage() {
     {error ? <div className="mb-5 rounded-lg bg-[var(--danger-soft)] p-3 text-sm font-semibold text-[var(--danger)]">{error}</div> : null}
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Readiness" value={data?.overallReadiness || 0} suffix="%" /><Metric label="Logged" value={subjects.filter((item) => item.latestRating !== null).length} suffix="/14" /><Metric label="Weak" value={weak} suffix="" /><Metric label="Neglected" value={neglected} suffix="" /></section>
     {data?.weeklyAnalysis ? <PageSection title="Weekly analysis" eyebrow="AI review"><div className="surface p-5"><AiMarkdown content={data.weeklyAnalysis} /></div></PageSection> : null}
-    <PageSection title="Subjects" eyebrow="Weekly input" action={<div className="flex flex-wrap gap-1">{filters.map((item) => <button key={item.id} onClick={() => setFilter(item.id)} className={`focus-ring rounded-full px-3 py-2 text-xs font-semibold ${filter === item.id ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>{item.label}</button>)}</div>}>
-      {loading && !data ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{[1,2,3,4,5,6].map((item) => <div key={item} className="surface h-40 animate-pulse bg-[var(--track)]" />)}</div> : visible.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map((subject) => <article key={subject.subjectId} className="surface p-4"><div className="flex justify-between gap-3"><div><h3 className="font-semibold">{subject.subjectName}</h3><p className="mt-1 text-xs text-[var(--text-secondary)]">Weight {Math.round(subject.importanceLevel * 100)}%</p></div><span className="pill pill-blue">{subject.latestRating ? `${subject.latestRating}/5` : "Not rated"}</span></div><ProgressBar value={((subject.latestRating || 0) / 5) * 100} tone={subject.latestRating && subject.latestRating <= 2 ? "rose" : "blue"} /><p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">{subject.topics.join(", ")}</p>{subject.aiRecommendation ? <div className="mt-3 border-t border-[var(--border)] pt-3"><AiMarkdown content={subject.aiRecommendation} /></div> : null}<div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3"><span className="text-xs text-[var(--text-secondary)]">{subject.hoursStudied}h · {subject.questionsSolved} questions</span><MicroInteractionButton onClick={() => openRating(subject)} className="btn-secondary">Rate</MicroInteractionButton></div></article>)}</div> : <EmptyState mark="T" title="No subjects in this filter" description="Switch filters or add a weekly rating to bring subjects into view." className="min-h-[320px]" />}
+    <PageSection title="Subjects" eyebrow="Weekly input" action={
+      <div className="flex items-center gap-1 rounded-full bg-[var(--bg-elevated)] p-1 border border-[var(--border)]">
+        {filters.map((item) => {
+          const isSelected = filter === item.id;
+          return (
+            <button 
+              key={item.id} 
+              onClick={() => setFilter(item.id)} 
+              className={`focus-ring rounded-full px-3.5 py-1.5 text-xs font-bold transition-all duration-150 ${
+                isSelected 
+                  ? "bg-[var(--bg-card)] text-[var(--accent)] shadow-xs border border-[var(--border-strong)]/10" 
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    }>
+      {loading && !data ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {[1,2,3,4,5,6].map((item) => (
+            <div key={item} className="surface h-40 animate-pulse bg-[var(--track)]" />
+          ))}
+        </div>
+      ) : visible.length ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {visible.map((subject) => (
+            <article key={subject.subjectId} className="surface p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start gap-3">
+                  <div>
+                    <h3 className="font-semibold text-sm leading-tight text-[var(--text-primary)]">{subject.subjectName}</h3>
+                    <p className="mt-1 text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)]">Weight {Math.round(subject.importanceLevel * 100)}%</p>
+                  </div>
+                  {subject.latestRating ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--accent)]/15 bg-gradient-to-br from-[var(--bg-card)] to-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-[var(--accent)] shadow-2xs shrink-0">
+                      ★ {subject.latestRating}/5
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--warning)]/15 bg-gradient-to-br from-[var(--bg-card)] to-[var(--warning-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--warning)] shadow-2xs shrink-0">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--warning)] opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--warning)]"></span>
+                      </span>
+                      Not rated
+                    </span>
+                  )}
+                </div>
+                <ProgressBar value={((subject.latestRating || 0) / 5) * 100} tone={subject.latestRating && subject.latestRating <= 2 ? "rose" : "blue"} />
+                <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">{subject.topics.join(", ")}</p>
+                {subject.aiRecommendation ? (
+                  <div className="mt-3 border-t border-[var(--border)] pt-3">
+                    <AiMarkdown content={subject.aiRecommendation} />
+                  </div>
+                ) : null}
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3">
+                <span className="text-xs text-[var(--text-secondary)]">{subject.hoursStudied}h · {subject.questionsSolved} questions</span>
+                <MicroInteractionButton onClick={() => openRating(subject)} className="btn-secondary py-1 min-h-[1.8rem] text-xs">Rate</MicroInteractionButton>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState mark="T" title="No subjects in this filter" description="Switch filters or add a weekly rating to bring subjects into view." className="min-h-[320px]" />
+      )}
     </PageSection>
-    {selected ? <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 p-4" onClick={() => setSelected(null)}><form onSubmit={saveRating} onClick={(event) => event.stopPropagation()} className="surface w-full max-w-lg space-y-4 p-5"><div><p className="section-label">Weekly log</p><h2 className="mt-2 text-xl font-semibold">{selected.subjectName}</h2></div><Rating label="Self rating" value={rating} onChange={setRating} /><div className="grid grid-cols-2 gap-3"><label><span className="section-label mb-2 block">Hours</span><input type="number" min="0" step=".5" value={hours} onChange={(event) => setHours(event.target.value)} className="app-input px-3 py-2" /></label><label><span className="section-label mb-2 block">Questions</span><input type="number" min="0" value={questions} onChange={(event) => setQuestions(event.target.value)} className="app-input px-3 py-2" /></label></div><Rating label="Confidence" value={confidence} onChange={setConfidence} /><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Weak sub-topics, mistakes, revision needed..." className="app-input min-h-24 p-3" /><div className="flex justify-end gap-2"><button type="button" onClick={() => setSelected(null)} className="btn-quiet">Cancel</button><MicroInteractionButton type="submit" loading={saving} className="btn-primary">Save</MicroInteractionButton></div></form></div> : null}
+    {selected ? (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 p-4" onClick={() => setSelected(null)}>
+        <form onSubmit={saveRating} onClick={(event) => event.stopPropagation()} className="surface w-full max-w-md space-y-5 p-6">
+          <div>
+            <p className="section-label">Weekly log</p>
+            <h2 className="mt-1.5 text-xl font-bold tracking-tight">{selected.subjectName}</h2>
+          </div>
+          <Rating label="Self rating" value={rating} onChange={setRating} />
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              <span className="section-label mb-2 block">Hours</span>
+              <input type="number" min="0" step=".5" value={hours} onChange={(event) => setHours(event.target.value)} className="app-input px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="section-label mb-2 block">Questions</span>
+              <input type="number" min="0" value={questions} onChange={(event) => setQuestions(event.target.value)} className="app-input px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <Rating label="Confidence" value={confidence} onChange={setConfidence} />
+          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Weak sub-topics, mistakes, revision needed..." className="app-input min-h-24 p-3 text-sm" />
+          <div className="flex justify-end gap-3 pt-1">
+            <button type="button" onClick={() => setSelected(null)} className="btn-quiet">Cancel</button>
+            <MicroInteractionButton type="submit" loading={saving} className="btn-primary">Save</MicroInteractionButton>
+          </div>
+        </form>
+      </div>
+    ) : null}
   </AppShell>;
 }
 
 function Metric({ label, value, suffix }: { label: string; value: number; suffix: string }) { return <div className="surface p-4"><p className="section-label">{label}</p><p className="mt-4 text-2xl font-semibold"><AnimatedNumber value={value} /><span className="ml-1 text-sm text-[var(--text-secondary)]">{suffix}</span></p></div>; }
-function Rating({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <div><span className="section-label mb-2 block">{label}</span><div className="grid grid-cols-5 gap-2">{[1,2,3,4,5].map((item) => <button key={item} type="button" onClick={() => onChange(String(item))} className={`focus-ring rounded-lg border px-3 py-2 font-semibold ${Number(value) === item ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)]"}`}>{item}</button>)}</div></div>; }
+function Rating({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { 
+  return <div>
+    <span className="section-label mb-2.5 block">{label}</span>
+    <div className="flex justify-center gap-3">
+      {[1,2,3,4,5].map((item) => {
+        const isSelected = Number(value) === item;
+        return (
+          <button 
+            key={item} 
+            type="button" 
+            onClick={() => onChange(String(item))} 
+            className={`focus-ring h-11 w-11 flex items-center justify-center rounded-full font-bold text-sm transition-all duration-150 border ${
+              isSelected 
+                ? "border-[var(--accent)] bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/15 scale-105" 
+                : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            {item}
+          </button>
+        );
+      })}
+    </div>
+  </div>; 
+}
