@@ -123,6 +123,16 @@ export function AppShell({
               </Link>
               {actions ? <div className="shrink-0">{actions}</div> : null}
             </div>
+            <nav className="tablet-nav" aria-label="Tablet navigation">
+              {navItems.map((item) => {
+                const active = isActive(pathname, item.href);
+                return (
+                  <Link key={item.href} href={item.href} className={`focus-ring rounded-lg border px-3 py-2 text-xs font-semibold ${active ? "border-[var(--accent)]/25 bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] bg-white text-[var(--text-secondary)]"}`}>
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
           </div>
 
           {title ? (

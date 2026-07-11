@@ -112,6 +112,12 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
 
 /* Mobile-only additions. Everything above this line is the pre-mobile desktop baseline. */
 .mobile-tab-bar { display: none; }
+.tablet-nav { display: none; }
+
+@media (min-width: 901px) and (max-width: 1023px) {
+  .tablet-nav { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.25rem; }
+  .mobile-content-clearance { padding-bottom: 0; }
+}
 
 @media (max-width: 900px) {
   .mobile-content-clearance { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
