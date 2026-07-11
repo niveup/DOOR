@@ -52,11 +52,11 @@ interface ThreadItem {
 }
 
 const suggestedPrompts = [
-  "Explain Fourier Series",
-  "What is Heap Memory?",
-  "Kirchhoff's Laws",
-  "Difference between Stack and Queue",
-  "Why does Binary Search work?",
+ "Explain entropy and irreversibility",
+ "Mohr’s circle for plane stress",
+ "Boundary layer separation",
+ "Vapour compression refrigeration cycle",
+ "Casting defects and remedies",
 ];
 
 interface LearningStyle {
@@ -391,7 +391,6 @@ export default function ExplainerPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-passcode": "1234",
         },
         body: JSON.stringify({
           topic: queryText,

@@ -45,7 +45,7 @@ export function ModelSelector({
   const loadModels = useCallback(async (provider: AiProviderName, selectedModel: string) => {
     try {
       const response = await fetch(`${backendUrl}/api/ai/models?provider=${provider}`, {
-        headers: { "x-passcode": "1234" },
+        headers: {},
       });
       const result = await response.json();
       const nextModels = Array.isArray(result.models) ? result.models : [];
@@ -59,7 +59,7 @@ export function ModelSelector({
     setLoading(true);
     try {
       const response = await fetch(`${backendUrl}/api/ai/config`, {
-        headers: { "x-passcode": "1234" },
+        headers: {},
       });
       const result = await response.json() as AiConfigurationResponse;
       if (!response.ok) throw new Error("AI configuration unavailable.");

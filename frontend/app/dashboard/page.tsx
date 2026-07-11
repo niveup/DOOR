@@ -168,7 +168,7 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const res = await fetch(`${backendUrl}/api/routine/today`, {
-        headers: { "x-passcode": "1234" },
+        headers: {},
       });
       if (res.ok) {
         const data = (await res.json()) as RoutinePlan | null;
@@ -187,7 +187,7 @@ export default function Dashboard() {
   const fetchTrackerStatus = useCallback(async () => {
     try {
       const res = await fetch(`${backendUrl}/api/tracker/status`, {
-        headers: { "x-passcode": "1234" },
+        headers: {},
       });
       if (!res.ok) return;
       const result = (await res.json()) as TrackerStatus;
@@ -236,7 +236,6 @@ export default function Dashboard() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-passcode": "1234",
           },
           body: JSON.stringify({ status }),
         });
@@ -313,7 +312,6 @@ export default function Dashboard() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-passcode": "1234",
         },
         body: JSON.stringify({
           messages: nextMessages.map((message) => ({ role: message.role, content: message.content })),
@@ -362,7 +360,6 @@ export default function Dashboard() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-passcode": "1234",
         },
         body: JSON.stringify({ tasks: planChatDraft }),
       });
@@ -395,7 +392,6 @@ export default function Dashboard() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-passcode": "1234",
         },
         body: JSON.stringify({
           tasks: manualTasks.map((task) => ({
@@ -435,7 +431,7 @@ export default function Dashboard() {
     try {
       const res = await fetch(`${backendUrl}/api/routine/today`, {
         method: "DELETE",
-        headers: { "x-passcode": "1234" },
+        headers: {},
       });
       if (res.ok) {
         setPlan(null);
@@ -471,7 +467,7 @@ export default function Dashboard() {
     return Math.round(earnedScore / activeWeight);
   }, [plan]);
 
-  const visibleTasks = plan?.tasks?.length ? plan.tasks : sampleTasks;
+  const visibleTasks = plan?.tasks || [];
   const completedCount = plan?.tasks.filter((task) => task.status === "COMPLETED").length || 0;
   const totalMinutes = visibleTasks.reduce((sum, task) => sum + task.durationMin, 0);
   const completedMinutes = plan?.tasks.reduce(

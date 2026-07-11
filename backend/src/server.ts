@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import cors from "cors";
 import dotenv from "dotenv";
 import fs from "fs";
@@ -20,7 +21,10 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const prisma = new PrismaClient();
 
-const allowedOrigins = ["http://localhost:3000", "https://jujum.vercel.app"];
+const isProduction = process.env.NODE_ENV === "production";
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || (isProduction ? "" : "http://localhost:3000"))
+ .split(",").map((value) => value.trim()).filter(Boolean);
+if (isProduction && allowedOrigins.length === 0) throw new Error("ALLOWED_ORIGINS is required in production.");
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -46,7 +50,7 @@ app.use(cors({
         hostname.startsWith("172.16.") ||
         hostname.endsWith(".local");
 
-      if (isLocalIp) {
+      if (!isProduction && isLocalIp) {
         console.log(`[CORS] Allowed (Local IP): ${origin}`);
         return callback(null, true);
       }
@@ -61,7 +65,7 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "x-passcode", "x-cron-secret"]
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: "64kb" }));
 
 // --- Helper Functions ---
 
@@ -222,24 +226,15 @@ async function publicAiConfiguration() {
 // --- Middleware ---
 
 function passcodeAuth(req: Request, res: Response, next: NextFunction) {
-  // Allow healthcheck and cron routes without standard passcode if cron secret matches
-  if (req.path === "/health") {
-    return next();
-  }
-
-  const cronSecretHeader = req.headers["x-cron-secret"] || req.query.secret;
-  if (req.path.startsWith("/cron") && cronSecretHeader === process.env.CRON_SHARED_SECRET) {
-    return next();
-  }
-
-  const passcodeHeader = req.headers["x-passcode"];
-  const correctPasscode = process.env.APP_PASSCODE || "1234";
-
-  if (passcodeHeader === correctPasscode) {
-    return next();
-  }
-
-  return res.status(401).json({ error: "Unauthorized: Invalid passcode" });
+ if (req.path === "/health") return next();
+ const expectedCron = process.env.CRON_SHARED_SECRET;
+ const cronHeader = typeof req.headers["x-cron-secret"] === "string" ? req.headers["x-cron-secret"] : "";
+ if (req.path.startsWith("/cron") && expectedCron && cronHeader && crypto.timingSafeEqual(crypto.createHash("sha256").update(cronHeader).digest(), crypto.createHash("sha256").update(expectedCron).digest())) return next();
+ const expected = process.env.APP_PASSCODE;
+ if (!expected || expected.length < 8) return res.status(503).json({ error: "Backend authentication is not configured." });
+ const received = typeof req.headers["x-passcode"] === "string" ? req.headers["x-passcode"] : "";
+ if (crypto.timingSafeEqual(crypto.createHash("sha256").update(received).digest(), crypto.createHash("sha256").update(expected).digest())) return next();
+ return res.status(401).json({ error: "Unauthorized" });
 }
 
 app.use(passcodeAuth);
@@ -444,8 +439,8 @@ app.post("/api/journal", async (req: Request, res: Response) => {
   const { entryText, mood, tags, studyDone, exerciseDone, readingDone } = req.body;
   const today = getKolkataDate();
 
-  if (!entryText || entryText.trim().length < 20) {
-    return res.status(400).json({ error: "Journal entry must be at least 20 characters." });
+  if (typeof entryText !== "string" || entryText.trim().length < 20 || entryText.length > 5000) {
+    return res.status(400).json({ error: "Journal entry must be between 20 and 5000 characters." });
   }
 
   try {

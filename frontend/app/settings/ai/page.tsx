@@ -48,7 +48,7 @@ export default function AiSettingsPage() {
   const loadModels = useCallback(async (nextProvider: ProviderName) => {
     try {
       const response = await fetch(`${backendUrl}/api/ai/models?provider=${nextProvider}`, {
-        headers: { "x-passcode": "1234" },
+        headers: {},
       });
       const result = await response.json();
       setModels(Array.isArray(result.models) ? result.models : []);
@@ -61,7 +61,7 @@ export default function AiSettingsPage() {
     setLoading(true);
     try {
       const response = await fetch(`${backendUrl}/api/ai/config`, {
-        headers: { "x-passcode": "1234" },
+        headers: {},
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI settings could not be loaded.");
@@ -104,7 +104,6 @@ export default function AiSettingsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-passcode": "1234",
         },
         body: JSON.stringify({ provider, model, apiKey: apiKey.trim() || undefined }),
       });
@@ -130,7 +129,6 @@ export default function AiSettingsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-passcode": "1234",
         },
         body: JSON.stringify({ provider }),
       });
