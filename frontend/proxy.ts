@@ -3,35 +3,31 @@ import type { NextRequest } from "next/server";
 import { getIronSession } from "iron-session";
 import { sessionOptions } from "./lib/session";
 
-// NOTE: Next.js only executes middleware from a file named `middleware.ts`
-// at the project root, exporting a function named `middleware`. The previous
-// `proxy.ts` / `proxy()` was never invoked, so the passcode gate did nothing.
-export async function middleware(request: NextRequest) {
-  const res = NextResponse.next();
-
+// Next.js 16 renamed middleware.ts to proxy.ts. Keep this check cheap: it only
+// verifies the signed, httpOnly session cookie and never calls a database.
+export async function proxy(request: NextRequest) {
+  const response = NextResponse.next();
   const session = await getIronSession<{ isLoggedIn?: boolean }>(
     request,
-    res,
+    response,
     sessionOptions
   );
-
   const { pathname } = request.nextUrl;
 
-  // Public resources, the passcode page, and the login API bypass the gate.
   if (
     pathname.startsWith("/passcode") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
   ) {
-    return res;
+    return response;
   }
 
   if (!session.isLoggedIn) {
     return NextResponse.redirect(new URL("/passcode", request.url));
   }
 
-  return res;
+  return response;
 }
 
 export const config = {
