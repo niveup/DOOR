@@ -1,26 +1,16 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { AppShell, PageSection } from "@/components/AppShell";
 import { MicroInteractionButton, ProgressBar } from "@/components/MotionComponents";
 
 type Mode = "Technical" | "HR" | "Mixed" | "GD" | "Rapid Fire";
-
-type Dimension = {
-  label: string;
-  value: number;
-};
-
-type Feedback = {
-  score: number;
-  dimensions: Dimension[];
-  missing: string[];
-  improved: string;
-};
+type Dimension = { label: string; value: number };
+type Feedback = { score: number; dimensions: Dimension[]; missing: string[]; improved: string };
+type EvaluationResponse = Feedback & { error?: string };
 
 const companies = ["BHEL", "ONGC", "IOCL", "NTPC", "HPCL", "BPCL", "GAIL", "SAIL", "DRDO", "ISRO", "Other"];
 const modes: Mode[] = ["Technical", "HR", "Mixed", "GD", "Rapid Fire"];
-
 const questionBank: Record<Mode, string[]> = {
   Technical: [
     "Explain the difference between impulse and reaction turbines with one practical example.",
@@ -64,24 +54,6 @@ const questionBank: Record<Mode, string[]> = {
   ],
 };
 
-const technicalTerms = [
-  "cycle",
-  "efficiency",
-  "pressure",
-  "temperature",
-  "stress",
-  "strain",
-  "flow",
-  "entropy",
-  "safety",
-  "maintenance",
-  "turbine",
-  "pump",
-  "heat",
-  "load",
-  "design",
-];
-
 export default function InterviewPage() {
   const [company, setCompany] = useState("BHEL");
   const [mode, setMode] = useState<Mode>("Mixed");
@@ -92,13 +64,15 @@ export default function InterviewPage() {
   const [answeredCount, setAnsweredCount] = useState(0);
   const [running, setRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300);
+  const [evaluating, setEvaluating] = useState(false);
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
   const questions = questionBank[mode];
   const currentQuestion = questions[questionIndex % questions.length];
   const sessionLength = mode === "Rapid Fire" ? 10 : 5;
 
   useEffect(() => {
-    if (!running || mode !== "Rapid Fire") return;
+    if (!running || mode !== "Rapid Fire" || evaluating) return;
     const timer = window.setTimeout(() => {
       if (timeLeft <= 1) {
         setAnsweredCount((count) => Math.min(sessionLength, count + 1));
@@ -107,71 +81,58 @@ export default function InterviewPage() {
         setFeedback(null);
         setError("");
         setTimeLeft(30);
-        setRunning(true);
         return;
       }
-
       setTimeLeft((value) => value - 1);
     }, 1000);
-
     return () => window.clearTimeout(timer);
-  }, [mode, questions.length, running, sessionLength, timeLeft]);
+  }, [evaluating, mode, questions.length, running, sessionLength, timeLeft]);
 
   const progress = Math.min(100, (answeredCount / sessionLength) * 100);
-
   const dimensionAverage = useMemo(() => {
-    if (!feedback) return 0;
+    if (!feedback?.dimensions.length) return 0;
     return feedback.dimensions.reduce((sum, item) => sum + item.value, 0) / feedback.dimensions.length;
   }, [feedback]);
 
-  const evaluateAnswer = (input: string): Feedback => {
-    const words = input.trim().split(/\s+/).filter(Boolean);
-    const lower = input.toLowerCase();
-    const termHits = technicalTerms.filter((term) => lower.includes(term)).length;
-    const hasStructure = /first|second|third|because|therefore|example|finally/.test(lower);
-    const hasCompany = lower.includes(company.toLowerCase()) || lower.includes("psu") || lower.includes("plant") || lower.includes("field");
-    const hasHonesty = /weak|improve|learn|miss|mistake|correct/.test(lower);
-
-    const clarity = Math.min(2, words.length > 90 ? 2 : words.length > 35 ? 1.5 : words.length > 15 ? 1 : 0.5);
-    const technical = Math.min(2, termHits >= 5 ? 2 : termHits >= 3 ? 1.5 : termHits >= 1 ? 1 : 0.5);
-    const structure = hasStructure ? 2 : words.length > 60 ? 1.25 : 0.75;
-    const psuFit = hasCompany ? 2 : 1;
-    const honesty = hasHonesty ? 2 : 1;
-    const dimensions = [
-      { label: "Clarity", value: clarity },
-      { label: "Technical", value: technical },
-      { label: "Structure", value: structure },
-      { label: "PSU fit", value: psuFit },
-      { label: "Honesty", value: honesty },
-    ];
-    const score = Math.max(1, Math.min(10, Math.round(dimensions.reduce((sum, item) => sum + item.value, 0))));
-    const missing = [
-      words.length < 50 ? "Add a sharper opening and one concrete example." : "Tighten the ending into a direct conclusion.",
-      termHits < 3 ? "Use more precise Mechanical Engineering terms." : "Keep technical terms connected to the actual question.",
-      !hasCompany ? `Connect the answer to ${company} or PSU field responsibility.` : "Mention measurable impact or safety where relevant.",
-    ];
-
-    return {
-      score,
-      dimensions,
-      missing,
-      improved: `A stronger answer would start with the direct concept, add one mechanical example, and then connect it to ${company} work culture. Keep it crisp: definition, reason, practical implication, and an honest line about how you would verify or improve in the field.`,
-    };
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (answer.trim().length < 20) {
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const preservedAnswer = answer.trim();
+    if (preservedAnswer.length < 20) {
       setError("Write at least 20 characters before scoring the answer.");
       return;
     }
-    setError("");
-    setFeedback(evaluateAnswer(answer));
-    setAnsweredCount((count) => Math.min(sessionLength, count + 1));
+
+    setEvaluating(true);
     setRunning(false);
+    setError("");
+    setFeedback(null);
+
+    try {
+      const response = await fetch(`${backendUrl}/api/interview/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-passcode": "1234" },
+        body: JSON.stringify({ company, mode, question: currentQuestion, answer: preservedAnswer }),
+      });
+      const result = (await response.json()) as EvaluationResponse;
+      if (!response.ok) throw new Error(result.error || "The AI evaluator could not score this answer.");
+      if (!Array.isArray(result.dimensions) || result.dimensions.length !== 5 || !Array.isArray(result.missing)) {
+        throw new Error("The evaluator returned incomplete feedback. Please retry.");
+      }
+      setFeedback(result);
+      setAnsweredCount((count) => Math.min(sessionLength, count + 1));
+    } catch (evaluationError) {
+      setError(
+        evaluationError instanceof Error
+          ? `${evaluationError.message} Your answer is still here.`
+          : "The AI evaluator is unavailable. Your answer is still here; please retry."
+      );
+    } finally {
+      setEvaluating(false);
+    }
   };
 
   const handleModeChange = (nextMode: Mode) => {
+    if (evaluating) return;
     setMode(nextMode);
     setQuestionIndex(0);
     setAnswer("");
@@ -183,6 +144,7 @@ export default function InterviewPage() {
   };
 
   const handleNext = () => {
+    if (evaluating) return;
     setQuestionIndex((index) => (index + 1) % questions.length);
     setAnswer("");
     setFeedback(null);
@@ -192,174 +154,77 @@ export default function InterviewPage() {
   };
 
   const handleSkip = () => {
+    if (evaluating) return;
     setAnsweredCount((count) => Math.min(sessionLength, count + 1));
     handleNext();
   };
 
   return (
-    <AppShell
-      eyebrow="Mock interview and GD prep"
-      title="Practice like the panel is already waiting"
-      subtitle="Choose the PSU, choose the round, answer one prompt at a time, and get a rubric-style score with concrete missing points."
-    >
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-        <PageSection title="Session Controls" eyebrow="Setup" className="xl:col-span-4">
-          <div className="surface space-y-5 p-5">
-            <label className="block">
-              <span className="section-label mb-2 block">Company</span>
-              <select value={company} onChange={(e) => setCompany(e.target.value)} className="app-input px-3 py-2.5 text-sm font-bold">
-                {companies.map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-            </label>
-
-            <div>
-              <span className="section-label mb-2 block">Mode</span>
-              <div className="grid grid-cols-2 gap-2">
-                {modes.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => handleModeChange(item)}
-                    className={`focus-ring rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${
-                      mode === item
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                        : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
+    <AppShell eyebrow="PSU preparation" title="Interview practice" subtitle="Answer one question at a time. The AI scores what you actually wrote, then shows the missing points and a stronger version.">
+      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
+        <aside className="space-y-5">
+          <section className="surface p-4">
+            <label className="mb-2 block text-xs font-bold text-[var(--text-secondary)]" htmlFor="company">Company</label>
+            <select id="company" value={company} onChange={(event) => setCompany(event.target.value)} disabled={evaluating} className="app-input px-3 py-2.5 text-sm font-bold">
+              {companies.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <p className="section-label mb-3 mt-5">Mode</p>
+            <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
+              {modes.map((item) => (
+                <button key={item} type="button" onClick={() => handleModeChange(item)} disabled={evaluating} className={`focus-ring min-h-11 rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${mode === item ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"}`}>
+                  {item}
+                </button>
+              ))}
             </div>
+          </section>
 
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <span className="section-label">Session</span>
-                <span className="pill pill-blue">{answeredCount}/{sessionLength}</span>
-              </div>
-              <div className="mt-4"><ProgressBar value={progress} tone="blue" /></div>
-              <p className="mt-3 text-sm font-medium leading-6 text-[var(--text-secondary)]">
-                Default rounds run 5 questions. Rapid Fire runs 10 prompts with a 30-second clock.
-              </p>
-            </div>
-
+          <section className="surface p-4">
+            <div className="mb-3 flex items-center justify-between text-xs"><span className="font-bold">Session</span><span className="tabular-nums text-[var(--text-secondary)]">{answeredCount}/{sessionLength}</span></div>
+            <ProgressBar value={progress} tone="blue" />
+            <p className="muted-copy mt-3">Default rounds use 5 questions. Rapid Fire uses 10 prompts and a 30-second clock.</p>
             {mode === "Rapid Fire" ? (
-              <div className="rounded-lg border border-[var(--warning)]/20 bg-[var(--warning-soft)] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="section-label text-[var(--warning)]">Clock</span>
-                  <span className="text-2xl font-semibold tabular-nums text-[var(--warning)]">{timeLeft}s</span>
-                </div>
-                <MicroInteractionButton onClick={() => setRunning((value) => !value)} className="btn-secondary mt-3 w-full">
-                  {running ? "Pause" : "Start"}
-                </MicroInteractionButton>
+              <div className="mt-4 rounded-lg bg-[var(--bg-elevated)] p-3">
+                <div className="flex items-center justify-between"><span className="text-xs font-bold">Clock</span><strong className="tabular-nums">{timeLeft}s</strong></div>
+                <button type="button" onClick={() => setRunning((value) => !value)} disabled={evaluating} className="btn-secondary mt-3 w-full">{running ? "Pause" : "Start"}</button>
               </div>
             ) : null}
+          </section>
+        </aside>
+
+        <form onSubmit={handleSubmit} className="surface p-5 sm:p-6">
+          <div className="mb-5 flex items-center justify-between gap-4"><span className="pill pill-blue">Question {(questionIndex % questions.length) + 1}</span><span className="text-xs font-semibold text-[var(--text-secondary)]">{mode}</span></div>
+          <h2 className="max-w-3xl text-xl font-bold leading-8 text-[var(--text-primary)]">{currentQuestion}</h2>
+          <label className="mb-2 mt-6 block text-xs font-bold" htmlFor="interview-answer">Your answer</label>
+          <textarea id="interview-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} disabled={evaluating} placeholder="Answer as you would speak in the room: direct opening, technical detail, practical example, honest closing." className="app-input min-h-[220px] resize-y px-4 py-3 text-sm leading-6" />
+          {evaluating ? <p className="mt-3 text-xs font-semibold text-[var(--accent)]" role="status">AI is checking this exact answer against the {mode} rubric…</p> : null}
+          {error ? <p className="mt-3 rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm font-semibold text-[var(--danger)]" role="alert">{error}</p> : null}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button type="button" onClick={handleSkip} disabled={evaluating} className="btn-quiet">Skip</button>
+            <MicroInteractionButton type="submit" loading={evaluating} disabled={answer.trim().length < 20} className="btn-primary">Score answer</MicroInteractionButton>
+            {feedback ? <button type="button" onClick={handleNext} className="btn-secondary">Next question</button> : null}
           </div>
-        </PageSection>
+        </form>
 
-        <PageSection title="Question" eyebrow={`${company} - ${mode}`} className="xl:col-span-8">
-          <form onSubmit={handleSubmit} className="surface p-5">
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <span className="pill pill-teal">Question {(questionIndex % questions.length) + 1}</span>
-                <span className="text-xs font-semibold text-[var(--text-secondary)]">{mode}</span>
-              </div>
-              <h2 className="text-xl font-semibold leading-tight tracking-tight text-[var(--text-primary)]">{currentQuestion}</h2>
-            </div>
-
-            <label className="mt-5 block">
-              <span className="section-label mb-2 block">Your answer</span>
-              <textarea
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Answer like you would speak in the room: direct opening, technical detail, practical example, honest closing."
-                className="app-input min-h-[190px] resize-none px-4 py-3 text-sm leading-6"
-              />
-            </label>
-
-            {error ? (
-              <div className="mt-4 rounded-lg border border-[var(--danger)]/20 bg-[var(--danger-soft)] px-4 py-3 text-sm font-semibold text-[var(--danger)]">
-                {error}
-              </div>
-            ) : null}
-
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <MicroInteractionButton type="button" onClick={handleSkip} className="btn-secondary">
-                Skip
-              </MicroInteractionButton>
-              <MicroInteractionButton type="submit" className="btn-primary">
-                Score answer
-              </MicroInteractionButton>
-              <MicroInteractionButton type="button" onClick={handleNext} className="btn-quiet">
-                Next question
-              </MicroInteractionButton>
-            </div>
-          </form>
-        </PageSection>
-      </section>
-
-      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
-        <PageSection title="Rubric" eyebrow="Evaluation" className="xl:col-span-5">
-          <div className="surface min-h-[360px] p-5">
+        <div className="space-y-5" aria-live="polite">
+          <PageSection title="Five-part rubric" eyebrow="AI evaluation">
             {feedback ? (
-              <div>
-                <div className="flex items-end justify-between gap-4 border-b border-[var(--border)] pb-4">
-                  <div>
-                    <p className="section-label mb-2">Score</p>
-                    <p className="text-3xl font-semibold tracking-tight text-[var(--text-primary)]">{feedback.score}<span className="text-lg text-[var(--text-secondary)]">/10</span></p>
-                  </div>
-                  <span className="pill pill-blue">Avg {dimensionAverage.toFixed(1)}/2</span>
-                </div>
-                <div className="mt-5 space-y-3">
-                  {feedback.dimensions.map((item) => (
-                    <div key={item.label}>
-                      <div className="mb-1.5 flex items-center justify-between text-xs font-semibold text-[var(--text-secondary)]">
-                        <span>{item.label}</span>
-                        <span>{item.value}/2</span>
-                      </div>
-                      <ProgressBar value={(item.value / 2) * 100} tone={item.value >= 1.5 ? "green" : "amber"} />
-                    </div>
-                  ))}
-                </div>
+              <div className="surface p-4">
+                <div className="mb-5 flex items-end justify-between"><div><p className="section-label">Score</p><strong className="mt-1 block text-3xl tabular-nums">{feedback.score}<span className="text-sm text-[var(--text-secondary)]"> /10</span></strong></div><span className="pill pill-blue">Avg {dimensionAverage.toFixed(1)}/2</span></div>
+                <div className="space-y-3">{feedback.dimensions.map((item) => <div key={item.label}><div className="mb-1 flex justify-between text-xs"><span>{item.label}</span><strong>{item.value}/2</strong></div><ProgressBar value={(item.value / 2) * 100} tone={item.value >= 1.5 ? "green" : "amber"} /></div>)}</div>
               </div>
             ) : (
-              <div className="flex min-h-[310px] flex-col items-center justify-center text-center">
-                <span className="grid h-12 w-12 place-items-center rounded-lg bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent)]">R</span>
-                <h3 className="mt-4 text-base font-semibold text-[var(--text-primary)]">Rubric appears after scoring</h3>
-                <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-[var(--text-secondary)]">The local evaluator follows the five-dimension scoring shape.</p>
-              </div>
+              <div className="surface-flat p-5 text-center"><div className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[var(--accent-soft)] font-bold text-[var(--accent)]">R</div><h3 className="mt-3 font-bold">Rubric appears after scoring</h3><p className="muted-copy mt-1">The real AI evaluator uses mode-specific dimensions.</p></div>
             )}
-          </div>
-        </PageSection>
+          </PageSection>
 
-        <PageSection title="Feedback" eyebrow="Missing points" className="xl:col-span-7">
-          <div className="surface min-h-[360px] p-5">
+          <PageSection title="What to improve" eyebrow="Coach notes">
             {feedback ? (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-lg border border-[var(--border)] bg-white p-4">
-                  <p className="section-label mb-3">Missing points</p>
-                  <ul className="space-y-3 text-sm font-medium leading-6 text-[var(--text-secondary)]">
-                    {feedback.missing.map((item) => (
-                      <li key={item} className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-3">{item}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] p-4">
-                  <p className="section-label text-[var(--accent)]">Improved answer shape</p>
-                  <p className="mt-3 text-sm font-semibold leading-6 text-[var(--text-primary)]">{feedback.improved}</p>
-                </div>
-              </div>
+              <div className="surface p-4"><h3 className="text-sm font-bold">Missing points</h3><ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-[var(--text-secondary)]">{feedback.missing.map((item) => <li key={item}>{item}</li>)}</ul><div className="mt-5 border-t border-[var(--border)] pt-4"><h3 className="text-sm font-bold">Improved answer</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{feedback.improved}</p></div></div>
             ) : (
-              <div className="flex min-h-[310px] flex-col items-center justify-center text-center">
-                <span className="grid h-12 w-12 place-items-center rounded-lg bg-[var(--teal-soft)] text-sm font-semibold text-[var(--teal)]">I</span>
-                <h3 className="mt-4 text-base font-semibold text-[var(--text-primary)]">Answer first, polish second</h3>
-                <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-[var(--text-secondary)]">Submit an answer to see missing points and a tighter response structure.</p>
-              </div>
+              <div className="surface-flat p-5 text-center"><div className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[var(--sun-soft)] font-bold text-[var(--sun)]">I</div><h3 className="mt-3 font-bold">Answer first, polish second</h3><p className="muted-copy mt-1">Your draft stays in the editor if evaluation fails.</p></div>
             )}
-          </div>
-        </PageSection>
+          </PageSection>
+        </div>
       </div>
     </AppShell>
   );
