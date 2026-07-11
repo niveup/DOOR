@@ -30,8 +30,17 @@ jobs:
       - run: python3 scripts/apply_markdown_consistency.py
       - working-directory: frontend
         run: npm install --legacy-peer-deps --no-audit --no-fund
-      - working-directory: frontend
-        run: npm run build
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          set +e
+          npm run build 2>&1 | tee /tmp/frontend-build.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            message=$(tail -80 /tmp/frontend-build.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+            echo "::error::$message"
+          fi
+          exit "$code"
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
