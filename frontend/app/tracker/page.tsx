@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
 import { AppShell, PageSection } from "@/components/AppShell";
 import { AiMarkdown } from "@/components/AiMarkdown";
 import { AnimatedNumber, EmptyState, MicroInteractionButton, ProgressBar } from "@/components/MotionComponents";
@@ -59,19 +60,22 @@ export default function TrackerPage() {
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Readiness" value={data?.overallReadiness || 0} suffix="%" /><Metric label="Logged" value={subjects.filter((item) => item.latestRating !== null).length} suffix="/14" /><Metric label="Weak" value={weak} suffix="" /><Metric label="Neglected" value={neglected} suffix="" /></section>
     {data?.weeklyAnalysis ? <PageSection title="Weekly analysis" eyebrow="AI review"><div className="surface p-5"><AiMarkdown content={data.weeklyAnalysis} /></div></PageSection> : null}
     <PageSection title="Subjects" eyebrow="Weekly input" action={
-      <div className="flex items-center gap-1 rounded-full bg-[var(--bg-elevated)] p-1 border border-[var(--border)]">
+      <div className="relative flex items-center rounded-full bg-[var(--bg-elevated)] p-1 border border-[var(--border)] w-fit z-0">
         {filters.map((item) => {
           const isSelected = filter === item.id;
           return (
             <button 
               key={item.id} 
               onClick={() => setFilter(item.id)} 
-              className={`focus-ring rounded-full px-3.5 py-1.5 text-xs font-bold transition-all duration-150 ${
-                isSelected 
-                  ? "bg-[var(--bg-card)] text-[var(--accent)] shadow-xs border border-[var(--border-strong)]/10" 
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
+              className="focus-ring relative rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors duration-250 text-[var(--text-secondary)] hover:text-[var(--text-primary)] z-10 border border-transparent"
             >
+              {isSelected && (
+                <motion.div 
+                  layoutId="active-filter" 
+                  className="absolute inset-0 bg-[var(--bg-card)] rounded-full border border-[var(--border-strong)]/10 shadow-xs -z-10"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
               {item.label}
             </button>
           );
@@ -85,7 +89,13 @@ export default function TrackerPage() {
           ))}
         </div>
       ) : visible.length ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <motion.div 
+          key={filter}
+          initial={{ opacity: 0.88, y: 3 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.16, ease: "easeOut" }}
+          className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+        >
           {visible.map((subject) => (
             <article key={subject.subjectId} className="surface p-4 flex flex-col justify-between">
               <div>
@@ -122,7 +132,7 @@ export default function TrackerPage() {
               </div>
             </article>
           ))}
-        </div>
+        </motion.div>
       ) : (
         <EmptyState mark="T" title="No subjects in this filter" description="Switch filters or add a weekly rating to bring subjects into view." className="min-h-[320px]" />
       )}
