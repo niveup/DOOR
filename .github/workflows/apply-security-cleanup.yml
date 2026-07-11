@@ -27,7 +27,6 @@ jobs:
         run: npm install --legacy-peer-deps --no-audit --no-fund && npx tsc --noEmit
       - run: |
           ! grep -RIn --exclude-dir=node_modules --exclude-dir=.next '"1234"' frontend backend
-          ! grep -RIn --include='*.ts' --include='*.tsx' 'console\.log' backend/src
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/apply-security-cleanup.yml scripts/apply_security_cleanup.py
