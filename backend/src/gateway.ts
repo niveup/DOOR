@@ -207,7 +207,7 @@ app.all("*", async (req, res) => {
   }
   const body = Buffer.isBuffer(req.body) && req.body.length ? req.body : undefined;
   try {
-    const upstream = await fetch(target, { method: req.method, headers, body, redirect: "manual" });
+    const upstream = await fetch(target, { method: req.method, headers, body: body as any, redirect: "manual" });
     upstream.headers.forEach((value, name) => {
       if (!["content-encoding", "transfer-encoding", "connection"].includes(name.toLowerCase())) res.setHeader(name, value);
     });
