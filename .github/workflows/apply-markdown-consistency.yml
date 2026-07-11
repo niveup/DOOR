@@ -3,10 +3,16 @@ name: Apply Markdown consistency patch
 on:
   push:
     branches: [fix/interview-ai-and-consistency]
-    paths: [.github/workflows/apply-markdown-consistency.yml]
+    paths:
+      - .github/workflows/apply-markdown-consistency.yml
+      - scripts/apply_markdown_consistency.py
 
 permissions:
   contents: write
+
+concurrency:
+  group: markdown-consistency-patch
+  cancel-in-progress: true
 
 jobs:
   patch-and-verify:
