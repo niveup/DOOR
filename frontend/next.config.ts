@@ -5,6 +5,15 @@ const devOrigins = (process.env.NEXT_PUBLIC_DEV_ORIGINS || "localhost:3000")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// ============================================================================
+// TROUBLESHOOTING PORT: IF ANYTHING BREAKS (CSP, WEBSOCKETS, HMR, OR PORT ISSUES), CHECK HERE!
+//
+// This block controls the Content Security Policy (CSP) and security headers.
+// - If you see console errors like "eval() is not supported" or HMR WebSocket 
+//   connection issues in development, check this configuration.
+// - In development mode (isDev = true), we allow 'unsafe-eval' and localhost 
+//   ws:// / http:// origins so debugging and hot-reloading work correctly.
+// ============================================================================
 const isDev = process.env.NODE_ENV === "development";
 
 const contentSecurityPolicy = [
