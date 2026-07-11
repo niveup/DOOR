@@ -2,9 +2,14 @@ name: Apply security cleanup
 on:
   push:
     branches: [fix/audit-report-2026-07-11]
-    paths: [.github/workflows/apply-security-cleanup.yml]
+    paths:
+      - .github/workflows/apply-security-cleanup.yml
+      - scripts/apply_security_cleanup.py
 permissions:
   contents: write
+concurrency:
+  group: security-cleanup
+  cancel-in-progress: true
 jobs:
   patch:
     runs-on: ubuntu-latest
