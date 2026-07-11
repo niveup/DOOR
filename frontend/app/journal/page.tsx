@@ -40,7 +40,7 @@ export default function JournalPage() {
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const response = await fetch(`${backendUrl}/api/journal/history?limit=30`, { headers: { "x-passcode": "1234" } });
+      const response = await fetch(`${backendUrl}/api/journal/history?limit=30`, { headers: {} });
       const result = (await response.json()) as JournalHistoryResponse & { error?: string };
       if (!response.ok) throw new Error(result.error || "Journal history could not be loaded.");
       setHistory(Array.isArray(result.entries) ? result.entries : []);
@@ -58,7 +58,7 @@ export default function JournalPage() {
     setLoading(true); setError(""); setLastSavedTask(""); setLastFeedback("");
     try {
       const response = await fetch(`${backendUrl}/api/journal`, {
-        method: "POST", headers: { "Content-Type": "application/json", "x-passcode": "1234" },
+        method: "POST", headers: { "Content-Type": "application/json",},
         body: JSON.stringify({ entryText, mood, tags, studyDone, exerciseDone, readingDone, aiProvider: aiSelection.provider, aiModel: aiSelection.model }),
       });
       const result = (await response.json()) as JournalResponse;

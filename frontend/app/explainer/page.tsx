@@ -391,7 +391,6 @@ export default function ExplainerPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-passcode": "1234",
         },
         body: JSON.stringify({
           topic: queryText,

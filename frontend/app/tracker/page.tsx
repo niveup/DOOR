@@ -30,7 +30,7 @@ export default function TrackerPage() {
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const response = await fetch(`${backendUrl}/api/tracker/status`, { headers: { "x-passcode": "1234" } });
+      const response = await fetch(`${backendUrl}/api/tracker/status`, { headers: {} });
       const result = (await response.json()) as TrackerData & { error?: string };
       if (!response.ok) throw new Error(result.error || "Tracker progress could not be loaded.");
       setData(result); setError(""); localStorage.setItem(cacheKey, JSON.stringify(result));
@@ -49,7 +49,7 @@ export default function TrackerPage() {
   const saveRating = async (event: React.FormEvent) => {
     event.preventDefault(); if (!selected) return; setSaving(true);
     try {
-      const response = await fetch(`${backendUrl}/api/tracker/rating`, { method: "POST", headers: { "Content-Type": "application/json", "x-passcode": "1234" }, body: JSON.stringify({ subjectId: selected.subjectId, selfRating: Number(rating), hoursStudied: Number(hours), questionsSolved: Number(questions), confidenceLevel: Number(confidence), notes }) });
+      const response = await fetch(`${backendUrl}/api/tracker/rating`, { method: "POST", headers: { "Content-Type": "application/json",}, body: JSON.stringify({ subjectId: selected.subjectId, selfRating: Number(rating), hoursStudied: Number(hours), questionsSolved: Number(questions), confidenceLevel: Number(confidence), notes }) });
       if (!response.ok) throw new Error("Could not save rating."); setSelected(null); await refresh(true); toast.success("Weekly rating saved");
     } catch (saveError) { toast.error(saveError instanceof Error ? saveError.message : "Tracker service is offline."); }
     finally { setSaving(false); }

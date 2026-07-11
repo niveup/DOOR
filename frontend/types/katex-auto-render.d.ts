@@ -1,4 +1,4 @@
-﻿declare module "katex/dist/contrib/auto-render.js" {
+declare module "katex/dist/contrib/auto-render.js" {
   export default function renderMathInElement(
     element: HTMLElement,
     options?: {
