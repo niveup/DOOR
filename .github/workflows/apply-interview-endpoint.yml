@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: interview-endpoint-patch
+  cancel-in-progress: true
+
 jobs:
   patch-and-verify:
     runs-on: ubuntu-latest
