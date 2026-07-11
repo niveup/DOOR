@@ -19,7 +19,7 @@ server=server.replace('if (isLocalIp) {', 'if (!isProduction && isLocalIp) {')
 server=server.replace('app.use(express.json());', 'app.use(express.json({ limit: "64kb" }));')
 start=server.find('function passcodeAuth('); end=server.find('app.use(passcodeAuth);',start)
 if start<0 or end<0: raise SystemExit('passcodeAuth markers missing')
-new='''function passcodeAuth(req: Request, res: Response, next: NextFunction) {
+server=server[:start]+'''function passcodeAuth(req: Request, res: Response, next: NextFunction) {
  if (req.path === "/health") return next();
  const expectedCron = process.env.CRON_SHARED_SECRET;
  const cronHeader = typeof req.headers["x-cron-secret"] === "string" ? req.headers["x-cron-secret"] : "";
@@ -31,14 +31,11 @@ new='''function passcodeAuth(req: Request, res: Response, next: NextFunction) {
  return res.status(401).json({ error: "Unauthorized" });
 }
 
-'''
-server=server[:start]+new+server[end:]
-old='''if (!entryText || entryText.trim().length < 20) {
- return res.status(400).json({ error: "Journal entry must be at least 20 characters." });
- }'''
-new_validation='''if (typeof entryText !== "string" || entryText.trim().length < 20 || entryText.length > 5000) {
- return res.status(400).json({ error: "Journal entry must be between 20 and 5000 characters." });
- }'''
-if old not in server: raise SystemExit('journal validation marker missing')
-server=server.replace(old,new_validation,1)
+'''+server[end:]
+pattern=r'if \(!entryText \|\| entryText\.trim\(\)\.length < 20\) \{\s*return res\.status\(400\)\.json\(\{ error: "Journal entry must be at least 20 characters\." \}\);\s*\}'
+replacement='''if (typeof entryText !== "string" || entryText.trim().length < 20 || entryText.length > 5000) {
+    return res.status(400).json({ error: "Journal entry must be between 20 and 5000 characters." });
+  }'''
+server,count=re.subn(pattern,replacement,server,count=1)
+if count!=1: raise SystemExit(f'journal validation replacements: {count}')
 path.write_text(server,encoding='utf-8')
