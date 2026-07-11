@@ -2,11 +2,11 @@
   "name": "jujum-backend",
   "version": "1.0.0",
   "description": "Backend API and Cron Worker for Jujum AI",
-  "main": "dist/server.js",
+  "main": "dist/gateway.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "nodemon --watch src/**/*.ts --exec ts-node src/server.ts",
+    "start": "node dist/gateway.js",
+    "dev": "nodemon --watch src/**/*.ts --exec ts-node src/gateway.ts",
     "prisma:generate": "prisma generate --schema=../prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=../prisma/schema.prisma"
   },
