@@ -77,10 +77,10 @@ export function PlanChatModal({
         role="dialog"
         aria-modal="true"
         aria-label="Plan with AI"
-        initial={{ opacity: 0, scale: 0.98, y: 10 }}
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.98, y: 10 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
+        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        transition={{ type: "spring", stiffness: 280, damping: 26 }}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         className="surface flex h-[88vh] max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden bg-[#FAF9F6] shadow-2xl border border-stone-300 rounded-none text-stone-800"

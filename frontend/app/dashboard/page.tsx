@@ -494,9 +494,9 @@ export default function Dashboard() {
           <MicroInteractionButton onClick={() => setManualPlanOpen(true)} className="btn-secondary">
             Create manually
           </MicroInteractionButton>
-          <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom shadow-xs">
-            <svg className="h-3.5 w-3.5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0V6H3a1 1 0 110-2h1V3a1 1 0 011-1zm12 7a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3h-3a1 1 0 110-2h3v-3a1 1 0 011-1zm-1-6a1 1 0 100 2h.01a1 1 0 100-2H16zm-4 7a1 1 0 100 2h.01a1 1 0 100-2H12zm-3-2a1 1 0 100 2h.01a1 1 0 100-2H9zM4 12a1 1 0 100 2h.01a1 1 0 100-2H4z" clipRule="evenodd" />
+          <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom shadow-xs group">
+            <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90 group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
             </svg>
             Plan with AI
           </MicroInteractionButton>
@@ -571,9 +571,9 @@ export default function Dashboard() {
           <PageSection title="AI Actions" eyebrow="Next move">
             <div className="surface soft-lavender p-4">
               <div className="flex flex-col gap-3 sm:flex-row xl:flex-col 2xl:flex-row">
-                <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom flex-1 shadow-xs">
-                  <svg className="h-3.5 w-3.5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0V6H3a1 1 0 110-2h1V3a1 1 0 011-1zm12 7a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3h-3a1 1 0 110-2h3v-3a1 1 0 011-1zm-1-6a1 1 0 100 2h.01a1 1 0 100-2H16zm-4 7a1 1 0 100 2h.01a1 1 0 100-2H12zm-3-2a1 1 0 100 2h.01a1 1 0 100-2H9zM4 12a1 1 0 100 2h.01a1 1 0 100-2H4z" clipRule="evenodd" />
+                <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom flex-1 shadow-xs group">
+                  <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90 group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
                   </svg>
                   Plan with AI
                 </MicroInteractionButton>
