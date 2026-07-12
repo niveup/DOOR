@@ -326,8 +326,11 @@ export default function SandboxChatPage() {
           </p>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="btn-secondary border border-stone-400 px-6 py-2 shadow-2xs hover:bg-[#F4F2ED] rounded-none font-semibold text-xs tracking-wider"
+            className="btn-ai-custom px-6 py-2 shadow-2xs rounded-none font-semibold text-xs tracking-wider"
           >
+            <svg className="h-3.5 w-3.5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0V6H3a1 1 0 110-2h1V3a1 1 0 011-1zm12 7a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3h-3a1 1 0 110-2h3v-3a1 1 0 011-1zm-1-6a1 1 0 100 2h.01a1 1 0 100-2H16zm-4 7a1 1 0 100 2h.01a1 1 0 100-2H12zm-3-2a1 1 0 100 2h.01a1 1 0 100-2H9zM4 12a1 1 0 100 2h.01a1 1 0 100-2H4z" clipRule="evenodd" />
+            </svg>
             PLAN WITH AI
           </button>
         </div>

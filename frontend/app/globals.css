@@ -144,3 +144,30 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
 @media (prefers-reduced-motion: reduce) {
   .mobile-tab { transition: none; }
 }
+
+.btn-ai-custom {
+  background: #2d2c2a;
+  border: 1px solid #2d2c2a;
+  color: #faf9f6;
+  font-weight: 700;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  min-height: 2.2rem;
+  padding: 0.55rem 1rem;
+  box-shadow: 0 4px 10px rgba(45, 44, 42, 0.08);
+  transition: all var(--duration-standard) var(--ease-standard);
+}
+.btn-ai-custom:hover:not(:disabled) {
+  background: #454340;
+  border-color: #454340;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(45, 44, 42, 0.15);
+}
+.btn-ai-custom:active:not(:disabled) {
+  transform: translateY(0);
+}
+

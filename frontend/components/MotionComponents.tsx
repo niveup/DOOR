@@ -159,6 +159,7 @@ export function EmptyState({
   onAction,
   loading = false,
   className = "",
+  btnClassName = "btn-primary mt-5",
 }: {
   mark?: string;
   title: string;
@@ -167,6 +168,7 @@ export function EmptyState({
   onAction?: () => void;
   loading?: boolean;
   className?: string;
+  btnClassName?: string;
 }) {
   const shouldReduceMotion = useReducedMotion();
 
@@ -183,7 +185,7 @@ export function EmptyState({
       <h3 className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
       <p className="mt-2 max-w-sm text-xs font-medium leading-5 text-[var(--text-secondary)]">{description}</p>
       {actionLabel && onAction ? (
-        <MicroInteractionButton onClick={onAction} loading={loading} className="btn-primary mt-5">
+        <MicroInteractionButton onClick={onAction} loading={loading} className={btnClassName}>
           {actionLabel}
         </MicroInteractionButton>
       ) : null}
