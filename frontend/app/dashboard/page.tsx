@@ -494,14 +494,16 @@ export default function Dashboard() {
           <MicroInteractionButton onClick={() => setManualPlanOpen(true)} className="btn-secondary">
             Create manually
           </MicroInteractionButton>
-          <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom shadow-xs group">
-            <span className="w-4 h-4 flex items-center justify-center shrink-0">
-              <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
-              </svg>
-            </span>
-            <span className="btn-text-slide">Plan with AI</span>
-          </MicroInteractionButton>
+          <span className="btn-ai-wrapper">
+            <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom shadow-xs group">
+              <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
+                </svg>
+              </span>
+              <span className="btn-text-slide">Plan with AI</span>
+            </MicroInteractionButton>
+          </span>
         </>
       }
     >
@@ -573,14 +575,16 @@ export default function Dashboard() {
           <PageSection title="AI Actions" eyebrow="Next move">
             <div className="surface soft-lavender p-4">
               <div className="flex flex-col gap-3 sm:flex-row xl:flex-col 2xl:flex-row">
-                <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom flex-1 shadow-xs group">
-                  <span className="w-4 h-4 flex items-center justify-center shrink-0">
-                    <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
-                    </svg>
-                  </span>
-                  <span className="btn-text-slide">Plan with AI</span>
-                </MicroInteractionButton>
+                <span className="btn-ai-wrapper flex-1">
+                  <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom w-full shadow-xs group">
+                    <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                      <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
+                      </svg>
+                    </span>
+                    <span className="btn-text-slide">Plan with AI</span>
+                  </MicroInteractionButton>
+                </span>
                 <Link href={explainerHref(weakArea)} className="btn-secondary flex-1">
                   Ask AI about weak subject
                 </Link>

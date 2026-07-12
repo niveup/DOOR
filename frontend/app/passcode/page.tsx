@@ -47,7 +47,7 @@ export default function PasscodePage() {
           <div>
             <span className="pill pill-blue">Private study workspace</span>
             <h1 className="mt-8 max-w-xl text-4xl font-semibold leading-tight tracking-tight text-[var(--text-primary)]">
-              Jujum AI keeps study honest.
+              DOOR keeps study honest.
             </h1>
             <p className="mt-5 max-w-lg text-sm font-medium leading-6 text-[var(--text-secondary)]">
               Journal at night, plan in the morning, explain weak concepts during study, and review the 14-subject readiness map every week.
@@ -72,12 +72,12 @@ export default function PasscodePage() {
         <section className="surface flex min-h-[560px] flex-col justify-center p-6 sm:p-8">
           <div className="mx-auto w-full max-w-sm">
             <div className="mb-8 text-center">
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] text-xl font-semibold text-[var(--accent)] shadow-sm">
-                J
+              <div className="mx-auto flex h-14 items-center justify-center text-4xl font-extrabold text-stone-800 font-serif tracking-wider">
+                DOOR
               </div>
-              <h2 className="mt-5 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Unlock Jujum AI</h2>
+              <h2 className="mt-5 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Unlock DOOR</h2>
               <p className="mt-2 text-sm font-medium leading-6 text-[var(--text-secondary)]">
-                Your private GATE and PSU mentor workspace.
+                Your private study and preparation workspace.
               </p>
             </div>
 

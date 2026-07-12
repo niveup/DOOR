@@ -324,17 +324,19 @@ export default function SandboxChatPage() {
           <p className="text-xs text-stone-500 mt-2 mb-6 leading-relaxed font-sans">
             Launch the new popup modal planner. We have completely redesigned the UI layout away from generic templates to a cozy, architectural journal design.
           </p>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="btn-ai-custom px-6 py-2 shadow-2xs rounded-none font-semibold text-xs tracking-wider group"
-          >
-            <span className="w-4 h-4 flex items-center justify-center shrink-0">
-              <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
-              </svg>
-            </span>
-            <span className="btn-text-slide">PLAN WITH AI</span>
-          </button>
+          <span className="btn-ai-wrapper">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="btn-ai-custom px-6 py-2 shadow-2xs rounded-none font-semibold text-xs tracking-wider group"
+            >
+              <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
+                </svg>
+              </span>
+              <span className="btn-text-slide">PLAN WITH AI</span>
+            </button>
+          </span>
         </div>
       </div>
 

@@ -11,8 +11,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Jujum AI - Private GATE and PSU Mentor",
-  description: "A focused study workspace for GATE Mechanical preparation, routine coaching, progress tracking, and PSU interview practice.",
+  title: "DOOR",
+  description: "A focused study workspace for preparation, routine coaching, progress tracking, and interview practice.",
 };
 
 export default function RootLayout({

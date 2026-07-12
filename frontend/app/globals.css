@@ -209,21 +209,58 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   transition: left 0.7s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.btn-ai-custom:hover:not(:disabled) {
+.btn-ai-wrapper {
+  position: relative;
+  display: inline-flex;
+  padding: 10px;
+  margin: -10px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Activation outline ring around the button */
+.btn-ai-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  border: 1.5px double rgba(198, 148, 55, 0);
+  border-radius: 6px;
+  pointer-events: none;
+  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.btn-ai-wrapper:hover::before {
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border-color: rgba(198, 148, 55, 0.4);
+  box-shadow: 0 0 8px rgba(198, 148, 55, 0.08);
+}
+
+/* Direct hover AND wrapper hover selectors */
+.btn-ai-custom:hover:not(:disabled),
+.btn-ai-wrapper:hover .btn-ai-custom {
   color: #1c1917;
   border-color: #c69437;
   box-shadow: 0 6px 16px rgba(198, 148, 55, 0.25);
 }
 
-.btn-ai-custom:hover:not(:disabled) svg {
+.btn-ai-custom:hover:not(:disabled) svg,
+.btn-ai-wrapper:hover .btn-ai-custom svg {
   color: #1c1917 !important;
 }
 
-.btn-ai-custom:hover:not(:disabled)::before {
+.btn-ai-custom:hover:not(:disabled)::before,
+.btn-ai-wrapper:hover .btn-ai-custom::before {
   transform: scaleX(1);
 }
 
-.btn-ai-custom:hover:not(:disabled)::after {
+.btn-ai-custom:hover:not(:disabled)::after,
+.btn-ai-wrapper:hover .btn-ai-custom::after {
   left: 150%;
 }
 
@@ -232,7 +269,8 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.btn-ai-custom:hover:not(:disabled) .btn-text-slide {
+.btn-ai-custom:hover:not(:disabled) .btn-text-slide,
+.btn-ai-wrapper:hover .btn-text-slide {
   transform: translateX(3px);
 }
 
@@ -240,7 +278,8 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.btn-ai-custom:hover:not(:disabled) .shrink-0 {
+.btn-ai-custom:hover:not(:disabled) .shrink-0,
+.btn-ai-wrapper:hover .shrink-0 {
   transform: translateX(1px);
 }
 

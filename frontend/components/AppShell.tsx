@@ -67,12 +67,8 @@ export function AppShell({
       <div className="mx-auto flex min-h-screen w-full max-w-[1500px] gap-4 px-3 py-3 sm:px-4 lg:px-5">
         <aside className="surface hidden w-[244px] shrink-0 flex-col justify-between p-3 lg:flex sticky top-3 h-[calc(100vh-24px)]">
           <div>
-            <Link href="/dashboard" className="focus-ring interactive-surface flex items-center gap-3 rounded-lg p-2">
-              <span className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)] shadow-sm">J</span>
-              <span>
-                <span className="block text-sm font-semibold tracking-tight">Jujum AI</span>
-                <span className="block text-[11px] font-semibold text-[var(--text-secondary)]">GATE + PSU mentor</span>
-              </span>
+            <Link href="/dashboard" className="focus-ring interactive-surface flex items-center gap-3 rounded-lg p-3">
+              <span className="text-xl font-extrabold text-stone-800 tracking-wide font-serif">DOOR</span>
             </Link>
 
             <nav className="mt-5 space-y-1" aria-label="Primary navigation">
@@ -115,10 +111,9 @@ export function AppShell({
           <div className="surface mb-3 flex flex-col gap-3 p-3 lg:hidden">
             <div className="flex items-center justify-between gap-3">
               <Link href="/dashboard" className="focus-ring flex items-center gap-2 rounded-lg">
-                <span className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)]">J</span>
                 <span>
-                  <span className="block text-sm font-semibold">Jujum AI</span>
-                  <span className="block text-[10px] font-bold text-[var(--text-secondary)]">{todayLabel()}</span>
+                  <span className="block text-lg font-extrabold text-stone-800 tracking-wide font-serif leading-none">DOOR</span>
+                  <span className="block text-[10px] font-bold text-[var(--text-secondary)] mt-0.5">{todayLabel()}</span>
                 </span>
               </Link>
               {actions ? <div className="shrink-0">{actions}</div> : null}
