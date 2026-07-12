@@ -69,8 +69,15 @@ export function AppShell({
           <div>
             <Link href="/dashboard" className="focus-ring interactive-surface flex items-center gap-2.5 rounded-lg p-2.5">
               <div className="h-8 w-8 rounded-md bg-stone-900 flex items-center justify-center text-white shadow-sm shrink-0">
-                <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V10a7 7 0 00-14 0v11M2 21h20" />
+                <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                  {/* Background Arch Fill (white light coming through) */}
+                  <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
+                  {/* Frame */}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 21V9a8 8 0 0116 0v12M2 21h20" />
+                  {/* Open Door Leaf (dark wood/stone) */}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#2d2c2a" />
+                  {/* Small Knob (gold) */}
+                  <circle cx="12.5" cy="12.5" r="1.1" fill="#dfb15b" stroke="none" />
                 </svg>
               </div>
               <span className="text-sm font-extrabold tracking-[0.22em] text-stone-850 uppercase font-sans">DOOR</span>
@@ -117,8 +124,15 @@ export function AppShell({
             <div className="flex items-center justify-between gap-3">
               <Link href="/dashboard" className="focus-ring flex items-center gap-2.5 rounded-lg">
                 <div className="h-8 w-8 rounded-md bg-stone-900 flex items-center justify-center text-white shadow-sm shrink-0">
-                  <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V10a7 7 0 00-14 0v11M2 21h20" />
+                  <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                    {/* Background Arch Fill (white light coming through) */}
+                    <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
+                    {/* Frame */}
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 21V9a8 8 0 0116 0v12M2 21h20" />
+                    {/* Open Door Leaf (dark wood/stone) */}
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#2d2c2a" />
+                    {/* Small Knob (gold) */}
+                    <circle cx="12.5" cy="12.5" r="1.1" fill="#dfb15b" stroke="none" />
                   </svg>
                 </div>
                 <span>

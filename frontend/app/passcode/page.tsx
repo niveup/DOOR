@@ -80,8 +80,15 @@ export default function PasscodePage() {
             <div className="text-center mb-8">
               {/* Architectural Door SVG */}
               <div className="mx-auto w-16 h-16 flex items-center justify-center text-stone-700 mb-4 animate-pulse">
-                <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 22V10a4 4 0 118 0v12M2 22h20" />
+                <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2">
+                  {/* Background Arch Fill (white light coming through) */}
+                  <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
+                  {/* Frame */}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 21V9a8 8 0 0116 0v12M2 21h20" />
+                  {/* Open Door Leaf (elegant warm beige/grey) */}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#f4f2ed" />
+                  {/* Small Knob (gold) */}
+                  <circle cx="12.5" cy="12.5" r="0.9" fill="#c69437" stroke="none" />
                 </svg>
               </div>
               <h2 className="text-2xl font-serif font-extrabold text-stone-800 tracking-[0.15em] uppercase">DOOR</h2>
