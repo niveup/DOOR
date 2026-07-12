@@ -488,12 +488,16 @@ export default function Dashboard() {
       subtitle="Plan, tasks, readiness, and AI help in one compact view."
       actions={
         <>
-          <MicroInteractionButton onClick={fetchTodayPlan} className="btn-secondary">
-            Refresh
-          </MicroInteractionButton>
-          <MicroInteractionButton onClick={() => setManualPlanOpen(true)} className="btn-secondary">
-            Create manually
-          </MicroInteractionButton>
+          <span className="btn-ai-wrapper">
+            <MicroInteractionButton onClick={fetchTodayPlan} className="btn-ai-custom shadow-xs">
+              <span className="btn-text-slide">Refresh</span>
+            </MicroInteractionButton>
+          </span>
+          <span className="btn-ai-wrapper">
+            <MicroInteractionButton onClick={() => setManualPlanOpen(true)} className="btn-ai-custom shadow-xs">
+              <span className="btn-text-slide">Create manually</span>
+            </MicroInteractionButton>
+          </span>
           <span className="btn-ai-wrapper">
             <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom shadow-xs group">
               <span className="w-4 h-4 flex items-center justify-center shrink-0">
@@ -583,9 +587,11 @@ export default function Dashboard() {
                     <span className="btn-text-slide">Plan with AI</span>
                   </MicroInteractionButton>
                 </span>
-                <Link href={explainerHref(weakArea)} className="btn-secondary flex-1">
-                  Ask AI about weak subject
-                </Link>
+                <span className="btn-ai-wrapper flex-1">
+                  <Link href={explainerHref(weakArea)} className="btn-ai-custom w-full shadow-xs">
+                    <span className="btn-text-slide">Ask AI about weak subject</span>
+                  </Link>
+                </span>
               </div>
             </div>
           </PageSection>
