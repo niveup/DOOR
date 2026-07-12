@@ -1,23 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { toast } from "sonner";
 import { MicroInteractionButton } from "@/components/MotionComponents";
 
 export default function PasscodePage() {
   const [passcode, setPasscode] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const shouldReduceMotion = useReducedMotion();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passcode) return;
-
     setLoading(true);
-    setError("");
 
     try {
       const res = await fetch("/api/auth", {
@@ -26,103 +22,108 @@ export default function PasscodePage() {
         body: JSON.stringify({ passcode }),
       });
 
-      const data = (await res.json()) as { success?: boolean; error?: string };
-      if (data.success) {
+      if (res.ok) {
+        toast.success("Access granted");
         router.push("/dashboard");
-        router.refresh();
       } else {
-        setError(data.error || "Incorrect passcode");
+        toast.error("Incorrect passcode");
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      toast.error("Authentication failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="app-background flex min-h-screen items-center justify-center px-4 py-8 text-[var(--text-primary)]">
-      <main className="grid w-full max-w-5xl grid-cols-1 gap-5 lg:grid-cols-[1fr_420px]">
-        <section className="surface soft-lavender hidden min-h-[560px] flex-col justify-between p-8 lg:flex">
+    <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center px-4 py-12 relative overflow-hidden select-none">
+      {/* Background Decorative Grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e5e0_1px,transparent_1px),linear-gradient(to_bottom,#e5e5e0_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-35 pointer-events-none" />
+
+      {/* Main Unified Card */}
+      <main className="relative w-full max-w-4xl bg-white border border-stone-300 shadow-2xl grid grid-cols-1 md:grid-cols-12 rounded-none overflow-hidden z-10">
+        
+        {/* LEFT COLUMN: Editorial Workspace Presentation (7/12 width) */}
+        <section className="md:col-span-7 p-8 md:p-12 bg-[#FCFBF9] flex flex-col justify-between border-b md:border-b-0 md:border-r border-stone-300 min-h-[500px]">
           <div>
-            <span className="pill pill-blue">Private study workspace</span>
-            <h1 className="mt-8 max-w-xl text-4xl font-semibold leading-tight tracking-tight text-[var(--text-primary)]">
+            <div className="flex items-center gap-2 text-stone-500 uppercase tracking-widest text-[9px] font-mono font-bold mb-6">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Private Workspace
+            </div>
+            <h1 className="text-3xl md:text-4xl font-serif font-extrabold text-stone-800 tracking-tight leading-tight">
               DOOR keeps study honest.
             </h1>
-            <p className="mt-5 max-w-lg text-sm font-medium leading-6 text-[var(--text-secondary)]">
-              Journal at night, plan in the morning, explain weak concepts during study, and review the 14-subject readiness map every week.
+            <p className="mt-4 text-xs md:text-sm text-stone-500 leading-relaxed max-w-md font-sans">
+              Welcome to your private preparation center. Designed for rigorous study, daily routines, progress tracking, and secure practice.
             </p>
           </div>
 
-          <div className="grid grid-cols-4 gap-3">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              ["01", "Journal"],
-              ["02", "Plan"],
-              ["03", "Explain"],
-              ["04", "Track"],
-            ].map(([step, label]) => (
-              <div key={step} className="rounded-lg border border-[var(--border)] bg-white p-3">
-                <p className="text-[10px] font-semibold text-[var(--accent)]">{step}</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{label}</p>
+              ["01", "Daily Ledger", "Journal and review daily study logs"],
+              ["02", "Study Plan", "Formulate targeted preparation items"],
+              ["03", "AI Explainer", "Interact and resolve complex concepts"],
+              ["04", "Tracker Maps", "Assess subject and exam readiness"],
+            ].map(([num, title, desc]) => (
+              <div key={num} className="border-l border-stone-300 pl-3 py-1">
+                <p className="text-[10px] font-mono font-bold text-stone-400">{num}</p>
+                <p className="text-xs font-serif font-bold text-stone-700 mt-0.5">{title}</p>
+                <p className="text-[10px] text-stone-400 mt-0.5 leading-snug">{desc}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="surface flex min-h-[560px] flex-col justify-center p-6 sm:p-8">
-          <div className="mx-auto w-full max-w-sm">
-            <div className="mb-8 text-center">
-              <div className="mx-auto flex h-14 items-center justify-center text-4xl font-extrabold text-stone-800 font-serif tracking-wider">
-                DOOR
+        {/* RIGHT COLUMN: Secure Entry Portal (5/12 width) */}
+        <section className="md:col-span-5 p-8 md:p-12 flex flex-col justify-center bg-white">
+          <div className="w-full">
+            <div className="text-center mb-8">
+              {/* Architectural Door SVG */}
+              <div className="mx-auto w-16 h-16 flex items-center justify-center text-stone-700 mb-4 animate-pulse">
+                <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 22V10a4 4 0 118 0v12M2 22h20" />
+                </svg>
               </div>
-              <h2 className="mt-5 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Unlock DOOR</h2>
-              <p className="mt-2 text-sm font-medium leading-6 text-[var(--text-secondary)]">
-                Your private study and preparation workspace.
-              </p>
+              <h2 className="text-2xl font-serif font-extrabold text-stone-800 tracking-[0.15em] uppercase">DOOR</h2>
+              <p className="text-[10px] text-stone-400 tracking-wider font-mono uppercase mt-1">Unlock Workspace</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <label className="block">
-                <span className="section-label mb-2 block">Passcode</span>
+              <div>
                 <input
                   type="password"
                   value={passcode}
-                  onChange={(event) => setPasscode(event.target.value)}
-                  placeholder="Enter passcode"
-                  disabled={loading}
-                  className={`app-input px-4 py-3 text-center text-lg font-semibold tracking-[0.25em] ${error ? "error" : ""}`}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full text-center tracking-[0.4em] text-sm font-mono bg-[#FAF9F5] border border-stone-300 focus:border-stone-850 focus:ring-1 focus:ring-stone-850 p-3 rounded-none focus:outline-none transition"
                 />
-              </label>
+              </div>
 
-              <AnimatePresence>
-                {error ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: shouldReduceMotion ? 0 : -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -4 }}
-                    transition={{ duration: shouldReduceMotion ? 0.01 : 0.15 }}
-                    className="rounded-lg border border-[var(--danger)]/20 bg-[var(--danger-soft)] px-3 py-2 text-center text-sm font-bold text-[var(--danger)]"
-                  >
-                    {error}
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
-
-              <MicroInteractionButton type="submit" loading={loading} disabled={loading || !passcode} className="btn-primary w-full">
-                Unlock workspace
-              </MicroInteractionButton>
+              <span className="btn-ai-wrapper w-full mt-2">
+                <MicroInteractionButton
+                  type="submit"
+                  loading={loading}
+                  className="w-full btn-ai-custom py-3 text-xs font-mono font-bold tracking-wider cursor-pointer group"
+                >
+                  <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
+                    </svg>
+                  </span>
+                  <span className="btn-text-slide">ENTER WORKSPACE</span>
+                </MicroInteractionButton>
+              </span>
             </form>
 
-            <div className="mt-8 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-              <p className="section-label mb-2">Mentor principle</p>
-              <p className="text-sm font-semibold leading-6 text-[var(--text-secondary)]">
-                Honesty beats motivation. The app should point to the next real action, not decorate missed work.
-              </p>
+            <div className="mt-8 flex items-center justify-center gap-1.5 text-stone-400 font-mono text-[9px] uppercase tracking-wider">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
+              Secure Gateway Active
             </div>
           </div>
         </section>
+
       </main>
     </div>
   );
 }
-
