@@ -559,9 +559,7 @@ export default function Dashboard() {
             />
           ) : (
             <EmptyState
-              mark="AI"
               title="No study plan for today"
-              description="Generate the AI plan when the backend is running. The preview below keeps the shape visible."
               actionLabel="Plan with AI"
               onAction={openPlanChat}
               loading={loading}

@@ -212,56 +212,33 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
 .btn-ai-wrapper {
   position: relative;
   display: inline-flex;
-  padding: 18px;
-  margin: -18px;
+  padding: 0;
+  margin: 0;
   align-items: center;
   justify-content: center;
 }
 
-/* Activation outline ring around the button */
-.btn-ai-wrapper::before {
-  content: "";
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  border: 1.5px double rgba(198, 148, 55, 0);
-  border-radius: 6px;
-  pointer-events: none;
-  transition: all 0.65s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.btn-ai-wrapper:hover::before {
-  top: 4px;
-  left: 4px;
-  right: 4px;
-  bottom: 4px;
-  border-color: rgba(198, 148, 55, 0.45);
-  box-shadow: 0 0 10px rgba(198, 148, 55, 0.08);
-}
-
-/* Direct hover AND wrapper hover selectors */
-.btn-ai-custom:hover:not(:disabled),
-.btn-ai-wrapper:hover .btn-ai-custom {
+/* Direct hover only — no wrapper hover (prevents coloring the empty gap area) */
+.btn-ai-custom:hover:not(:disabled) {
   color: #1c1917;
   border-color: #c69437;
   box-shadow: 0 6px 16px rgba(198, 148, 55, 0.25);
 }
 
-.btn-ai-custom:hover:not(:disabled) svg,
-.btn-ai-wrapper:hover .btn-ai-custom svg {
+.btn-ai-custom:hover:not(:disabled) svg {
   color: #1c1917 !important;
 }
 
-.btn-ai-custom:hover:not(:disabled)::before,
-.btn-ai-wrapper:hover .btn-ai-custom::before {
+.btn-ai-custom:hover:not(:disabled)::before {
   transform: scaleX(1);
 }
 
-.btn-ai-custom:hover:not(:disabled)::after,
-.btn-ai-wrapper:hover .btn-ai-custom::after {
+.btn-ai-custom:hover:not(:disabled)::after {
   left: 150%;
+}
+
+.btn-ai-custom:hover:not(:disabled) .btn-text-slide {
+  transform: translateX(3px);
 }
 
 .btn-text-slide {
@@ -269,17 +246,11 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.btn-ai-custom:hover:not(:disabled) .btn-text-slide,
-.btn-ai-wrapper:hover .btn-text-slide {
-  transform: translateX(3px);
+.btn-ai-custom:hover:not(:disabled) .shrink-0 {
+  transform: translateX(1px);
 }
 
 .btn-ai-custom .shrink-0 {
   transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.btn-ai-custom:hover:not(:disabled) .shrink-0,
-.btn-ai-wrapper:hover .shrink-0 {
-  transform: translateX(1px);
 }
 

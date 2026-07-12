@@ -152,7 +152,7 @@ export function MotionCard({
 }
 
 export function EmptyState({
-  mark = "--",
+  mark,
   title,
   description,
   actionLabel,
@@ -163,7 +163,7 @@ export function EmptyState({
 }: {
   mark?: string;
   title: string;
-  description: string;
+  description?: string;
   actionLabel?: string;
   onAction?: () => void;
   loading?: boolean;
@@ -179,13 +179,17 @@ export function EmptyState({
       transition={{ duration: shouldReduceMotion ? 0.01 : 0.2, ease: [0, 0, 0.2, 1] }}
       className={`surface-flat flex flex-col items-center justify-center p-6 text-center ${className}`}
     >
-      <span className="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)]">
-        {mark}
-      </span>
+      {mark ? (
+        <span className="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)]">
+          {mark}
+        </span>
+      ) : null}
       <h3 className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
-      <p className="mt-2 max-w-sm text-xs font-medium leading-5 text-[var(--text-secondary)]">{description}</p>
+      {description ? (
+        <p className="mt-2 max-w-sm text-xs font-medium leading-5 text-[var(--text-secondary)]">{description}</p>
+      ) : null}
       {actionLabel && onAction ? (
-        <span className="btn-ai-wrapper mt-5">
+        <span className="btn-ai-wrapper mt-8">
           <MicroInteractionButton onClick={onAction} loading={loading} className={btnClassName.replace("mt-5", "")}>
             {actionLabel}
           </MicroInteractionButton>
