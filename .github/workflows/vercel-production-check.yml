@@ -1,0 +1,39 @@
+name: Vercel production check
+on:
+  push:
+    branches: [deploy/vercel-production-ready]
+  pull_request:
+    paths: ["frontend/**", "VERCEL_DEPLOYMENT.md"]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+      SESSION_SECRET: ci-session-secret-32-characters-minimum-value
+      APP_PASSCODE: ci-passcode-not-for-production
+      NEXT_PUBLIC_API_URL: /api/backend
+      BACKEND_API_URL: https://example.com
+      NEXT_PUBLIC_DEV_ORIGINS: localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - working-directory: frontend
+        run: npx tsc --noEmit
+      - working-directory: frontend
+        run: npm run lint
+      - working-directory: frontend
+        run: npm run build
+      - name: Assert deploy contract
+        run: |
+          test -f frontend/.next/BUILD_ID
+          grep -q 'NEXT_PUBLIC_API_URL=/api/backend' frontend/.env.example
+          grep -q 'BACKEND_API_URL=' frontend/.env.example
+          grep -q 'Root Directory.*frontend' VERCEL_DEPLOYMENT.md
