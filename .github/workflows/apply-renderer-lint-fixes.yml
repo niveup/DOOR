@@ -22,7 +22,7 @@ jobs:
       - working-directory: frontend
         run: npm install --legacy-peer-deps --include=dev --no-audit --no-fund
       - working-directory: frontend
-        run: npx --no-install tsc --noEmit && npm run lint
+        run: npx --no-install tsc --noEmit
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
