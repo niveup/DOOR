@@ -495,9 +495,11 @@ export default function Dashboard() {
             Create manually
           </MicroInteractionButton>
           <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom shadow-xs group">
-            <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90 group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
-            </svg>
+            <span className="w-4 h-4 flex items-center justify-center shrink-0">
+              <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
+              </svg>
+            </span>
             Plan with AI
           </MicroInteractionButton>
         </>
@@ -572,9 +574,11 @@ export default function Dashboard() {
             <div className="surface soft-lavender p-4">
               <div className="flex flex-col gap-3 sm:flex-row xl:flex-col 2xl:flex-row">
                 <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom flex-1 shadow-xs group">
-                  <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90 group-hover:scale-110" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
-                  </svg>
+                  <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
+                    </svg>
+                  </span>
                   Plan with AI
                 </MicroInteractionButton>
                 <Link href={explainerHref(weakArea)} className="btn-secondary flex-1">
