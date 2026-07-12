@@ -1,0 +1,33 @@
+name: Apply renderer lint fixes
+on:
+  push:
+    branches: [deploy/vercel-production-ready]
+    paths: [.github/workflows/apply-renderer-lint-fixes.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: deploy/vercel-production-ready, fetch-depth: 0 }
+      - run: python3 scripts/apply_renderer_lint_fixes.py
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - working-directory: frontend
+        run: npm install --legacy-peer-deps --include=dev --no-audit --no-fund
+      - working-directory: frontend
+        run: npx --no-install tsc --noEmit && npm run lint && npm run build
+        env:
+          NODE_ENV: production
+          SESSION_SECRET: ci-session-secret-32-characters-minimum-value
+          APP_PASSCODE: ci-passcode-not-for-production
+          NEXT_PUBLIC_API_URL: /api/backend
+          BACKEND_API_URL: https://example.com
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-renderer-lint-fixes.yml scripts/apply_renderer_lint_fixes.py
+          git add frontend/components/AiMarkdown.tsx
+          git commit -m "fix(ui): keep AI renderer hooks unconditional"
+          git push
