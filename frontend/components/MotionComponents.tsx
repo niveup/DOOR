@@ -189,11 +189,13 @@ export function EmptyState({
         <p className="mt-2 max-w-sm text-xs font-medium leading-5 text-[var(--text-secondary)]">{description}</p>
       ) : null}
       {actionLabel && onAction ? (
-        <span className="btn-ai-wrapper mt-12">
-          <MicroInteractionButton onClick={onAction} loading={loading} className={btnClassName.replace("mt-5", "")}>
-            {actionLabel}
-          </MicroInteractionButton>
-        </span>
+        <div className="mt-8">
+          <span className="btn-ai-wrapper">
+            <MicroInteractionButton onClick={onAction} loading={loading} className={btnClassName.replace("mt-5", "")}>
+              {actionLabel}
+            </MicroInteractionButton>
+          </span>
+        </div>
       ) : null}
     </motion.div>
   );
