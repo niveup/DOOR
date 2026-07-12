@@ -2,51 +2,24 @@ import type { NextConfig } from "next";
 
 const devOrigins = (process.env.NEXT_PUBLIC_DEV_ORIGINS || "localhost:3000")
   .split(",")
-  .map((origin) => origin.trim())
+  .map((value) => value.trim())
   .filter(Boolean);
-
-// ============================================================================
-// TROUBLESHOOTING PORT: IF ANYTHING BREAKS (CSP, WEBSOCKETS, HMR, OR PORT ISSUES), CHECK HERE!
-//
-// This block controls the Content Security Policy (CSP) and security headers.
-// - If you see console errors like "eval() is not supported" or HMR WebSocket 
-//   connection issues in development, check this configuration.
-// - In development mode (isDev = true), we allow 'unsafe-eval' and localhost 
-//   ws:// / http:// origins so debugging and hot-reloading work correctly.
-// ============================================================================
-const isDev = process.env.NODE_ENV === "development";
-
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https://mermaid.ink",
-  `connect-src 'self'${isDev ? " ws://localhost:* wss://localhost:* http://localhost:* ws://127.0.0.1:* wss://127.0.0.1:* http://127.0.0.1:*" : ""}`,
-  "worker-src 'self' blob:",
-  "upgrade-insecure-requests",
-].join("; ");
-
-const securityHeaders = [
-  { key: "Content-Security-Policy", value: contentSecurityPolicy },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
-  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
-];
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: devOrigins,
   poweredByHeader: false,
   turbopack: { root: process.cwd() },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [{
+      source: "/(.*)",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+        { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+      ],
+    }];
   },
 };
 

@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: door-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run prisma:generate && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: INTERNAL_API_PORT
+        value: 4001
+      - key: ALLOWED_ORIGINS
+        sync: false # Comma-separated browser origins (e.g. your vercel app URL)
+      - key: APP_PASSCODE
+        sync: false # Strong shared passcode (8+ characters, must match Vercel APP_PASSCODE)
+      - key: CRON_SHARED_SECRET
+        sync: false # Secure shared cron secret
+      - key: SESSION_SECRET
+        sync: false # Secure session secret (32+ characters)
+      - key: AI_CREDENTIAL_ENCRYPTION_KEY
+        sync: false # Optional key for AI credentials (defaults to SESSION_SECRET if not set)
+      - key: DATABASE_URL
+        sync: false # Supabase PostgreSQL connection URL
+      - key: DIRECT_URL
+        sync: false # Supabase direct PostgreSQL connection URL
+      - key: AI_PROVIDER
+        value: openrouter
+      - key: AI_MODEL
+        value: openrouter/free
+      - key: AI_API_KEY
+        sync: false # API key for the default AI provider
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: CEREBRAS_API_KEY
+        sync: false

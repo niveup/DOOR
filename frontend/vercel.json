@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm install --legacy-peer-deps --include=dev --no-audit --no-fund",
+  "buildCommand": "npm run build",
+  "regions": ["bom1"],
+  "functions": {
+    "app/api/backend/[...path]/route.ts": {
+      "maxDuration": 120,
+      "memory": 1024
+    }
+  }
+}
