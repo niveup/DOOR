@@ -500,7 +500,7 @@ export default function Dashboard() {
                 <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
               </svg>
             </span>
-            Plan with AI
+            <span className="btn-text-slide">Plan with AI</span>
           </MicroInteractionButton>
         </>
       }
@@ -579,7 +579,7 @@ export default function Dashboard() {
                       <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
                     </svg>
                   </span>
-                  Plan with AI
+                  <span className="btn-text-slide">Plan with AI</span>
                 </MicroInteractionButton>
                 <Link href={explainerHref(weakArea)} className="btn-secondary flex-1">
                   Ask AI about weak subject

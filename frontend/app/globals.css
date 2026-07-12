@@ -227,3 +227,20 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   left: 150%;
 }
 
+.btn-text-slide {
+  display: inline-block;
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.btn-ai-custom:hover:not(:disabled) .btn-text-slide {
+  transform: translateX(3px);
+}
+
+.btn-ai-custom .shrink-0 {
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.btn-ai-custom:hover:not(:disabled) .shrink-0 {
+  transform: translateX(1px);
+}
+
