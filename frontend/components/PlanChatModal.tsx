@@ -77,9 +77,9 @@ export function PlanChatModal({
         role="dialog"
         aria-modal="true"
         aria-label="Plan with AI"
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
         transition={{ type: "spring", stiffness: 280, damping: 26 }}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
