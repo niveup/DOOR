@@ -67,8 +67,13 @@ export function AppShell({
       <div className="mx-auto flex min-h-screen w-full max-w-[1500px] gap-4 px-3 py-3 sm:px-4 lg:px-5">
         <aside className="surface hidden w-[244px] shrink-0 flex-col justify-between p-3 lg:flex sticky top-3 h-[calc(100vh-24px)]">
           <div>
-            <Link href="/dashboard" className="focus-ring interactive-surface flex items-center gap-3 rounded-lg p-3">
-              <span className="text-xl font-extrabold text-stone-800 tracking-wide font-serif">DOOR</span>
+            <Link href="/dashboard" className="focus-ring interactive-surface flex items-center gap-2.5 rounded-lg p-2.5">
+              <div className="h-8 w-8 rounded-md bg-stone-900 flex items-center justify-center text-white shadow-sm shrink-0">
+                <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V10a7 7 0 00-14 0v11M2 21h20" />
+                </svg>
+              </div>
+              <span className="text-sm font-extrabold tracking-[0.22em] text-stone-850 uppercase font-sans">DOOR</span>
             </Link>
 
             <nav className="mt-5 space-y-1" aria-label="Primary navigation">
@@ -110,10 +115,15 @@ export function AppShell({
         <main className="min-w-0 flex-1 mobile-content-clearance">
           <div className="surface mb-3 flex flex-col gap-3 p-3 lg:hidden">
             <div className="flex items-center justify-between gap-3">
-              <Link href="/dashboard" className="focus-ring flex items-center gap-2 rounded-lg">
+              <Link href="/dashboard" className="focus-ring flex items-center gap-2.5 rounded-lg">
+                <div className="h-8 w-8 rounded-md bg-stone-900 flex items-center justify-center text-white shadow-sm shrink-0">
+                  <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V10a7 7 0 00-14 0v11M2 21h20" />
+                  </svg>
+                </div>
                 <span>
-                  <span className="block text-lg font-extrabold text-stone-800 tracking-wide font-serif leading-none">DOOR</span>
-                  <span className="block text-[10px] font-bold text-[var(--text-secondary)] mt-0.5">{todayLabel()}</span>
+                  <span className="block text-sm font-extrabold tracking-[0.22em] text-stone-850 uppercase font-sans leading-none">DOOR</span>
+                  <span className="block text-[9px] font-bold text-[var(--text-secondary)] mt-1">{todayLabel()}</span>
                 </span>
               </Link>
               {actions ? <div className="shrink-0">{actions}</div> : null}

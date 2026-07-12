@@ -587,9 +587,6 @@ export default function Dashboard() {
                   Ask AI about weak subject
                 </Link>
               </div>
-              <p className="mt-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
-                Tell AI what you want to study, compare time options, and approve the draft before anything is saved.
-              </p>
             </div>
           </PageSection>
 
