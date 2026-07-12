@@ -10,7 +10,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      NODE_ENV: production
       SESSION_SECRET: ci-session-secret-32-characters-minimum-value
       APP_PASSCODE: ci-passcode-not-for-production
       NEXT_PUBLIC_API_URL: /api/backend
@@ -24,22 +23,16 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - working-directory: frontend
-        run: npm install --legacy-peer-deps --no-audit --no-fund
+        run: npm install --legacy-peer-deps --include=dev --no-audit --no-fund
       - name: TypeScript
         working-directory: frontend
-        run: |
-          set +e
-          npx tsc --noEmit 2>&1 | tee /tmp/tsc.log
-          code=${PIPESTATUS[0]}
-          if [ "$code" -ne 0 ]; then
-            message=$(tail -100 /tmp/tsc.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
-            echo "::error::$message"
-          fi
-          exit "$code"
+        run: npx --no-install tsc --noEmit
       - working-directory: frontend
         run: npm run lint
       - name: Production build
         working-directory: frontend
+        env:
+          NODE_ENV: production
         run: |
           set +e
           npm run build 2>&1 | tee /tmp/build.log
