@@ -164,10 +164,6 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
 .btn-ai-custom:hover:not(:disabled) {
   background: #454340;
   border-color: #454340;
-  transform: translateY(-1px);
   box-shadow: 0 6px 14px rgba(45, 44, 42, 0.15);
-}
-.btn-ai-custom:active:not(:disabled) {
-  transform: translateY(0);
 }
 
