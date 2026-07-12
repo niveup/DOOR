@@ -10,7 +10,7 @@ Render automates deployment using the Blueprint specification in the root `rende
 
 1. Sign in to your [Render Dashboard](https://dashboard.render.com/).
 2. Click **New +** in the top right corner and select **Blueprint**.
-3. Connect your GitHub repository `niveup/DOOR` (ensure the branch is set to `deploy/vercel-production-ready` or your main branch after PR merge).
+3. Connect your GitHub repository `niveup/DOOR` (Ensure the branch is set to **`deploy/vercel-production-ready`** as this is the active branch where Render blueprint changes and dependencies are configured).
 4. Render will automatically parse the root `render.yaml` file and prepare the service named `door-backend`.
 5. Enter the required **Environment Variables** (see below) prompted by Render.
 6. Click **Apply** to start the deployment.
@@ -41,7 +41,7 @@ During the Blueprint setup, Render will prompt you for the following environment
 ## 3. Deployment Steps Executed on Render
 
 When you apply the Blueprint, Render runs:
-- **Build Command**: `npm install && npm run prisma:generate && npm run build` (inside the `backend/` directory).
+- **Build Command**: `npm install --include=dev && npm run prisma:generate && npm run build` (inside the `backend/` directory).
 - **Start Command**: `npm run start` (running `node dist/gateway.js` on port `4000` internally, proxying to `server.ts` on port `4001`).
 
 ---
