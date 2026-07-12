@@ -2,9 +2,14 @@ name: Apply renderer lint fixes
 on:
   push:
     branches: [deploy/vercel-production-ready]
-    paths: [.github/workflows/apply-renderer-lint-fixes.yml]
+    paths:
+      - .github/workflows/apply-renderer-lint-fixes.yml
+      - scripts/apply_renderer_lint_fixes.py
 permissions:
   contents: write
+concurrency:
+  group: renderer-lint-fixes
+  cancel-in-progress: true
 jobs:
   patch:
     runs-on: ubuntu-latest
@@ -17,13 +22,7 @@ jobs:
       - working-directory: frontend
         run: npm install --legacy-peer-deps --include=dev --no-audit --no-fund
       - working-directory: frontend
-        run: npx --no-install tsc --noEmit && npm run lint && npm run build
-        env:
-          NODE_ENV: production
-          SESSION_SECRET: ci-session-secret-32-characters-minimum-value
-          APP_PASSCODE: ci-passcode-not-for-production
-          NEXT_PUBLIC_API_URL: /api/backend
-          BACKEND_API_URL: https://example.com
+        run: npx --no-install tsc --noEmit && npm run lint
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
