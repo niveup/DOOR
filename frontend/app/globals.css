@@ -162,10 +162,20 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   padding: 0.55rem 1rem;
   box-shadow: 0 4px 10px rgba(45, 44, 42, 0.08);
   z-index: 1;
-  transition: border-color var(--duration-standard) var(--ease-standard), box-shadow var(--duration-standard) var(--ease-standard);
+  transition: border-color 0.4s cubic-bezier(0.25, 1, 0.5, 1), 
+              color 0.4s cubic-bezier(0.25, 1, 0.5, 1), 
+              box-shadow 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Smooth background fill slide from left */
+.btn-ai-custom span,
+.btn-ai-custom svg {
+  z-index: 2;
+  transition: color 0.4s cubic-bezier(0.25, 1, 0.5, 1), 
+              fill 0.4s cubic-bezier(0.25, 1, 0.5, 1), 
+              stroke 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Gold background fill slide from left */
 .btn-ai-custom::before {
   content: "";
   position: absolute;
@@ -173,35 +183,40 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #454340 0%, #4c4a47 100%);
+  background: linear-gradient(90deg, #dfb15b 0%, #c69437 100%);
   z-index: -1;
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Shimmer beam that slides across */
+/* Brighter shimmer beam that slides across */
 .btn-ai-custom::after {
   content: "";
   position: absolute;
   top: 0;
   left: -100%;
-  width: 40%;
+  width: 45%;
   height: 100%;
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.22) 50%,
     rgba(255, 255, 255, 0) 100%
   );
   transform: skewX(-20deg);
-  z-index: 2;
-  transition: left 0.65s cubic-bezier(0.25, 1, 0.5, 1);
+  z-index: 3;
+  transition: left 0.7s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .btn-ai-custom:hover:not(:disabled) {
-  border-color: #454340;
-  box-shadow: 0 6px 14px rgba(45, 44, 42, 0.15);
+  color: #1c1917;
+  border-color: #c69437;
+  box-shadow: 0 6px 16px rgba(198, 148, 55, 0.25);
+}
+
+.btn-ai-custom:hover:not(:disabled) svg {
+  color: #1c1917 !important;
 }
 
 .btn-ai-custom:hover:not(:disabled)::before {
