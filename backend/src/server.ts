@@ -590,7 +590,7 @@ app.get("/api/journal/history", async (req: Request, res: Response) => {
 // Get Routine Plan (by optional date query param, defaults to today)
 app.get("/api/routine/today", async (req: Request, res: Response) => {
   const dateQuery = req.query.date as string;
-  const targetDate = dateQuery ? getKolkataDate(new Date(dateQuery)) : getKolkataDate();
+  const targetDate = dateQuery ? new Date(dateQuery) : getKolkataDate();
   try {
     const plan = await prisma.routinePlan.findUnique({
       where: { date: targetDate },

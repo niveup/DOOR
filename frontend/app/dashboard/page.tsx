@@ -10,6 +10,33 @@ import { AnimatePresence, motion } from "motion/react";
 import { AiSelection, ModelSelector } from "@/components/ModelSelector";
 import { PlanChatModal } from "@/components/PlanChatModal";
 
+function cleanMathText(text: string): string {
+  return text
+    .replace(/\\Delta/gi, "Δ")
+    .replace(/\\theta/gi, "θ")
+    .replace(/\\sigma/gi, "σ")
+    .replace(/\\pi/gi, "π")
+    .replace(/\\alpha/gi, "α")
+    .replace(/\\beta/gi, "β")
+    .replace(/\\gamma/gi, "γ")
+    .replace(/\\lambda/gi, "λ")
+    .replace(/\\mu/gi, "μ")
+    .replace(/\$/g, ""); // Remove math delimiters
+}
+
+function formatPriorityText(text: string): string {
+  let cleaned = text;
+  // Remove common prefixes
+  cleaned = cleaned.replace(/^(Study\s+)?GATE\s+Syllabus\s+Core\s+Topics:\s*(Focus\s+on\s*)?/i, "");
+  cleaned = cleaned.replace(/^Focus\s+on\s*/i, "");
+  cleaned = cleaned.replace(/^Study\s+Focus\s+on\s*/i, "");
+  // Strip math symbols
+  cleaned = cleanMathText(cleaned);
+  // Capitalize first letter
+  if (cleaned.length === 0) return "";
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
 type TaskStatus = "COMPLETED" | "PARTIAL" | "NOT";
 type TaskType = "study" | "exercise" | "reading" | "routine";
 type Tone = "blue" | "green" | "amber" | "rose" | "teal" | "lavender";
@@ -204,9 +231,11 @@ export default function Dashboard() {
         setPlan(data);
         setError("");
       } else {
+        setPlan(null);
         setError("Plan could not be loaded.");
       }
     } catch {
+      setPlan(null);
       setError("Backend is not reachable. Showing a preview state.");
     } finally {
       setLoading(false);
@@ -509,7 +538,7 @@ export default function Dashboard() {
     (sum, task) => sum + task.durationMin * taskCompletionRatio(task.status),
     0
   ) || 0;
-  const priority = plan?.mainPriority || "Generate the AI plan to lock today's priority";
+  const priority = plan?.mainPriority ? formatPriorityText(plan.mainPriority) : "Generate the AI plan to lock today's priority";
   const taskProgress = plan?.tasks.length
     ? (plan.tasks.reduce((sum, task) => sum + taskCompletionRatio(task.status), 0) / plan.tasks.length) * 100
     : 0;
@@ -911,7 +940,6 @@ const PlanPanel = memo(function PlanPanel({
     <div className="surface p-4">
       <div className="mb-3 flex flex-col justify-between gap-3 border-b border-[var(--border)] pb-3 sm:flex-row sm:items-center">
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-[var(--text-secondary)]">{plan.greeting}</p>
           <h3 className="mt-1 line-clamp-2 text-base font-semibold text-[var(--text-primary)]">{priority}</h3>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -962,7 +990,7 @@ const PlanPanel = memo(function PlanPanel({
               </span>
               <span className="min-w-0">
                 <span className={`block truncate text-xs font-semibold ${isDone ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}`}>
-                  {task.title}
+                  {cleanMathText(task.title)}
                 </span>
                 <span className="mt-1 block truncate text-[10px] font-medium text-[var(--text-secondary)]">
                   {taskTypeLabel(task.taskType)} / {taskStatusLabel(task.status)} / tap for next step
