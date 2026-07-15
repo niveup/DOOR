@@ -90,19 +90,9 @@ export function PlanChatModal({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-stone-300 px-6 py-4 bg-white/70">
           <div className="min-w-0">
             <h2 className="text-lg font-extrabold text-stone-800 tracking-tight font-serif">Plan with AI</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] font-mono text-stone-400">SYSTEM MODEL:</span>
-              <ModelSelector value={aiSelection} onChange={onAiSelectionChange} />
-            </div>
           </div>
           
           <div className="flex items-center gap-3 self-end sm:self-center">
-            <span className={`pill rounded-none font-mono text-[9px] tracking-wider uppercase ${
-              ready ? "bg-stone-800 text-[#FAF9F5] border-stone-800" : "bg-transparent text-stone-600 border-dashed border-stone-400"
-            }`}>
-              {ready ? "● PLAN AGREED" : "○ DISCUSSING DRAFT"}
-            </span>
-            
             <button
               type="button"
               onClick={onClose}
@@ -246,11 +236,13 @@ export function PlanChatModal({
               <AnimatePresence initial={false}>
                 {draftTasks.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center p-6 border border-dashed border-stone-300 bg-[#FCFBF8]">
-                    <svg className="h-8 w-8 text-stone-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                    <svg className="h-6 w-6 text-stone-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <p className="text-[10px] font-mono font-bold text-stone-600 uppercase mt-1">Ledger Empty</p>
-                    <p className="text-[10px] text-stone-400 font-sans mt-0.5">Please instruct the assistant to initialize tasks.</p>
+                    <p className="text-[10px] font-mono font-bold text-stone-600 uppercase mt-1">No Tasks Drafted</p>
+                    <p className="text-[10px] text-stone-500 font-sans mt-1 max-w-[200px] leading-normal">
+                      Your study tasks will appear here once proposed in the chat.
+                    </p>
                   </div>
                 ) : (
                   draftTasks.map((task, index) => {

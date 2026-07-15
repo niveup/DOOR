@@ -327,7 +327,7 @@ export default function SandboxChatPage() {
           <span className="btn-ai-wrapper">
             <button
               onClick={() => setIsModalOpen(true)}
-              className="btn-ai-custom px-6 py-2 shadow-2xs rounded-none font-semibold text-xs tracking-wider group"
+              className="btn-ai-custom brand-fixed px-6 py-2 shadow-2xs rounded-none font-semibold text-xs tracking-wider group"
             >
               <span className="w-4 h-4 flex items-center justify-center shrink-0">
                 <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">

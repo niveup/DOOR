@@ -111,7 +111,7 @@ export default function PasscodePage() {
                 <MicroInteractionButton
                   type="submit"
                   loading={loading}
-                  className="w-full btn-ai-custom py-3 text-xs font-mono font-bold tracking-wider cursor-pointer group"
+                  className="w-full btn-ai-custom brand-fixed py-3 text-xs font-mono font-bold tracking-wider cursor-pointer group"
                 >
                   <span className="w-4 h-4 flex items-center justify-center shrink-0">
                     <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">

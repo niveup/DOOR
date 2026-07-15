@@ -40,6 +40,42 @@ export default function AiSettingsPage() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const currentTheme = (document.documentElement.dataset.theme as "light" | "dark") || "light";
+    setTheme(currentTheme);
+    setMounted(true);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "light" ? "dark" : "light";
+    setTheme(nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+    localStorage.setItem("jujum-theme", nextTheme);
+  };
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const syncTheme = () => {
+      const currentTheme = (document.documentElement.dataset.theme as "light" | "dark") || "light";
+      setTheme(currentTheme);
+    };
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === "data-theme") {
+          syncTheme();
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, [mounted]);
+
   const selectedProvider = useMemo(
     () => configuration?.providers.find((item) => item.provider === provider) || null,
     [configuration, provider]
@@ -244,6 +280,35 @@ export default function AiSettingsPage() {
                 {testResult.message}
               </div>
             ) : null}
+          </div>
+        </PageSection>
+
+        <PageSection title="Appearance" eyebrow="Theme preference">
+          <div className="surface p-4 flex flex-col gap-3">
+            <p className="text-xs font-medium text-[var(--text-secondary)]">Toggle color theme manually.</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="btn-secondary w-full py-1.5 flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+              >
+                {!mounted || theme === "light" ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                    </svg>
+                    <span>Dark Theme</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21M4.95 4.95l1.59 1.59m10.91 10.91l1.59 1.59M3 12h2.25m13.5 0H21m-2.23-7.28l-1.59 1.59m-10.91 10.91l-1.59 1.59M12 8.25a3.75 3.75 0 100 7.5 3.75 3.75 0 000-7.5z" />
+                    </svg>
+                    <span>Light Theme</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </PageSection>
       </div>

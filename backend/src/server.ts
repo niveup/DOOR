@@ -587,12 +587,13 @@ app.get("/api/journal/history", async (req: Request, res: Response) => {
   }
 });
 
-// Get Today's Routine Plan
+// Get Routine Plan (by optional date query param, defaults to today)
 app.get("/api/routine/today", async (req: Request, res: Response) => {
-  const today = getKolkataDate();
+  const dateQuery = req.query.date as string;
+  const targetDate = dateQuery ? getKolkataDate(new Date(dateQuery)) : getKolkataDate();
   try {
     const plan = await prisma.routinePlan.findUnique({
-      where: { date: today },
+      where: { date: targetDate },
       include: { tasks: true }
     });
     res.json(plan);
@@ -619,8 +620,8 @@ app.post("/api/routine/manual", async (req: Request, res: Response) => {
   const mainPriority = typeof req.body?.mainPriority === "string" ? req.body.mainPriority.trim() : "";
   const validTaskTypes = new Set(["study", "exercise", "reading", "routine"]);
 
-  if (tasks.length < 1 || tasks.length > 8) {
-    return res.status(400).json({ error: "Add between 1 and 8 tasks." });
+  if (tasks.length < 1 || tasks.length > 30) {
+    return res.status(400).json({ error: "Add between 1 and 30 tasks." });
   }
 
   const normalizedTasks: Array<{
@@ -768,7 +769,7 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
     });
     const prompt = loadPrompt("plan_chat.md", {
       user_name: settings?.name || "Aspirant",
-      available_hours: settings?.dailyAvailableHours || 4,
+      available_hours: 24,
       weak_subjects: weakSubjects,
       existing_plan: existingPlanText,
       student_profile: JSON.stringify({
@@ -830,7 +831,7 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
     let reply = String(parsed.reply || "What would you like to adjust?").trim().slice(0, 1200);
     let normalizedSuggestions = suggestions;
     if (durationMentions.length === 0) {
-      const availableMinutes = Math.max(30, Math.round((settings?.dailyAvailableHours || 4) * 60));
+      const availableMinutes = 1440;
       const timeOptions = availableMinutes < 60
         ? [15, 30, Math.min(45, availableMinutes)]
         : [30, 45, 60];
@@ -850,6 +851,177 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
       suggestions: normalizedSuggestions,
       ready: (Boolean(parsed.ready) || confirmationDetected) && draftTasks.length > 0,
       draftTasks,
+    });
+  } catch (error: any) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
+  const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+  const messages = rawMessages
+    .filter((message: any) => message && (message.role === "user" || message.role === "assistant"))
+    .map((message: any) => ({
+      role: message.role as "user" | "assistant",
+      content: String(message.content || "").trim().slice(0, 2000),
+    }))
+    .filter((message: { content: string }) => message.content.length > 0)
+    .slice(-14);
+
+  if (!messages.some((message: { role: string }) => message.role === "user")) {
+    return res.status(400).json({ error: "Ask the coach a question first." });
+  }
+
+  try {
+    const [settings, progressRatings, subjects, existingPlan, recentJournals] = await Promise.all([
+      prisma.settings.findUnique({ where: { id: "default" } }),
+      prisma.progressRating.findMany({
+        orderBy: [{ weekStartDate: "desc" }],
+      }),
+      prisma.subject.findMany({ orderBy: { subjectId: "asc" } }),
+      prisma.routinePlan.findUnique({
+        where: { date: getKolkataDate() },
+        include: { tasks: true },
+      }),
+      prisma.journal.findMany({
+        orderBy: { date: "desc" },
+        take: 5,
+        select: {
+          date: true,
+          entryText: true,
+          mood: true,
+          tags: true,
+          tomorrowTask: true,
+          studyDone: true,
+          exerciseDone: true,
+          readingDone: true,
+        },
+      }),
+    ]);
+
+    const ratingsBySubject = new Map<number, any[]>();
+    for (const r of progressRatings) {
+      const list = ratingsBySubject.get(r.subjectId) || [];
+      if (list.length < 2) {
+        list.push(r);
+        ratingsBySubject.set(r.subjectId, list);
+      }
+    }
+
+    const now = getKolkataDate();
+    const threeWeeksAgo = new Date(now);
+    threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
+
+    const ratingsList = subjects.map((subject) => {
+      const recentRatings = ratingsBySubject.get(subject.subjectId) || [];
+      const latestRating = recentRatings[0] || null;
+      const isNeglected = latestRating
+        ? latestRating.weekStartDate < threeWeeksAgo
+        : true;
+      const hasAvoidanceWarning = recentRatings.length >= 2
+        && recentRatings.every((r) => r.selfRating <= 2);
+
+      return {
+        subjectName: subject.subjectName,
+        importanceLevel: subject.importanceLevel,
+        latestRating: latestRating ? latestRating.selfRating : null,
+        hoursStudied: latestRating ? latestRating.hoursStudied : 0,
+        questionsSolved: latestRating ? latestRating.questionsSolved : 0,
+        isNeglected,
+        hasAvoidanceWarning
+      };
+    });
+
+    const sumRatings = ratingsList.reduce((acc, r) => acc + (r.latestRating || 0), 0);
+    const overallReadiness = Math.round((sumRatings / 70) * 100);
+
+    const weakSubject =
+      subjects.find((subject) => ratingsBySubject.get(subject.subjectId)?.some((r) => r.hasAvoidanceWarning)) ||
+      subjects.find((subject) => ratingsBySubject.get(subject.subjectId)?.some((r) => r.isNeglected)) ||
+      [...subjects].sort((a, b) => {
+        const aRating = ratingsBySubject.get(a.subjectId)?.[0]?.selfRating || 5;
+        const bRating = ratingsBySubject.get(b.subjectId)?.[0]?.selfRating || 5;
+        return aRating - bRating;
+      })[0];
+    const weakSubjectName = weakSubject ? weakSubject.subjectName : "None";
+
+    const subjectsStatus = ratingsList
+      .map((item) => 
+        `- ${item.subjectName} (Weight: ${Math.round(item.importanceLevel * 100)}%): ` +
+        `Rating: ${item.latestRating ? `${item.latestRating}/5` : "Not rated"}, ` +
+        `Hours studied: ${item.hoursStudied}h, ` +
+        `Questions solved: ${item.questionsSolved}, ` +
+        `${item.isNeglected ? "[Neglected] " : ""}${item.hasAvoidanceWarning ? "[Avoidance Warning]" : ""}`
+      )
+      .join("\n");
+
+    const todayTasks = existingPlan?.tasks.length
+      ? existingPlan.tasks.map((task: Task) => `- ${task.title} (${task.durationMin} mins, status: ${task.status})`).join("\n")
+      : "No plan generated for today yet.";
+
+    const recentJournalContext = recentJournals.length
+      ? recentJournals.map((journal: any) =>
+          `* ${journal.date.toISOString().split("T")[0]}: ` +
+          `Study: ${journal.studyDone ? "Done" : "Missed"}, Exercise: ${journal.exerciseDone ? "Done" : "Missed"} | ` +
+          `Entry: ${journal.entryText.slice(0, 300)}`
+        ).join("\n")
+      : "No journal history logged.";
+
+    const conversation = messages
+      .map((message: { role: "user" | "assistant"; content: string }) => `${message.role === "user" ? "Student" : "Coach"}: ${message.content}`)
+      .join("\n");
+
+    const prompt = loadPrompt("general_chat.md", {
+      user_name: settings?.name || "Aspirant",
+      target_exam: settings?.targetExam || "GATE",
+      target_year: settings?.targetYear || 2027,
+      prep_level: settings?.prepLevel || "Beginner",
+      preferred_language: settings?.preferredLanguage || "hinglish",
+      wake_time: settings?.wakeTime || "06:00",
+      sleep_time: settings?.sleepTime || "22:00",
+      overall_readiness: String(overallReadiness),
+      weak_subject: weakSubjectName,
+      subjects_status: subjectsStatus,
+      main_priority: existingPlan?.mainPriority || "None",
+      today_tasks: todayTasks,
+      recent_journals: recentJournalContext,
+      conversation,
+    });
+
+    const requestedProvider = isAiProviderName(req.body?.aiProvider) ? req.body.aiProvider : undefined;
+    const requestedModel = typeof req.body?.aiModel === "string" && req.body.aiModel.trim().length <= 160
+      ? req.body.aiModel.trim()
+      : undefined;
+
+    const aiResponse = await aiChat(
+      "You are Jujum AI, a general study coach. Provide helpful tips and schedule guidance. Return JSON only.",
+      prompt,
+      { provider: requestedProvider, model: requestedModel }
+    );
+
+    const jsonStart = aiResponse.indexOf("{");
+    const jsonEnd = aiResponse.lastIndexOf("}");
+    if (jsonStart < 0 || jsonEnd <= jsonStart) {
+      throw new Error("Coach response did not contain JSON.");
+    }
+
+    const parsed = JSON.parse(jsonrepair(aiResponse.slice(jsonStart, jsonEnd + 1))) as {
+      reply?: unknown;
+      suggestions?: unknown;
+      action?: unknown;
+    };
+
+    const suggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions.map((suggestion) => String(suggestion).trim().slice(0, 100)).filter(Boolean).slice(0, 4)
+      : [];
+
+    const reply = String(parsed.reply || "I am listening. How can I help you today?").trim().slice(0, 2000);
+    const action = parsed.action && typeof parsed.action === "object" ? parsed.action : null;
+
+    res.json({
+      reply,
+      suggestions,
+      action
     });
   } catch (error: any) {
     res.status(502).json({ error: error.message });
@@ -908,7 +1080,7 @@ async function generateTodayRoutinePlan(replaceExisting: boolean) {
   ]);
 
   const userName = settings?.name || "Aspirant";
-  const availableHours = settings?.dailyAvailableHours || 4;
+  const availableHours = 24;
   const tomorrowTask = yesterdayJournal?.tomorrowTask || "Study GATE Syllabus Core Topics";
   const weakSubjects = progressRatings
     .filter((rating: ProgressRating) => rating.selfRating <= 2)

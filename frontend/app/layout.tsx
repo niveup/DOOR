@@ -21,7 +21,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${poppins.variable} h-full antialiased`}>
+    <html lang="en" className={`${poppins.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var theme = localStorage.getItem('jujum-theme');
+                if (!theme) {
+                  theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.dataset.theme = theme;
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full bg-[var(--bg-page)] text-[var(--text-primary)] font-sans">
         <Toaster
           position="bottom-right"

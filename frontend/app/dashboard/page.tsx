@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AppShell, PageSection } from "@/components/AppShell";
 import { AiMarkdown } from "@/components/AiMarkdown";
 import { AnimatedNumber, EmptyState, MicroInteractionButton, MotionCard, ProgressBar, StatusBadge } from "@/components/MotionComponents";
+import { AnimatePresence, motion } from "motion/react";
 import { AiSelection, ModelSelector } from "@/components/ModelSelector";
 import { PlanChatModal } from "@/components/PlanChatModal";
 
@@ -163,12 +164,39 @@ export default function Dashboard() {
   const pendingTaskStatuses = useRef(new Map<string, TaskStatus>());
   const taskSaveTimers = useRef(new Map<string, number>());
   const taskSavesInFlight = useRef(new Set<string>());
+  const getTodayKolkataDateString = () => {
+    const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const todayStr = useMemo(() => getTodayKolkataDateString(), []);
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+
+  const isTodaySelected = selectedDate === todayStr;
+
+  const formatSelectedDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return new Intl.DateTimeFormat("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      }).format(date);
+    } catch {
+      return dateStr;
+    }
+  };
+
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-  const fetchTodayPlan = useCallback(async () => {
+  const fetchTodayPlan = useCallback(async (dateStr?: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${backendUrl}/api/routine/today`, {
+      const queryDate = dateStr || selectedDate;
+      const res = await fetch(`${backendUrl}/api/routine/today?date=${queryDate}`, {
         headers: {},
       });
       if (res.ok) {
@@ -176,14 +204,19 @@ export default function Dashboard() {
         setPlan(data);
         setError("");
       } else {
-        setError("Today plan could not be loaded.");
+        setError("Plan could not be loaded.");
       }
     } catch {
       setError("Backend is not reachable. Showing a preview state.");
     } finally {
       setLoading(false);
     }
-  }, [backendUrl]);
+  }, [backendUrl, selectedDate]);
+
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    void fetchTodayPlan(newDate);
+  };
 
   const fetchTrackerStatus = useCallback(async () => {
     try {
@@ -216,7 +249,8 @@ export default function Dashboard() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [fetchTodayPlan, fetchTrackerStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const timers = taskSaveTimers.current;
@@ -254,9 +288,9 @@ export default function Dashboard() {
 
     setPlan((currentPlan) => currentPlan
       ? {
-          ...currentPlan,
-          tasks: currentPlan.tasks.map((task) => task.taskId === taskId ? { ...task, status: nextStatus } : task),
-        }
+        ...currentPlan,
+        tasks: currentPlan.tasks.map((task) => task.taskId === taskId ? { ...task, status: nextStatus } : task),
+      }
       : currentPlan
     );
     setError("");
@@ -488,26 +522,26 @@ export default function Dashboard() {
       subtitle="Plan, tasks, readiness, and AI help in one compact view."
       actions={
         <>
-          <span className="btn-ai-wrapper">
-            <MicroInteractionButton onClick={fetchTodayPlan} className="btn-ai-custom shadow-xs">
-              <span className="btn-text-slide">Refresh</span>
-            </MicroInteractionButton>
-          </span>
-          <span className="btn-ai-wrapper">
-            <MicroInteractionButton onClick={() => setManualPlanOpen(true)} className="btn-ai-custom shadow-xs">
-              <span className="btn-text-slide">Create manually</span>
-            </MicroInteractionButton>
-          </span>
-          <span className="btn-ai-wrapper">
-            <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom shadow-xs group">
-              <span className="w-4 h-4 flex items-center justify-center shrink-0">
-                <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
-                </svg>
+          <MicroInteractionButton onClick={() => void fetchTodayPlan()} className="btn-secondary">
+            Refresh
+          </MicroInteractionButton>
+          {isTodaySelected && (
+            <>
+              <MicroInteractionButton onClick={() => setManualPlanOpen(true)} className="btn-secondary">
+                Create manually
+              </MicroInteractionButton>
+              <span className="btn-ai-wrapper">
+                <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom brand-fixed shadow-xs group">
+                  <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
+                    </svg>
+                  </span>
+                  <span className="btn-text-slide">Plan with AI</span>
+                </MicroInteractionButton>
               </span>
-              <span className="btn-text-slide">Plan with AI</span>
-            </MicroInteractionButton>
-          </span>
+            </>
+          )}
         </>
       }
     >
@@ -541,7 +575,23 @@ export default function Dashboard() {
       </section>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <PageSection title="Today's Plan" eyebrow="Routine coach" className="xl:col-span-7">
+        <PageSection
+          title={isTodaySelected ? "Today's Plan" : `${formatSelectedDate(selectedDate)}'s Plan`}
+          eyebrow={isTodaySelected ? "Routine coach" : "Plan history"}
+          className="xl:col-span-7"
+          action={
+            <div className="flex items-center gap-2">
+              <label htmlFor="plan-date-select" className="sr-only">Choose Date</label>
+              <input
+                id="plan-date-select"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="focus-ring rounded-full border border-[var(--border)] bg-white px-3.5 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition cursor-pointer"
+              />
+            </div>
+          }
+        >
           {loading ? (
             <div className="surface p-4">
               <div className="animate-pulse space-y-3">
@@ -563,11 +613,11 @@ export default function Dashboard() {
             />
           ) : (
             <EmptyState
-              title="No study plan for today"
-              actionLabel="Plan with AI"
-              onAction={openPlanChat}
+              title={isTodaySelected ? "No study plan for today" : "No study plan was created for this day"}
+              actionLabel={isTodaySelected ? "Plan with AI" : undefined}
+              onAction={isTodaySelected ? openPlanChat : undefined}
               loading={loading}
-              btnClassName="btn-ai-custom mt-5 shadow-xs"
+              btnClassName="btn-ai-custom brand-fixed mt-5 shadow-xs"
               className="min-h-[280px]"
             />
           )}
@@ -578,7 +628,7 @@ export default function Dashboard() {
             <div className="surface soft-lavender p-4">
               <div className="flex flex-col gap-3 sm:flex-row xl:flex-col 2xl:flex-row">
                 <span className="btn-ai-wrapper flex-1">
-                  <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom w-full shadow-xs group">
+                  <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom brand-fixed w-full shadow-xs group">
                     <span className="w-4 h-4 flex items-center justify-center shrink-0">
                       <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
@@ -587,11 +637,9 @@ export default function Dashboard() {
                     <span className="btn-text-slide">Plan with AI</span>
                   </MicroInteractionButton>
                 </span>
-                <span className="btn-ai-wrapper flex-1">
-                  <Link href={explainerHref(weakArea)} className="btn-ai-custom w-full shadow-xs">
-                    <span className="btn-text-slide">Ask AI about weak subject</span>
-                  </Link>
-                </span>
+                <Link href={explainerHref(weakArea)} className="btn-secondary flex-1">
+                  Ask AI about weak subject
+                </Link>
               </div>
             </div>
           </PageSection>
@@ -651,15 +699,17 @@ export default function Dashboard() {
         </div>
       </PageSection>
 
-      {manualPlanOpen ? (
-        <ManualPlanModal
-          tasks={manualTasks}
-          saving={manualPlanSaving}
-          onChange={setManualTasks}
-          onClose={() => setManualPlanOpen(false)}
-          onSubmit={saveManualPlan}
-        />
-      ) : null}
+      <AnimatePresence>
+        {manualPlanOpen && (
+          <ManualPlanModal
+            tasks={manualTasks}
+            saving={manualPlanSaving}
+            onChange={setManualTasks}
+            onClose={() => setManualPlanOpen(false)}
+            onSubmit={saveManualPlan}
+          />
+        )}
+      </AnimatePresence>
 
       {planChatOpen ? (
         <PlanChatModal
@@ -701,7 +751,7 @@ function ManualPlanModal({
   };
 
   const addTask = () => {
-    if (tasks.length >= 8) return;
+    if (tasks.length >= 30) return;
     onChange([
       ...tasks,
       {
@@ -721,45 +771,62 @@ function ManualPlanModal({
   const totalMinutes = tasks.reduce((total, task) => total + (Number(task.durationMin) || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(88,104,126,0.18)] p-3 backdrop-blur-sm" onMouseDown={onClose}>
-      <form
+    <motion.div
+      initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+      animate={{ opacity: 1, backdropFilter: "blur(5px)" }}
+      exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+      transition={{ duration: 0.22, ease: "easeInOut" }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,18,24,0.3)] p-3"
+      onMouseDown={onClose}
+    >
+      <motion.form
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
         onSubmit={onSubmit}
         onMouseDown={(event) => event.stopPropagation()}
-        className="surface max-h-[90vh] w-full max-w-2xl overflow-y-auto p-4 sm:p-5"
+        className="surface flex flex-col h-[80vh] w-full max-w-2xl overflow-hidden p-4 sm:p-5"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4 shrink-0">
           <div>
-            <p className="section-label mb-1.5">Today</p>
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Create plan manually</h2>
-            <p className="mt-1 text-xs font-medium text-[var(--text-secondary)]">The first task becomes today&apos;s priority.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close manual plan" title="Close" className="focus-ring grid h-8 w-8 place-items-center rounded-md text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]">
-            x
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close manual plan"
+            title="Close"
+            className="focus-ring flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="flex-1 overflow-y-auto no-scrollbar my-4 space-y-2.5 pr-1">
           {tasks.map((task, index) => (
-            <div key={task.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5 sm:grid-cols-[24px_minmax(0,1fr)_120px_88px_32px] sm:items-center">
+            <div key={task.id} className="grid grid-cols-[24px_1fr] gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5 sm:grid-cols-[24px_minmax(0,1fr)_120px_88px_32px] sm:items-center">
               <span className="text-center text-[11px] font-semibold text-[var(--text-secondary)]">{index + 1}</span>
               <input
                 required
                 value={task.title}
                 onChange={(event) => updateTask(task.id, { title: event.target.value })}
                 placeholder="Task name"
-                className="app-input bg-white px-3 py-2 text-xs"
+                className="app-input rounded-full bg-white px-4 py-1.5 text-xs border border-[var(--border)] focus:border-[var(--accent)] focus:outline-none transition"
               />
               <select
                 value={task.taskType}
                 onChange={(event) => updateTask(task.id, { taskType: event.target.value as TaskType })}
-                className="app-input bg-white px-2 py-2 text-xs"
+                className="app-input rounded-full bg-white px-3 py-1.5 text-xs border border-[var(--border)] focus:border-[var(--accent)] focus:outline-none transition cursor-pointer"
               >
                 <option value="study">Study</option>
                 <option value="exercise">Exercise</option>
                 <option value="reading">Reading</option>
                 <option value="routine">Routine</option>
               </select>
-              <label className="relative">
+              <label className="relative block">
                 <input
                   required
                   type="number"
@@ -768,9 +835,9 @@ function ManualPlanModal({
                   value={task.durationMin}
                   onChange={(event) => updateTask(task.id, { durationMin: event.target.value })}
                   aria-label={`Minutes for task ${index + 1}`}
-                  className="app-input bg-white px-2 py-2 pr-7 text-xs"
+                  className="app-input rounded-full bg-white px-4 py-1.5 pr-8 text-xs font-semibold border border-[var(--border)] focus:border-[var(--accent)] focus:outline-none transition"
                 />
-                <span className="pointer-events-none absolute right-2 top-2 text-[10px] font-semibold text-[var(--text-faint)]">m</span>
+                <span className="pointer-events-none absolute right-3.5 top-1.5 text-[10px] font-semibold text-[var(--text-faint)]">m</span>
               </label>
               <button
                 type="button"
@@ -778,27 +845,48 @@ function ManualPlanModal({
                 disabled={tasks.length === 1}
                 aria-label={`Remove task ${index + 1}`}
                 title="Remove task"
-                className="focus-ring grid h-8 w-8 place-items-center rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:bg-white disabled:opacity-30"
+                className="focus-ring flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:opacity-30 transition cursor-pointer"
               >
-                x
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
           ))}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <button type="button" onClick={addTask} disabled={tasks.length >= 8} className="btn-secondary disabled:opacity-40">
-            Add task
-          </button>
-          <span className="text-xs font-semibold text-[var(--text-secondary)]">{totalMinutes} minutes total</span>
-        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4 shrink-0">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={addTask}
+              disabled={tasks.length >= 30}
+              className="px-4 py-2 rounded-full font-bold text-xs border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition disabled:opacity-40 cursor-pointer"
+            >
+              Add task
+            </button>
+            <span className="text-xs font-semibold text-[var(--text-secondary)]">{totalMinutes} minutes total</span>
+          </div>
 
-        <div className="mt-4 flex justify-end gap-2 border-t border-[var(--border)] pt-4">
-          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-          <MicroInteractionButton type="submit" loading={saving} className="btn-primary">Save today&apos;s plan</MicroInteractionButton>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-full font-bold text-xs text-[var(--text-secondary)] bg-[var(--bg-elevated)] hover:bg-[var(--border)] transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <MicroInteractionButton
+              type="submit"
+              loading={saving}
+              className="px-5 py-2.5 rounded-full font-bold text-xs text-white bg-zinc-900 hover:bg-zinc-950 transition cursor-pointer shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5"
+            >
+              Save today&apos;s plan
+            </MicroInteractionButton>
+          </div>
         </div>
-      </form>
-    </div>
+      </motion.form>
+    </motion.div>
   );
 }
 
@@ -857,20 +945,18 @@ const PlanPanel = memo(function PlanPanel({
               key={task.taskId}
               type="button"
               onClick={() => onToggleTask(task.taskId, task.status)}
-              className={`focus-ring interactive-surface grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border px-3 py-2.5 text-left ${
-                flashed ? "scale-[1.004]" : "scale-100"
-              } ${isDone ? "border-[var(--border)] bg-[var(--bg-elevated)]" : "border-[var(--border)] bg-white"}`}
+              className={`focus-ring interactive-surface grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border px-3 py-2.5 text-left ${flashed ? "scale-[1.004]" : "scale-100"
+                } ${isDone ? "border-[var(--border)] bg-[var(--bg-elevated)]" : "border-[var(--border)] bg-white"}`}
             >
               <span
-                className={`grid h-6 w-6 place-items-center rounded-full border text-[10px] font-semibold ${
-                  isDone
-                    ? "border-[var(--success)] bg-[var(--success)] text-white"
-                    : isPartial
-                      ? "border-[var(--sun)] bg-[var(--sun-soft)] text-[var(--sun)]"
+                className={`grid h-6 w-6 place-items-center rounded-full border text-[10px] font-semibold ${isDone
+                  ? "border-[var(--success)] bg-[var(--success)] text-white"
+                  : isPartial
+                    ? "border-[var(--sun)] bg-[var(--sun-soft)] text-[var(--sun)]"
                     : task.isPriority
                       ? "border-[var(--sun)] bg-[var(--sun-soft)] text-[var(--sun)]"
                       : "border-[var(--border-strong)] bg-white text-[var(--text-secondary)]"
-                }`}
+                  }`}
               >
                 {isDone ? "OK" : isPartial ? "50" : "0"}
               </span>

@@ -30,6 +30,6 @@ Carry-over Notes (Optional): A short note if there are missed tasks carried over
 
 ## Constraints:
 * Total word count must be less than or equal to 200 words.
-* Total sum of minutes of all tasks MUST be less than or equal to {{max_minutes}} minutes (available_hours * 60 * 1.1).
+* There is no upper limit on the sum of minutes for all tasks. Plan as many hours/minutes as needed.
 * You must output at least 3 tasks and at most 6 tasks.
 * Default language is Hinglish. Technical terms stay in English.

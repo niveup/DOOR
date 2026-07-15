@@ -4,7 +4,7 @@ You are helping {{user_name}} decide today's plan through conversation.
 
 ## Current Context
 * Student profile: {{student_profile}}
-* Available time setting: {{available_hours}} hours
+* Available time setting: No limit (plan as many hours/minutes as needed)
 * Current weak subjects: {{weak_subjects}}
 * Existing plan: {{existing_plan}}
 * Recent journals:
