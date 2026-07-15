@@ -420,7 +420,7 @@ export default function Dashboard() {
     if (planChatDraft.length === 0) return;
     setPlanChatSaving(true);
     try {
-      const response = await fetch(`${backendUrl}/api/routine/manual`, {
+      const response = await fetch(`${backendUrl}/api/routine/manual?date=${selectedDate}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -452,7 +452,7 @@ export default function Dashboard() {
     setManualPlanSaving(true);
     setError("");
     try {
-      const response = await fetch(`${backendUrl}/api/routine/manual`, {
+      const response = await fetch(`${backendUrl}/api/routine/manual?date=${selectedDate}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -491,9 +491,9 @@ export default function Dashboard() {
   };
 
   const handleDeletePlan = async () => {
-    if (!confirm("Are you sure you want to delete today's plan?")) return;
+    if (!confirm(`Are you sure you want to delete the plan for ${formatSelectedDate(selectedDate)}?`)) return;
     try {
-      const res = await fetch(`${backendUrl}/api/routine/today`, {
+      const res = await fetch(`${backendUrl}/api/routine/today?date=${selectedDate}`, {
         method: "DELETE",
         headers: {},
       });
@@ -947,14 +947,14 @@ const PlanPanel = memo(function PlanPanel({
           <button
             type="button"
             onClick={onEditPlan}
-            className="focus-ring rounded-lg border border-[var(--border)] bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition cursor-pointer"
+            className="focus-ring rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition cursor-pointer"
           >
             Edit Plan
           </button>
           <button
             type="button"
             onClick={onDeletePlan}
-            className="focus-ring rounded-lg border border-[var(--border)] bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--danger)] hover:bg-[var(--danger-soft)] transition cursor-pointer"
+            className="focus-ring rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-1 text-xs font-semibold text-[var(--danger)] hover:bg-[var(--danger-soft)] hover:border-[var(--danger)]/20 transition cursor-pointer"
           >
             Delete Plan
           </button>

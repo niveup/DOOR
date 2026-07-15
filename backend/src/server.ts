@@ -602,14 +602,15 @@ app.get("/api/routine/today", async (req: Request, res: Response) => {
   }
 });
 
-// Delete Today's Routine Plan
+// Delete Routine Plan (by optional date query param, defaults to today)
 app.delete("/api/routine/today", async (req: Request, res: Response) => {
-  const today = getKolkataDate();
+  const dateQuery = req.query.date as string;
+  const targetDate = dateQuery ? new Date(dateQuery) : getKolkataDate();
   try {
     await prisma.routinePlan.deleteMany({
-      where: { date: today }
+      where: { date: targetDate }
     });
-    res.json({ success: true, message: "Today's plan has been cleared." });
+    res.json({ success: true, message: "Plan has been cleared." });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -643,7 +644,8 @@ app.post("/api/routine/manual", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Task time must be between 5 and 480 minutes." });
   }
 
-  const today = getKolkataDate();
+  const dateQuery = req.query.date as string;
+  const targetDate = dateQuery ? new Date(dateQuery) : getKolkataDate();
   const totalEstimatedMin = normalizedTasks.reduce((total, task) => total + task.durationMin, 0);
   const planPriority = mainPriority || normalizedTasks[0].title;
   const planText = normalizedTasks
@@ -652,18 +654,18 @@ app.post("/api/routine/manual", async (req: Request, res: Response) => {
 
   try {
     const plan = await prisma.$transaction(async (transaction) => {
-      await transaction.routinePlan.deleteMany({ where: { date: today } });
+      await transaction.routinePlan.deleteMany({ where: { date: targetDate } });
       return transaction.routinePlan.create({
         data: {
-          date: today,
+          date: targetDate,
           greeting: "Your plan is ready. Start with the first task.",
           planText,
           mainPriority: planPriority,
           totalEstimatedMin,
-          isWeekend: today.getDay() === 0 || today.getDay() === 6,
+          isWeekend: targetDate.getDay() === 0 || targetDate.getDay() === 6,
           tasks: {
             create: normalizedTasks.map((task) => ({
-              date: today,
+              date: targetDate,
               title: task.title,
               taskType: task.taskType,
               durationMin: task.durationMin,
