@@ -35,7 +35,7 @@ export default function JournalPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [aiSelection, setAiSelection] = useState<AiSelection>({ provider: "nvidia", model: "meta/llama-3.1-8b-instruct" });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);

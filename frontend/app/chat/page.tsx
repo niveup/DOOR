@@ -17,7 +17,7 @@ interface ChatMessage {
 
 export default function ChatPage() {
   const router = useRouter();
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -72,6 +72,13 @@ export default function ChatPage() {
           aiModel: aiSelection.model,
         }),
       });
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Non-JSON response received:", text.slice(0, 500));
+        throw new Error("Received an invalid response from the server (possibly redirected to passcode login). Please refresh or log in again.");
+      }
 
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Failed to get coach response.");

@@ -25,7 +25,7 @@ export default function TrackerPage() {
   const [confidence, setConfidence] = useState("3");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);

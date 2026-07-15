@@ -217,7 +217,7 @@ export default function Dashboard() {
     }
   };
 
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
   const fetchTodayPlan = useCallback(async (dateStr?: string) => {
     setLoading(true);

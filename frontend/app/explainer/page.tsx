@@ -290,7 +290,7 @@ export default function ExplainerPage() {
   const [revealedSectionsCount, setRevealedSectionsCount] = useState<number>(0);
 
   const shouldReduceMotion = useReducedMotion();
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
   // Progressive reveal of sections when a new turn is loaded
   useEffect(() => {
