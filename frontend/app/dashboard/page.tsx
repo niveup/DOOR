@@ -642,7 +642,8 @@ export default function Dashboard() {
             />
           ) : (
             <EmptyState
-              title={isTodaySelected ? "No study plan for today" : "No study plan was created for this day"}
+              title="No plan found"
+              description={isTodaySelected ? "Generate one or create a manual plan for today." : "No study plan was created for this day."}
               actionLabel={isTodaySelected ? "Plan with AI" : undefined}
               onAction={isTodaySelected ? openPlanChat : undefined}
               loading={loading}
@@ -1002,12 +1003,6 @@ const PlanPanel = memo(function PlanPanel({
         })}
       </div>
 
-      <details className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2">
-        <summary className="cursor-pointer text-xs font-semibold text-[var(--text-primary)]">Coach note</summary>
-        <div className="mt-2 border-t border-[var(--border)] pt-2">
-          <AiMarkdown content={plan.planText} />
-        </div>
-      </details>
     </div>
   );
 });
