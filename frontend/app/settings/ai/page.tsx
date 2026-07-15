@@ -29,7 +29,7 @@ const providerLabels: Record<ProviderName, string> = {
 };
 
 export default function AiSettingsPage() {
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
   const [configuration, setConfiguration] = useState<AiConfiguration | null>(null);
   const [provider, setProvider] = useState<ProviderName>("openrouter");
   const [model, setModel] = useState("openrouter/free");

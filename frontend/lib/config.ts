@@ -1,5 +1,5 @@
 export function getBackendUrl() {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     if (hostname !== "localhost" && hostname !== "127.0.0.1") {

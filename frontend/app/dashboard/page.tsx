@@ -938,30 +938,28 @@ const PlanPanel = memo(function PlanPanel({
   onDeletePlan: () => void;
 }) {
   return (
-    <div className="surface p-4">
-      <div className="mb-3 flex flex-col justify-between gap-3 border-b border-[var(--border)] pb-3 sm:flex-row sm:items-center">
-        <div className="min-w-0">
-          <h3 className="mt-1 line-clamp-2 text-base font-semibold text-[var(--text-primary)]">{priority}</h3>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onEditPlan}
-            className="focus-ring rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition cursor-pointer"
-          >
-            Edit Plan
-          </button>
-          <button
-            type="button"
-            onClick={onDeletePlan}
-            className="focus-ring rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-1 text-xs font-semibold text-[var(--danger)] hover:bg-[var(--danger-soft)] hover:border-[var(--danger)]/20 transition cursor-pointer"
-          >
-            Delete Plan
-          </button>
-          <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-1 text-xs font-semibold text-[var(--text-secondary)]">
-            {scoreBand(score)}
-          </span>
-        </div>
+    <div className="surface p-4 relative">
+      {/* Header row — title left, buttons pinned right */}
+      <div className="mb-3 border-b border-[var(--border)] pb-3 pr-[170px]">
+        <h3 className="line-clamp-2 text-base font-semibold text-[var(--text-primary)]">{priority}</h3>
+      </div>
+
+      {/* Edit / Delete — always top-right, never move */}
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onEditPlan}
+          className="focus-ring rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition cursor-pointer whitespace-nowrap"
+        >
+          Edit Plan
+        </button>
+        <button
+          type="button"
+          onClick={onDeletePlan}
+          className="focus-ring rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-1 text-xs font-semibold text-[var(--danger)] hover:bg-[var(--danger-soft)] hover:border-[var(--danger)]/20 transition cursor-pointer whitespace-nowrap"
+        >
+          Delete Plan
+        </button>
       </div>
 
       <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
