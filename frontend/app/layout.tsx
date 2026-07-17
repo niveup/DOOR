@@ -29,7 +29,7 @@ export default function RootLayout({
               (function() {
                 var theme = localStorage.getItem('jujum-theme');
                 if (!theme) {
-                  theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  theme = 'light';
                 }
                 document.documentElement.dataset.theme = theme;
               })();
