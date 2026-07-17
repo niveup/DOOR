@@ -229,11 +229,11 @@ export function AppShell({
             </nav>
           </div>
 
-          {title ? (
+          {title || actions ? (
             <header className="surface mb-4 flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-end lg:p-4">
               <div className="min-w-0">
                 {eyebrow ? <p className="section-label mb-2">{eyebrow}</p> : null}
-                <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">{title}</h1>
+                {title ? <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">{title}</h1> : null}
                 {subtitle ? <p className="mt-1.5 max-w-3xl text-xs font-medium leading-5 text-[var(--text-secondary)]">{subtitle}</p> : null}
               </div>
               {actions ? <div className="hidden shrink-0 items-center gap-2 lg:flex">{actions}</div> : null}
