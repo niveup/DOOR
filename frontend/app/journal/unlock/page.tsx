@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 export default function JournalUnlockPage() {
   const [passcode, setPasscode] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const unlock = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -23,8 +21,10 @@ export default function JournalUnlockPage() {
       if (!response.ok) throw new Error(result.error || "Journal unlock failed.");
       setPasscode("");
       toast.success("Private journal unlocked");
-      router.replace("/journal");
-      router.refresh();
+      // Full navigation ensures the Set-Cookie from the auth response is
+      // applied before the browser sends the next request. The client-side
+      // router fires too fast and the proxy reads the stale session cookie.
+      window.location.replace("/journal");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Journal unlock failed.");
     } finally {
