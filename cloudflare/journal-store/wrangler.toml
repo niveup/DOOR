@@ -1,0 +1,10 @@
+name = "door-journal-store"
+main = "src/index.ts"
+compatibility_date = "2026-07-16"
+workers_dev = true
+preview_urls = false
+
+[[d1_databases]]
+binding = "JOURNAL_DB"
+database_name = "door-journal"
+database_id = "23941a07-435f-4b59-830e-41e069284277"

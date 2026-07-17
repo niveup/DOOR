@@ -33,6 +33,9 @@ During the Blueprint setup, Render will prompt you for the following environment
 | `NVIDIA_API_KEY` | (Optional) NVIDIA API key. |
 | `CEREBRAS_API_KEY` | (Optional) Cerebras API key. |
 | `AI_CREDENTIAL_ENCRYPTION_KEY` | (Optional) Key used to encrypt saved provider credentials. If omitted, falls back to `SESSION_SECRET`. |
+| `JOURNAL_ENCRYPTION_KEY` | 32+ character journal-only encryption secret; must match Vercel and must not be set in Cloudflare. |
+| `CF_JOURNAL_STORE_URL` | HTTPS URL of the deployed `cloudflare/journal-store` Worker. |
+| `CF_JOURNAL_STORE_SECRET` | 32+ character Worker HMAC secret; must match Vercel and the Worker secret. |
 
 *Note: `NODE_ENV` is pre-configured to `production`, `PORT` defaults to `4000`, and `INTERNAL_API_PORT` defaults to `4001` in the blueprint.*
 

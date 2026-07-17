@@ -169,6 +169,13 @@ export default function TrackerPage() {
 
 function Metric({ label, value, suffix }: { label: string; value: number; suffix: string }) { return <div className="surface p-4"><p className="section-label">{label}</p><p className="mt-4 text-2xl font-semibold"><AnimatedNumber value={value} /><span className="ml-1 text-sm text-[var(--text-secondary)]">{suffix}</span></p></div>; }
 function Rating({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { 
+  const ratingEmojis: Record<number, string> = {
+    1: "😟",
+    2: "😐",
+    3: "🙂",
+    4: "😊",
+    5: "⚡",
+  };
   return <div>
     <span className="section-label mb-2.5 block">{label}</span>
     <div className="flex justify-center gap-3">
@@ -179,13 +186,14 @@ function Rating({ label, value, onChange }: { label: string; value: string; onCh
             key={item} 
             type="button" 
             onClick={() => onChange(String(item))} 
-            className={`focus-ring h-11 w-11 flex items-center justify-center rounded-full font-bold text-sm transition-all duration-150 border ${
+            className={`focus-ring h-12 w-12 flex flex-col items-center justify-center rounded-full font-bold transition-all duration-150 border ${
               isSelected 
                 ? "border-[var(--accent)] bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/15 scale-105" 
                 : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
             }`}
           >
-            {item}
+            <span className="text-base leading-none">{ratingEmojis[item]}</span>
+            <span className="text-[9px] leading-none mt-0.5 opacity-80">{item}</span>
           </button>
         );
       })}

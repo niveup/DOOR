@@ -23,6 +23,12 @@ services:
         sync: false # Secure session secret (32+ characters)
       - key: AI_CREDENTIAL_ENCRYPTION_KEY
         sync: false # Optional key for AI credentials (defaults to SESSION_SECRET if not set)
+      - key: JOURNAL_ENCRYPTION_KEY
+        sync: false # 32+ characters; shared with Vercel, never with Cloudflare D1
+      - key: CF_JOURNAL_STORE_URL
+        sync: false # HTTPS URL of the private journal Worker
+      - key: CF_JOURNAL_STORE_SECRET
+        sync: false # 32+ characters; shared only with the journal Worker and Vercel
       - key: DATABASE_URL
         sync: false # Supabase PostgreSQL connection URL
       - key: DIRECT_URL

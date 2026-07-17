@@ -25,6 +25,14 @@ async function relay(request: NextRequest, context: RouteContext) {
   }
 
   const { path } = await context.params;
+  // Journal contents only travel through /api/journal, which enforces the
+  // separate journal lock and encrypted Cloudflare D1 storage boundary.
+  if (path[0] === "api" && path[1] === "journal") {
+    return NextResponse.json({ error: "Use the private journal route." }, {
+      status: 404,
+      headers: { "Cache-Control": "no-store, private, max-age=0" },
+    });
+  }
   const safePath = path.map(encodeURIComponent).join("/");
   const target = new URL(`${baseUrl}/${safePath}`);
   request.nextUrl.searchParams.forEach((value, key) => target.searchParams.append(key, value));

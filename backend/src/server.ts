@@ -8,6 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import { createAiProvider, AiProviderName } from "./lib/ai/provider";
 import { decryptApiKey, encryptApiKey } from "./lib/ai/credentials";
 import { jsonrepair } from "jsonrepair";
+import { listPrivateJournalEntries, privateJournalByDate } from "./lib/private-journal-store";
 
 // Stub types for initial compilation prior to running 'prisma generate'
 type Journal = any;
@@ -202,6 +203,26 @@ async function aiChat(
   return aiProvider.chat(systemPrompt, userPrompt, options.model, options.imageUrl);
 }
 
+// A temporary D1 outage should reduce journal context, not take the planner or
+// coach offline. This intentionally never falls back to the retired plaintext store.
+async function privateJournalEntriesOrEmpty(limit: number) {
+  try {
+    return await listPrivateJournalEntries(limit);
+  } catch (error) {
+    console.error("Private journal context unavailable", error instanceof Error ? error.message : "unknown error");
+    return [];
+  }
+}
+
+async function privateJournalByDateOrNull(date: Date) {
+  try {
+    return await privateJournalByDate(date);
+  } catch (error) {
+    console.error("Private journal context unavailable", error instanceof Error ? error.message : "unknown error");
+    return null;
+  }
+}
+
 async function publicAiConfiguration() {
   await initializeAiCredentials();
   const credentials = await prisma.aiProviderCredential.findMany({ orderBy: { provider: "asc" } });
@@ -238,6 +259,16 @@ function passcodeAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 app.use(passcodeAuth);
+
+// Journal records used to be persisted through these PostgreSQL endpoints.
+// Leave them unavailable so an app-level passcode can never bypass the private
+// journal's separate lock, encryption, and D1 service authentication.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.path === "/api/journal" || req.path === "/api/journal/history") {
+    return res.status(410).set("Cache-Control", "no-store").json({ error: "The legacy journal endpoint is retired." });
+  }
+  return next();
+});
 
 // --- API Endpoints ---
 
@@ -559,6 +590,65 @@ app.post("/api/journal", async (req: Request, res: Response) => {
   }
 });
 
+// Private-journal feedback only. Persistence is intentionally handled by the
+// encrypted Cloudflare D1 journal store, not by this service or its AI logs.
+app.post("/api/journal/feedback", async (req: Request, res: Response) => {
+  const entryText = typeof req.body?.entryText === "string" ? req.body.entryText.trim() : "";
+  const mood = typeof req.body?.mood === "string" ? req.body.mood : null;
+  const tags = Array.isArray(req.body?.tags) ? req.body.tags.filter((tag: unknown): tag is string => typeof tag === "string").slice(0, 6) : [];
+  const studyDone = req.body?.studyDone === true;
+  const exerciseDone = req.body?.exerciseDone === true;
+  const readingDone = req.body?.readingDone === true;
+  const history = Array.isArray(req.body?.history)
+    ? req.body.history.slice(0, 7).map((item: unknown) => {
+      const entry = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      return {
+        date: typeof entry.date === "string" ? entry.date.slice(0, 10) : "",
+        entryText: typeof entry.entryText === "string" ? entry.entryText.slice(0, 5000) : "",
+        mood: typeof entry.mood === "string" ? entry.mood.slice(0, 20) : "N/A",
+      };
+    }).filter((item: { entryText: string }) => item.entryText.length > 0)
+    : [];
+
+  if (entryText.length < 20 || entryText.length > 5000 || !mood || !["1", "2", "3", "4", "5"].includes(mood)) {
+    return res.status(400).set("Cache-Control", "no-store").json({ error: "Journal feedback input is invalid." });
+  }
+
+  try {
+    const settings = await prisma.settings.findUnique({ where: { id: "default" } });
+    const historyContext = history.length
+      ? history.map((entry: { date: string; entryText: string; mood: string }) => `- ${entry.date}: ${entry.entryText} (Mood: ${entry.mood})`).join("\n")
+      : "No previous journal entries found.";
+    const systemPrompt = loadPrompt("journal.md", {
+      user_name: settings?.name || "Aspirant",
+      date: getKolkataDate().toISOString().split("T")[0],
+      entry_text: entryText,
+      mood,
+      tags: JSON.stringify(tags),
+      history_context: historyContext,
+      weak_subjects: "Not requested for this private response",
+    });
+    const requestedProvider = isAiProviderName(req.body?.aiProvider) ? req.body.aiProvider : undefined;
+    const requestedModel = typeof req.body?.aiModel === "string" && req.body.aiModel.trim().length <= 160
+      ? req.body.aiModel.trim()
+      : undefined;
+    const aiResponse = await aiChat(
+      "You are Jujum AI, a strict, honest Hinglish mentor. Do not retain or repeat private journal text beyond your response.",
+      systemPrompt,
+      { provider: requestedProvider, model: requestedModel }
+    );
+    const parts = aiResponse.split("---").map((part) => part.trim());
+    res.set({ "Cache-Control": "no-store, private", "Referrer-Policy": "no-referrer" }).json({
+      aiFeedback: parts[0] || "Your entry is saved. Revisit the facts and choose one small next step.",
+      patternDetected: parts[2] || null,
+      tomorrowTask: parts[3] || null,
+    });
+  } catch (error) {
+    console.error("Private journal feedback failed", error instanceof Error ? error.message : "unknown error");
+    res.status(502).set("Cache-Control", "no-store").json({ error: "Mentor feedback is temporarily unavailable." });
+  }
+});
+
 app.get("/api/journal/history", async (req: Request, res: Response) => {
   try {
     const requestedLimit = Number(req.query.limit || 30);
@@ -711,20 +801,7 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
         where: { date: getKolkataDate() },
         include: { tasks: true },
       }),
-      prisma.journal.findMany({
-        orderBy: { date: "desc" },
-        take: 7,
-        select: {
-          date: true,
-          entryText: true,
-          mood: true,
-          tags: true,
-          tomorrowTask: true,
-          studyDone: true,
-          exerciseDone: true,
-          readingDone: true,
-        },
-      }),
+      privateJournalEntriesOrEmpty(7),
       prisma.routinePlan.findMany({
         orderBy: { date: "desc" },
         take: 7,
@@ -885,20 +962,7 @@ app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
         where: { date: getKolkataDate() },
         include: { tasks: true },
       }),
-      prisma.journal.findMany({
-        orderBy: { date: "desc" },
-        take: 5,
-        select: {
-          date: true,
-          entryText: true,
-          mood: true,
-          tags: true,
-          tomorrowTask: true,
-          studyDone: true,
-          exerciseDone: true,
-          readingDone: true,
-        },
-      }),
+      privateJournalEntriesOrEmpty(5),
     ]);
 
     const ratingsBySubject = new Map<number, any[]>();
@@ -1073,7 +1137,7 @@ async function generateTodayRoutinePlan(replaceExisting: boolean) {
 
   const [settings, yesterdayJournal, progressRatings, subjects] = await Promise.all([
     prisma.settings.findUnique({ where: { id: "default" } }),
-    prisma.journal.findUnique({ where: { date: yesterday } }),
+    privateJournalByDateOrNull(yesterday),
     prisma.progressRating.findMany({
       orderBy: [{ weekStartDate: "desc" }],
       distinct: ["subjectId"],
@@ -1298,10 +1362,10 @@ app.get("/cron/tick", async (req: Request, res: Response) => {
       return res.json({ job: "finalize_yesterday", status: "completed" });
     }
 
-    // 06:00 AM IST Cron - Generate Today's Routine Plan.
+    // 06:00 AM IST Cron - Generate Today's Routine Plan (disabled automatic generation per user request)
     // The dashboard can also force this so the user is not stuck waiting for 6 AM.
     const forcePlanGeneration = req.query.force === "plan";
-    if (currentHour === 6 || forcePlanGeneration) {
+    if (forcePlanGeneration) {
       return res.json(await generateTodayRoutinePlan(false));
     }
 
