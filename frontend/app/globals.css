@@ -475,3 +475,17 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
 /* BRAND-FIXED REGISTRY:
  * - .journal-paper, .journal-reflection, .journal-unlock-card (warm paper treatment)
  */
+
+/* KaTeX styling overrides for responsive viewports */
+.katex-block-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding: 0.25rem 0;
+  -webkit-overflow-scrolling: touch;
+}
+.katex-inline-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+}

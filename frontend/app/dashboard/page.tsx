@@ -9,20 +9,7 @@ import { AnimatedNumber, EmptyState, MicroInteractionButton, MotionCard, Progres
 import { AnimatePresence, motion } from "motion/react";
 import { AiSelection, ModelSelector } from "@/components/ModelSelector";
 import { PlanChatModal } from "@/components/PlanChatModal";
-
-function cleanMathText(text: string): string {
-  return text
-    .replace(/\\Delta/gi, "Δ")
-    .replace(/\\theta/gi, "θ")
-    .replace(/\\sigma/gi, "σ")
-    .replace(/\\pi/gi, "π")
-    .replace(/\\alpha/gi, "α")
-    .replace(/\\beta/gi, "β")
-    .replace(/\\gamma/gi, "γ")
-    .replace(/\\lambda/gi, "λ")
-    .replace(/\\mu/gi, "μ")
-    .replace(/\$/g, ""); // Remove math delimiters
-}
+import { Latex } from "@/components/Latex";
 
 function formatPriorityText(text: string): string {
   let cleaned = text;
@@ -30,8 +17,6 @@ function formatPriorityText(text: string): string {
   cleaned = cleaned.replace(/^(Study\s+)?GATE\s+Syllabus\s+Core\s+Topics:\s*(Focus\s+on\s*)?/i, "");
   cleaned = cleaned.replace(/^Focus\s+on\s*/i, "");
   cleaned = cleaned.replace(/^Study\s+Focus\s+on\s*/i, "");
-  // Strip math symbols
-  cleaned = cleanMathText(cleaned);
   // Capitalize first letter
   if (cleaned.length === 0) return "";
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
@@ -941,7 +926,7 @@ const PlanPanel = memo(function PlanPanel({
     <div className="surface p-4 relative">
       {/* Header row — title left, buttons pinned right */}
       <div className="mb-3 border-b border-[var(--border)] pb-3 pr-[170px]">
-        <h3 className="line-clamp-2 text-base font-semibold text-[var(--text-primary)]">{priority}</h3>
+        <h3 className="line-clamp-2 text-base font-semibold text-[var(--text-primary)]"><Latex text={priority} /></h3>
       </div>
 
       {/* Edit / Delete — always top-right, never move */}
@@ -989,7 +974,7 @@ const PlanPanel = memo(function PlanPanel({
               </span>
               <span className="min-w-0">
                 <span className={`block truncate text-xs font-semibold ${isDone ? "text-[var(--text-secondary)]" : "text-[var(--text-primary)]"}`}>
-                  {cleanMathText(task.title)}
+                  <Latex text={task.title} />
                 </span>
                 <span className="mt-1 block truncate text-[10px] font-medium text-[var(--text-secondary)]">
                   {taskTypeLabel(task.taskType)} / {taskStatusLabel(task.status)} / tap for next step
