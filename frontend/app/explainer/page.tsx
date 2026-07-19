@@ -484,7 +484,8 @@ export default function ExplainerPage() {
   };
 
   return (
-    <AppShell>
+    <div className="explainer-page">
+ <AppShell>
       <div className="w-full px-1 pt-5 sm:pt-6 flex flex-col gap-6">
         
         {/* Main Input Card OR New Doubt Header */}
@@ -944,6 +945,7 @@ export default function ExplainerPage() {
         </div>
       )}
     </AppShell>
+ </div>
   );
 }
 
