@@ -528,7 +528,7 @@ export default function ExplainerPage() {
                       key={style.id}
                       type="button"
                       onClick={() => setLearningStyle(style.id)}
-                      className={`focus-ring rounded-lg border py-1.5 px-2.5 text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      className={`explainer-mode-btn focus-ring rounded-lg border py-1.5 px-2.5 text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                         learningStyle === style.id
                           ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
                           : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -721,7 +721,7 @@ export default function ExplainerPage() {
                       </div>
 
                       {/* Flowing Textbook Sections */}
-                      <div className="space-y-4">
+                      <div className="space-y-8 mt-6">
                         {(exp.sections || []).map((sec, idx) => {
                           // Hide sections not yet revealed in client-side progressive reveal (only for last turn)
                           const isLastTurn = turnIdx === thread.length - 1;
@@ -734,14 +734,84 @@ export default function ExplainerPage() {
                           const isCollapsible = !isEssay && hasTitle && sec.collapsed !== false;
 
                           if (!isCollapsible) {
+                            if (sec.type === "formula") {
+                              return (
+                                <div key={sec.id} className="explainer-layout-split grid grid-cols-1 md:grid-cols-12 gap-6 pt-6 mt-6 first:pt-0 first:mt-0 border-t border-[var(--border)]/30 first:border-t-0">
+                                  <div className="md:col-span-4 flex flex-col justify-start">
+                                    {hasTitle && (
+                                      <h4 className="font-serif font-bold text-sm text-[var(--text-primary)] leading-tight tracking-tight select-none mb-1">
+                                        <AiMarkdown content={sec.title} />
+                                      </h4>
+                                    )}
+                                    <p className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider select-none">
+                                      Model & Formulation
+                                    </p>
+                                  </div>
+                                  <div className="md:col-span-8">
+                                    <SectionRenderer section={sec} copiedText={copiedText} onCopy={handleCopy} />
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (sec.type === "alert") {
+                              return (
+                                <div key={sec.id} className="explainer-layout-split grid grid-cols-1 md:grid-cols-12 gap-6 pt-6 mt-6 first:pt-0 first:mt-0 border-t border-[var(--border)]/30 first:border-t-0">
+                                  <div className="md:col-span-4 flex flex-col justify-start">
+                                    <p className="text-[10px] font-bold text-[var(--danger)] uppercase tracking-widest select-none mt-1">
+                                      ⚠️ Critical Benchmark
+                                    </p>
+                                  </div>
+                                  <div className="md:col-span-8">
+                                    <SectionRenderer section={sec} copiedText={copiedText} onCopy={handleCopy} />
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (sec.type === "table") {
+                              return (
+                                <div key={sec.id} className="explainer-layout-wide pt-6 mt-6 first:pt-0 first:mt-0 border-t border-[var(--border)]/30 first:border-t-0">
+                                  {hasTitle && (
+                                    <h4 className="font-serif font-bold text-sm text-[var(--text-primary)] tracking-tight mb-3 select-none">
+                                      <AiMarkdown content={sec.title} />
+                                    </h4>
+                                  )}
+                                  <div className="w-full">
+                                    <SectionRenderer section={sec} copiedText={copiedText} onCopy={handleCopy} />
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (sec.type === "hierarchy") {
+                              return (
+                                <div key={sec.id} className="explainer-layout-split grid grid-cols-1 md:grid-cols-12 gap-6 pt-6 mt-6 first:pt-0 first:mt-0 border-t border-[var(--border)]/30 first:border-t-0">
+                                  <div className="md:col-span-4 flex flex-col justify-start">
+                                    {hasTitle && (
+                                      <h4 className="font-serif font-bold text-sm text-[var(--text-primary)] leading-tight tracking-tight select-none mb-1">
+                                        <AiMarkdown content={sec.title} />
+                                      </h4>
+                                    )}
+                                    <p className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider select-none">
+                                      Structure Tree
+                                    </p>
+                                  </div>
+                                  <div className="md:col-span-8">
+                                    <SectionRenderer section={sec} copiedText={copiedText} onCopy={handleCopy} />
+                                  </div>
+                                </div>
+                              );
+                            }
+
                             return (
-                              <div key={sec.id} className="pt-6 mt-6 first:pt-0 first:mt-0">
+                              <div key={sec.id} className="pt-6 mt-6 first:pt-0 first:mt-0 max-w-[72ch] explainer-layout-text">
                                 {hasTitle && (
-                                  <h3 className="font-bold text-sm text-[var(--text-primary)] py-2 select-none tracking-tight [&_p]:m-0 [&_p]:inline-block [&_p]:text-inherit">
+                                  <h3 className="font-serif font-extrabold text-base text-[var(--text-primary)] py-2 select-none tracking-tight [&_p]:m-0 [&_p]:inline-block [&_p]:text-inherit">
                                     <AiMarkdown content={sec.title} />
                                   </h3>
                                 )}
-                                <div className="mt-2 px-2">
+                                <div className="mt-1 px-1">
                                   <SectionRenderer section={sec} copiedText={copiedText} onCopy={handleCopy} />
                                 </div>
                               </div>
@@ -754,31 +824,39 @@ export default function ExplainerPage() {
                             : defaultCollapsed;
 
                           return (
-                            <div key={sec.id} className="pt-6 mt-6 first:pt-0 first:mt-0">
-                              <button
-                                type="button"
-                                onClick={() => toggleSection(`${turnIdx}-${sec.id}`, defaultCollapsed)}
-                                className="explainer-section-toggle flex items-center justify-between w-full text-left font-bold text-sm text-[var(--text-primary)] py-2 hover:bg-[var(--bg-elevated)] px-2 rounded-lg transition cursor-pointer select-none"
-                              >
-                                <span className="tracking-tight [&_p]:m-0 [&_p]:inline-block [&_p]:text-inherit">
-                                  <AiMarkdown content={sec.title} />
-                                </span>
-                                <span className="text-xs text-[var(--text-secondary)]">{isCollapsed ? "▶ Show" : "▼ Hide"}</span>
-                              </button>
-                              
-                              <AnimatePresence initial={false}>
-                                {!isCollapsed && (
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="overflow-hidden mt-3 px-2"
-                                  >
-                                    <SectionRenderer section={sec} copiedText={copiedText} onCopy={handleCopy} />
-                                  </motion.div>
+                            <div key={sec.id} className="explainer-layout-split grid grid-cols-1 md:grid-cols-12 gap-6 pt-6 mt-6 first:pt-0 first:mt-0 border-t border-[var(--border)]/30 first:border-t-0">
+                              <div className="md:col-span-4 flex items-start">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSection(`${turnIdx}-${sec.id}`, defaultCollapsed)}
+                                  className="explainer-section-toggle flex items-center gap-2 font-bold text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] py-1.5 px-2.5 rounded-lg border border-[var(--border)]/50 bg-white hover:border-[var(--accent)] transition cursor-pointer select-none active:scale-[0.985]"
+                                >
+                                  <span className="text-[10px] font-mono leading-none">{isCollapsed ? "▶" : "▼"}</span>
+                                  <span className="tracking-tight select-none font-bold uppercase tracking-wide text-[9px]">
+                                    {isCollapsed ? "Reveal Details" : "Collapse"}
+                                  </span>
+                                </button>
+                              </div>
+                              <div className="md:col-span-8">
+                                {hasTitle && (
+                                  <h4 className="font-serif font-bold text-sm text-[var(--text-primary)] mb-1.5 select-none tracking-tight">
+                                    <AiMarkdown content={sec.title} />
+                                  </h4>
                                 )}
-                              </AnimatePresence>
+                                <AnimatePresence initial={false}>
+                                  {!isCollapsed && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: "auto", opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{ duration: 0.2 }}
+                                      className="overflow-hidden mt-1.5"
+                                    >
+                                      <SectionRenderer section={sec} copiedText={copiedText} onCopy={handleCopy} />
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
                             </div>
                           );
                         })}
@@ -894,7 +972,7 @@ export default function ExplainerPage() {
                       setTopic(q);
                       void triggerQuery(q);
                     }}
-                    className="focus-ring rounded-full border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
+                    className="explainer-prompt-chip focus-ring rounded-full border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
                   >
                     • {q}
                   </button>
@@ -1164,32 +1242,21 @@ function QuizWidget({
 
 function ThinkingPanel() {
   return (
-    <div className="surface soft-blue p-5 border border-[var(--border)] rounded-2xl bg-white shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="section-label mb-2 text-[var(--accent)] animate-pulse">Scholar is building explanation...</p>
-          <h3 className="text-base font-bold text-[var(--text-primary)]">Writing sections</h3>
-          <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">
-            Analyzing doubts, formulating derivations, and compiling interactive quiz checks.
-          </p>
-        </div>
-        <div className="flex min-w-[220px] gap-2">
-          {["Read", "Solve", "Quiz"].map((item, index) => (
-            <span key={item} className="flex-1 rounded-lg border border-white bg-[var(--accent-soft)]/40 px-3 py-2 text-center text-[11px] font-semibold text-[var(--accent)]">
-              <span className="mx-auto mb-2 block h-1.5 w-1.5 rounded-full bg-[var(--accent)] opacity-80 animate-ping" style={{ animationDelay: `${index * 150}ms` }} />
-              {item}
-            </span>
-          ))}
-        </div>
+    <div className="p-6 border border-[var(--border)] rounded-xl bg-[var(--bg-elevated)]/40 flex flex-col gap-4">
+      <div className="flex items-center gap-2 text-stone-500 uppercase tracking-widest text-[9px] font-mono font-bold">
+        <span className="h-1 w-1 rounded-full bg-[var(--accent)]" />
+        Formulating explanation
       </div>
-      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-        {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="animate-pulse rounded-xl border border-[var(--border)] bg-white p-4">
-            <div className="h-3 w-32 rounded bg-[var(--track)]" />
-            <div className="mt-4 h-3 rounded bg-[var(--track)]" />
-            <div className="mt-2 h-3 w-4/5 rounded bg-[var(--track)]" />
-          </div>
-        ))}
+      <div className="flex flex-col gap-2 font-mono text-[11px] text-[var(--text-secondary)]">
+        <div className="flex items-center gap-1.5">
+          <span className="explainer-loader-typewriter-line1">Analyzing conceptual constraints...</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="explainer-loader-typewriter-line2">Retrieving syllabus benchmarks...</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="explainer-loader-typewriter-line3">Drafting mathematical steps...</span>
+        </div>
       </div>
     </div>
   );

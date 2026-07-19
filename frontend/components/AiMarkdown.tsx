@@ -309,7 +309,7 @@ function QuizComponent({ code }: { code: string }) {
                       setSelected(prev => ({ ...prev, [qIdx]: oIdx }));
                       setShowExplanation(prev => ({ ...prev, [qIdx]: true }));
                     }}
-                    className={`text-left text-xs p-2.5 rounded-lg border transition duration-150 cursor-pointer flex justify-between items-center ${btnStyle}`}
+                    className={`explainer-quiz-btn text-left text-xs p-2.5 rounded-lg border transition duration-150 cursor-pointer flex justify-between items-center ${btnStyle}`}
                   >
                     <span>{opt}</span>
                     {isAnswered && isCorrect && <span className="text-emerald-600 font-bold">✓</span>}
