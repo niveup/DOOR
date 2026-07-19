@@ -1,41 +1,26 @@
 from pathlib import Path
+import re
 
 page = Path("frontend/app/explainer/page.tsx")
 text = page.read_text(encoding="utf-8-sig")
 
-replacements = [
-    (
-        'className="surface p-4 sm:p-5 flex flex-col gap-4 shadow-md border border-[var(--border)] rounded-2xl bg-white"',
-        'className="surface explainer-query-panel p-4 sm:p-5 flex flex-col gap-4 shadow-md border border-[var(--border)] rounded-2xl bg-white"',
-        "query panel",
-    ),
-    (
-        'className="surface flex justify-between items-center border border-[var(--border)] p-4 px-6 rounded-2xl bg-white shadow-sm"',
-        'className="surface explainer-session-bar flex justify-between items-center border border-[var(--border)] p-4 px-6 rounded-2xl bg-white shadow-sm"',
-        "session bar",
-    ),
-    (
-        'className="flex items-center justify-between w-full text-left font-bold text-sm text-[var(--text-primary)] py-2 hover:bg-[var(--bg-elevated)] px-2 rounded-lg transition cursor-pointer select-none"',
-        'className="explainer-section-toggle flex items-center justify-between w-full text-left font-bold text-sm text-[var(--text-primary)] py-2 hover:bg-[var(--bg-elevated)] px-2 rounded-lg transition cursor-pointer select-none"',
-        "section toggle",
-    ),
-    (
-        'className="overflow-hidden mt-3 px-2"',
-        'className="explainer-section-body overflow-hidden mt-3 px-2"',
-        "section body",
-    ),
-    (
-        'className="focus-ring rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"',
-        'className="explainer-followup focus-ring rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"',
-        "follow-up chip",
-    ),
-]
+def add_class(pattern: str, class_name: str, label: str, flags=0):
+    global text
+    matches = list(re.finditer(pattern, text, flags))
+    if len(matches) != 1:
+        raise SystemExit(f"{label}: expected one match, found {len(matches)}")
+    start, end = matches[0].span()
+    value = text[start:end]
+    if class_name in value:
+        return
+    value = value.replace('className="', f'className="{class_name} ', 1)
+    text = text[:start] + value + text[end:]
 
-for old, new, label in replacements:
-    count = text.count(old)
-    if count < 1:
-        raise SystemExit(f"{label}: expected at least one match, found {count}")
-    text = text.replace(old, new)
+add_class(r'className="surface[^\"]*shadow-md[^\"]*rounded-2xl[^\"]*bg-white"', "explainer-query-panel", "query panel")
+add_class(r'className="surface[^\"]*justify-between[^\"]*rounded-2xl[^\"]*bg-white[^\"]*shadow-sm"', "explainer-session-bar", "session bar")
+add_class(r'className="flex items-center justify-between w-full text-left font-bold text-sm[^\"]*cursor-pointer select-none"', "explainer-section-toggle", "section toggle")
+add_class(r'className="overflow-hidden mt-3 px-2"', "explainer-section-body", "section body")
+add_class(r'className="focus-ring rounded-full border[^\"]*hover:bg-\[var\(--accent-soft\)\][^\"]*cursor-pointer"', "explainer-followup", "follow-up chip")
 
 page.write_text(text, encoding="utf-8")
 
@@ -59,37 +44,21 @@ if marker not in styles:
   min-height: 44px;
   transition: color 140ms var(--ease-standard), background-color 140ms var(--ease-standard), transform 140ms var(--ease-out);
 }
-.explainer-section-toggle:hover {
-  transform: translateX(3px);
-}
-.explainer-section-toggle:active {
-  transform: translateX(1px) scale(0.99);
-}
-.explainer-section-body {
-  max-width: 74ch;
-  line-height: 1.78;
-  text-wrap: pretty;
-}
+.explainer-section-toggle:hover { transform: translateX(3px); }
+.explainer-section-toggle:active { transform: translateX(1px) scale(0.99); }
+.explainer-section-body { max-width: 74ch; line-height: 1.78; text-wrap: pretty; }
 .explainer-followup {
   transition: color 140ms var(--ease-standard), background-color 140ms var(--ease-standard), border-color 140ms var(--ease-standard), transform 180ms var(--ease-out);
 }
-.explainer-followup:hover {
-  transform: translateX(4px);
-}
-.explainer-followup:active {
-  transform: translateX(1px) scale(0.98);
-}
+.explainer-followup:hover { transform: translateX(4px); }
+.explainer-followup:active { transform: translateX(1px) scale(0.98); }
 @media (max-width: 900px) {
   .explainer-session-bar { align-items: flex-start; flex-direction: column; gap: 12px; }
   .explainer-section-body { max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .explainer-query-panel,
-  .explainer-section-toggle,
-  .explainer-followup { transition: none; }
-  .explainer-section-toggle:hover,
-  .explainer-followup:hover { transform: none; }
+  .explainer-query-panel, .explainer-section-toggle, .explainer-followup { transition: none; }
+  .explainer-section-toggle:hover, .explainer-followup:hover { transform: none; }
 }
 '''
 css.write_text(styles, encoding="utf-8")
-'''}]}}.functions.call_tool(...) 大发快三和值?, invalid? Need correct tool name call_tool args object, prior tool call likely malformed? It shows no output. Let's retry properly. қари.
