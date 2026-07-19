@@ -3,7 +3,9 @@ name: Apply Explainer polish
 on:
   push:
     branches: [feat/explainer-guided-output-polish]
-    paths: [.github/workflows/apply-explainer-polish.yml]
+    paths:
+      - .github/workflows/apply-explainer-polish.yml
+      - scripts/apply_explainer_polish.py
 
 permissions:
   contents: write
