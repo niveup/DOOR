@@ -167,7 +167,7 @@ function FormulaBlock({ code }: { code: string }) {
   }
 
   return (
-    <div className="my-4 py-3 px-4 border-l-2 border-[var(--accent)] bg-[var(--bg-elevated)]/40 rounded-r-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="explainer-formula-block my-4 py-3 px-4 border-l-2 border-[var(--accent)] bg-[var(--bg-elevated)]/40 rounded-r-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="flex-1 text-center md:text-left py-1 overflow-x-auto">
         <AiMarkdown content={expression.includes("$") ? expression : `$$${expression}$$`} />
       </div>
@@ -277,7 +277,7 @@ function QuizComponent({ code }: { code: string }) {
   const [showExplanation, setShowExplanation] = useState<Record<number, boolean>>({});
 
   return (
-    <div className="my-6 flex flex-col gap-5">
+    <div className="explainer-quiz my-6 flex flex-col gap-5">
       {quizData.map((q, qIdx) => {
         const isAnswered = selected[qIdx] !== undefined;
         return (
@@ -356,7 +356,7 @@ function FlashcardsComponent({ code }: { code: string }) {
           <div
             key={idx}
             onClick={() => setFlipped(prev => ({ ...prev, [idx]: !isFlipped }))}
-            className="h-32 [perspective:1000px] cursor-pointer"
+            className="explainer-flashcard h-32 [perspective:1000px] cursor-pointer"
           >
             <div className={`relative w-full h-full transition-transform duration-500 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
               {/* Front side */}
@@ -394,7 +394,7 @@ function InterviewQuestionsComponent({ code }: { code: string }) {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   return (
-    <div className="my-5 flex flex-col gap-3">
+    <div className="explainer-interview-cards my-5 flex flex-col gap-3">
       {questions.map((qa, idx) => {
         const isExpanded = expanded[idx] || false;
         return (
@@ -442,7 +442,7 @@ function MermaidDiagram({ code }: { code: string }) {
   const url = `https://mermaid.ink/svg/${base64}`;
 
   return (
-    <div className="my-6 rounded-xl border border-[var(--border)]/60 bg-white p-4 flex flex-col items-center justify-center relative min-h-[140px] shadow-sm">
+    <div className="explainer-diagram my-6 rounded-xl border border-[var(--border)]/60 bg-white p-4 flex flex-col items-center justify-center relative min-h-[140px] shadow-sm">
       <span className="text-[9px] uppercase tracking-wider text-[var(--text-faint)] font-bold mb-3 select-none">Flowchart & System Diagram</span>
       {loading && (
         <div className="absolute inset-0 bg-white/80 flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)] select-none">

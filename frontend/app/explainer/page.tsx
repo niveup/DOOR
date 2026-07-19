@@ -498,7 +498,7 @@ export default function ExplainerPage() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.2 }}
               onSubmit={handleQuery}
-              className="surface p-4 sm:p-5 flex flex-col gap-4 shadow-md border border-[var(--border)] rounded-2xl bg-white"
+              className="surface explainer-query-form p-4 sm:p-5 flex flex-col gap-4 shadow-md border border-[var(--border)] rounded-2xl bg-white"
             >
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="topic" className="section-label block">
@@ -616,7 +616,7 @@ export default function ExplainerPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.98 }}
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
-              className="surface flex justify-between items-center border border-[var(--border)] p-4 px-6 rounded-2xl bg-white shadow-sm"
+              className="surface explainer-session-bar flex justify-between items-center border border-[var(--border)] p-4 px-6 rounded-2xl bg-white shadow-sm"
             >
               <div className="flex items-center gap-3">
                 <div className="relative flex h-2.5 w-2.5">
@@ -758,7 +758,7 @@ export default function ExplainerPage() {
                               <button
                                 type="button"
                                 onClick={() => toggleSection(`${turnIdx}-${sec.id}`, defaultCollapsed)}
-                                className="flex items-center justify-between w-full text-left font-bold text-sm text-[var(--text-primary)] py-2 hover:bg-[var(--bg-elevated)] px-2 rounded-lg transition cursor-pointer select-none"
+                                className="explainer-section-toggle flex items-center justify-between w-full text-left font-bold text-sm text-[var(--text-primary)] py-2 hover:bg-[var(--bg-elevated)] px-2 rounded-lg transition cursor-pointer select-none"
                               >
                                 <span className="tracking-tight [&_p]:m-0 [&_p]:inline-block [&_p]:text-inherit">
                                   <AiMarkdown content={sec.title} />
@@ -796,7 +796,7 @@ export default function ExplainerPage() {
                                 key={q}
                                 type="button"
                                 onClick={() => void triggerQuery(q, true)}
-                                className="focus-ring rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
+                                className="explainer-followup focus-ring rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
                               >
                                 {q}
                               </button>

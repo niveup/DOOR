@@ -689,8 +689,33 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   opacity: 0.85;
 }
 
-/* Explainer-only output polish */
+/* Explainer-only output rhythm and micro-interactions. Base tokens stay unchanged. */
+.explainer-query-form { transition: border-color 160ms var(--ease-standard), transform 180ms var(--ease-out); }
+.explainer-query-form:focus-within { border-color: var(--accent); }
+.explainer-session-bar { transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-standard); }
+.explainer-session-bar:hover { transform: translateY(-1px); border-color: var(--border-strong); }
+.explainer-section-toggle { transition: background-color 120ms var(--ease-standard), color 120ms var(--ease-standard), transform 120ms var(--ease-out); }
+.explainer-section-toggle:hover { background: var(--bg-elevated); color: var(--accent); }
+.explainer-section-toggle:active { transform: scale(.99); }
+.explainer-section-toggle svg, .explainer-section-toggle span:first-child { transition: transform 180ms var(--ease-out); }
+.explainer-followup { transition: transform 150ms var(--ease-out), background-color 150ms var(--ease-standard), color 150ms var(--ease-standard); }
+.explainer-followup:hover { transform: translateX(3px); }
+.explainer-followup:active { transform: translateX(1px) scale(.98); }
+.explainer-formula-block { transition: transform 150ms var(--ease-out), background-color 150ms var(--ease-standard); }
+.explainer-formula-block:hover { transform: translateY(-2px); background-color: var(--bg-elevated); }
+.explainer-formula-block:active { transform: translateY(0) scale(.995); }
+.explainer-quiz button { transition: transform 120ms var(--ease-out), background-color 120ms var(--ease-standard), border-color 120ms var(--ease-standard); }
+.explainer-quiz button:hover { transform: translateX(2px); }
+.explainer-quiz button:active { transform: translateX(1px) scale(.985); }
+.explainer-flashcard { transition: transform 180ms var(--ease-out); }
+.explainer-flashcard:hover { transform: translateY(-3px); }
+.explainer-flashcard:active { transform: translateY(0) scale(.985); }
+.explainer-interview-cards button { transition: padding 160ms var(--ease-out), background-color 160ms var(--ease-standard); }
+.explainer-interview-cards button:hover { padding-left: 1.1rem; }
+.explainer-diagram img { transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out); }
+.explainer-diagram img:hover { transform: scale(1.01); }
 
+/* Explainer-only output polish */
 .explainer-page .ai-markdown {
   max-width: 74ch;
   line-height: 1.78;
@@ -737,11 +762,15 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   max-width: 100%;
   overflow-x: auto;
 }
+
 @media (max-width: 900px) {
+  .explainer-formula-block { overflow-x: auto; }
   .explainer-page .ai-markdown { max-width: none; }
   .explainer-page .ai-markdown table { display: block; max-width: 100%; overflow-x: auto; }
 }
+
 @media (prefers-reduced-motion: reduce) {
+  .explainer-query-form, .explainer-session-bar, .explainer-section-toggle, .explainer-followup, .explainer-formula-block, .explainer-quiz button, .explainer-flashcard, .explainer-interview-cards button, .explainer-diagram img { animation: none; transition: none; }
   .explainer-page button,
   .explainer-page button svg { transition: none; }
   .explainer-page button:hover,
