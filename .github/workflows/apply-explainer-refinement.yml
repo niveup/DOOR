@@ -1,0 +1,29 @@
+name: Apply Explainer refinement
+on:
+  push:
+    branches: [feat/explainer-guided-output]
+    paths:
+      - .github/workflows/apply-explainer-refinement.yml
+      - scripts/apply_explainer_refinement.py
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: feat/explainer-guided-output, fetch-depth: 0 }
+      - run: python3 scripts/apply_explainer_refinement.py
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - working-directory: frontend
+        run: npm install --legacy-peer-deps --include=dev --no-audit --no-fund
+      - working-directory: frontend
+        run: npx --no-install tsc --noEmit && npm run build
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-explainer-refinement.yml scripts/apply_explainer_refinement.py
+          git add frontend/app/explainer/page.tsx frontend/components/AiMarkdown.tsx frontend/app/globals.css
+          git commit -m "feat(explainer): add guided hierarchy and tactile interactions"
+          git push
