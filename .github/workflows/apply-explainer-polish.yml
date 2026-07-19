@@ -17,6 +17,11 @@ concurrency:
 jobs:
   patch-and-verify:
     runs-on: ubuntu-latest
+    env:
+      SESSION_SECRET: ci-session-secret-32-characters-minimum-value
+      APP_PASSCODE: ci-passcode-not-for-production
+      NEXT_PUBLIC_API_URL: /api/backend
+      BACKEND_API_URL: https://example.com
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,4 +45,4 @@ jobs:
           git commit -m "feat(explainer): polish guided output hierarchy and interactions"
           git push
 
-# verification-trigger-2026-07-19-2
+# verification-trigger-2026-07-19-3
