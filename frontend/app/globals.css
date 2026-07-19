@@ -688,3 +688,62 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   padding: 2rem;
   opacity: 0.85;
 }
+
+/* Explainer-only output polish */
+
+.explainer-page .ai-markdown {
+  max-width: 74ch;
+  line-height: 1.78;
+  text-wrap: pretty;
+}
+.explainer-page .ai-markdown > p:first-child {
+  font-size: 1.04rem;
+  line-height: 1.68;
+}
+.explainer-page .ai-markdown h2,
+.explainer-page .ai-markdown h3 {
+  margin-top: 1.8rem;
+  margin-bottom: .65rem;
+  letter-spacing: -.015em;
+}
+.explainer-page .ai-markdown blockquote {
+  margin-block: 1.5rem;
+  padding: .9rem 1rem;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+.explainer-page button {
+  transition: color 140ms var(--ease-standard), background-color 140ms var(--ease-standard), border-color 140ms var(--ease-standard), transform 150ms var(--ease-out);
+}
+.explainer-page button:active {
+  transform: scale(.985);
+}
+.explainer-page button[aria-expanded="true"] {
+  color: var(--accent);
+}
+.explainer-page button[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+.explainer-page button svg {
+  transition: transform 160ms var(--ease-out);
+}
+.explainer-page button:hover {
+  transform: translateY(-1px);
+}
+.explainer-page button:active {
+  transform: translateY(0) scale(.985);
+}
+.explainer-page [class*="katex"] {
+  max-width: 100%;
+  overflow-x: auto;
+}
+@media (max-width: 900px) {
+  .explainer-page .ai-markdown { max-width: none; }
+  .explainer-page .ai-markdown table { display: block; max-width: 100%; overflow-x: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .explainer-page button,
+  .explainer-page button svg { transition: none; }
+  .explainer-page button:hover,
+  .explainer-page button:active { transform: none; }
+}
