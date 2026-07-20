@@ -88,16 +88,6 @@ const learningStyles: LearningStyle[] = [
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
     </svg>
   )},
-  { id: "Visual", label: "Visual", icon: (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-  )},
-  { id: "Research", label: "Research", icon: (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  )},
 ];
 
 const formatCell = (value: unknown) => {
@@ -265,7 +255,6 @@ function normalizeApiResponse(raw: any): Explanation {
 export default function ExplainerPage() {
   const [topic, setTopic] = useState("");
   const [learningStyle, setLearningStyle] = useState("Exam Focus");
-  const [deepMode, setDeepMode] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   
@@ -291,6 +280,27 @@ export default function ExplainerPage() {
 
   const shouldReduceMotion = useReducedMotion();
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+
+  // Load active AI config on mount
+  useEffect(() => {
+    const fetchActiveConfig = async () => {
+      try {
+        const response = await fetch(`${backendUrl}/api/ai/config`);
+        if (response.ok) {
+          const result = await response.json();
+          const activeProvider = result.activeProvider || "nvidia";
+          const activeConfig = result.providers?.find((item: any) => item.provider === activeProvider);
+          setAiSelection({
+            provider: activeProvider,
+            model: activeConfig?.model || result.activeModel || "meta/llama-3.1-8b-instruct",
+          });
+        }
+      } catch {
+        // Fallback to default
+      }
+    };
+    void fetchActiveConfig();
+  }, [backendUrl]);
 
   // Progressive reveal of sections when a new turn is loaded
   useEffect(() => {
@@ -395,7 +405,7 @@ export default function ExplainerPage() {
         body: JSON.stringify({
           topic: queryText,
           mode: selectedMode,
-          deep: deepMode,
+          deep: false,
           history,
           aiProvider: aiSelection.provider,
           aiModel: aiSelection.model,
@@ -508,7 +518,7 @@ export default function ExplainerPage() {
                   id="topic"
                   value={topic}
                   onChange={(event) => setTopic(event.target.value)}
-                  placeholder={imagePreview ? "Ask what to explain from the image..." : "What is entropy? / Why does binary search work? / Ask any engineering doubt..."}
+                  placeholder={imagePreview ? "Ask what to explain from the image..." : "What is entropy? / Mohr’s circle for plane stress / Ask any engineering doubt..."}
                   className="app-input min-h-[90px] h-[90px] resize-none px-4 py-3 text-sm leading-6 w-full rounded-xl border border-[var(--border)] focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -519,61 +529,35 @@ export default function ExplainerPage() {
                 />
               </div>
 
-              {/* Learning Style Selector */}
-              <div>
-                <span className="text-[10px] font-bold text-[var(--text-secondary)] tracking-wider uppercase mb-1.5 block">Learning Mode</span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {learningStyles.map((style) => (
-                    <button
-                      key={style.id}
-                      type="button"
-                      onClick={() => setLearningStyle(style.id)}
-                      className={`explainer-mode-btn focus-ring rounded-lg border py-1.5 px-2.5 text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        learningStyle === style.id
-                          ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                          : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-                      }`}
-                    >
-                      <span className="flex items-center justify-center text-[var(--text-secondary)]">{style.icon}</span>
-                      <span>{style.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Divider and Actions */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[var(--border)] pt-3.5 mt-0.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <ModelSelector value={aiSelection} onChange={setAiSelection} />
-                  
-                  <button
-                    type="button"
-                    onClick={() => setDeepMode((value) => !value)}
-                    className={`focus-ring flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition cursor-pointer select-none ${
-                      deepMode
-                        ? "border-[var(--teal)] bg-[var(--teal-soft)] text-[var(--teal)] shadow-sm"
-                        : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-                    }`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${deepMode ? "bg-[var(--teal)] animate-pulse" : "bg-gray-300"}`} />
-                    <span>Deep Research</span>
-                  </button>
+              {/* Learning Style Selector & Explain Button */}
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mt-1.5">
+                <div>
+                  <span className="text-[10px] font-bold text-[var(--text-secondary)] tracking-wider uppercase mb-1.5 block">Learning Mode</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {learningStyles.map((style) => (
+                      <button
+                        key={style.id}
+                        type="button"
+                        onClick={() => setLearningStyle(style.id)}
+                        className={`explainer-mode-btn focus-ring rounded-lg border py-1.5 px-2.5 text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          learningStyle === style.id
+                            ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                            : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+                        }`}
+                      >
+                        <span className="flex items-center justify-center text-[var(--text-secondary)]">{style.icon}</span>
+                        <span>{style.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <label className="focus-ring !min-h-[2rem] !rounded-lg !text-[11px] !py-1.5 !px-2.5 border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[var(--bg-elevated)] transition active:scale-[0.98]">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                    </svg>
-                    <span className="font-semibold">Add image</span>
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                  </label>
-
+                <div className="shrink-0">
                   <MicroInteractionButton
                     type="submit"
                     loading={loading && thread.length === 0}
                     disabled={loading || (!topic.trim() && !image)}
-                    className="btn-primary !min-h-[2rem] !rounded-lg !text-[11px] !py-1.5 !px-3.5 flex items-center justify-center gap-1.5 shadow-sm hover:bg-[var(--accent-hover)] transition cursor-pointer active:scale-[0.98] disabled:opacity-45"
+                    className="btn-primary !min-h-[2.1rem] !rounded-lg !text-[11px] !py-1.5 !px-3.5 flex items-center justify-center gap-1.5 shadow-sm hover:bg-[var(--accent-hover)] transition cursor-pointer active:scale-[0.98] disabled:opacity-45"
                   >
                     <span>Explain Concept</span>
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
@@ -666,8 +650,8 @@ export default function ExplainerPage() {
                       </div>
                     )}
 
-                    {/* Explainer Workspace Panel - Typography First Notion/Apple style */}
-                    <div className="flex flex-col gap-6 py-2">
+                    {/* Explainer Workspace Panel - Styled Logbook/Tome Card */}
+                    <div className="explainer-log-card flex flex-col gap-6 p-6 sm:p-8 rounded-2xl border border-[var(--border)] shadow-sm bg-white relative overflow-hidden">
                       
                       {/* Off-syllabus Warning Banner */}
                       {exp.off_syllabus && (
@@ -688,37 +672,7 @@ export default function ExplainerPage() {
                         </p>
                       </div>
 
-                      {/* Sleek Horizontal Meta Row */}
-                      <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs text-[var(--text-secondary)] font-semibold border-b border-[var(--border)]/50 pb-4">
-                        <span className="flex items-center gap-1.5 bg-[var(--accent-soft)] text-[var(--accent)] px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider select-none">
-                          {exp.session?.difficulty || "Medium"}
-                        </span>
-                        
-                        {!exp.off_syllabus && exp.session?.exam_tags && exp.session.exam_tags.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[var(--text-faint)] font-medium">Appears in:</span>
-                            <div className="flex items-center gap-1">
-                              {exp.session.exam_tags.map(tag => (
-                                <span key={tag} className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] select-none">{tag}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {exp.session?.prerequisites && exp.session.prerequisites.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[var(--text-faint)] font-medium">Prerequisites:</span>
-                            <span className="text-[var(--text-primary)] font-semibold">{exp.session.prerequisites.join(" • ")}</span>
-                          </div>
-                        )}
 
-                        {exp.session?.next_topics && exp.session.next_topics.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[var(--text-faint)] font-medium">Next:</span>
-                            <span className="text-[var(--text-primary)] font-semibold">{exp.session.next_topics.join(" • ")}</span>
-                          </div>
-                        )}
-                      </div>
 
                       {/* Flowing Textbook Sections */}
                       <div className="space-y-8 mt-6">
@@ -736,18 +690,13 @@ export default function ExplainerPage() {
                           if (!isCollapsible) {
                             if (sec.type === "formula") {
                               return (
-                                <div key={sec.id} className="explainer-layout-split grid grid-cols-1 md:grid-cols-12 gap-6 pt-6 mt-6 first:pt-0 first:mt-0 border-t border-[var(--border)]/30 first:border-t-0">
-                                  <div className="md:col-span-4 flex flex-col justify-start">
-                                    {hasTitle && (
-                                      <h4 className="font-serif font-bold text-sm text-[var(--text-primary)] leading-tight tracking-tight select-none mb-1">
-                                        <AiMarkdown content={sec.title} />
-                                      </h4>
-                                    )}
-                                    <p className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider select-none">
-                                      Model & Formulation
-                                    </p>
-                                  </div>
-                                  <div className="md:col-span-8">
+                                <div key={sec.id} className="explainer-layout-wide pt-4 mt-4 first:pt-0 first:mt-0 border-t border-[var(--border)]/30 first:border-t-0">
+                                  {hasTitle && (
+                                    <h4 className="font-sans font-bold text-[13px] text-[var(--text-primary)] tracking-tight mb-2.5 select-none">
+                                      <AiMarkdown content={sec.title} />
+                                    </h4>
+                                  )}
+                                  <div className="w-full">
                                     <SectionRenderer section={sec} copiedText={copiedText} onCopy={handleCopy} />
                                   </div>
                                 </div>
@@ -956,27 +905,92 @@ export default function ExplainerPage() {
             <ThinkingPanel />
           ) : (
             /* Empty State */
-            <div className="surface p-6 sm:p-8 rounded-2xl bg-white border border-[var(--border)] shadow-sm text-center flex flex-col items-center justify-center min-h-[380px]">
-              <span className="text-4xl mb-4">📖</span>
-              <h3 className="text-lg font-bold text-[var(--text-primary)]">What would you like to understand today?</h3>
-              <p className="text-xs font-semibold text-[var(--text-secondary)] mt-2 max-w-sm">
-                Select a suggested query or type any engineering concept to start your study session.
-              </p>
-              
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-6 max-w-lg">
-                {suggestedPrompts.map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => {
-                      setTopic(q);
-                      void triggerQuery(q);
-                    }}
-                    className="explainer-prompt-chip focus-ring rounded-full border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition cursor-pointer"
-                  >
-                    • {q}
-                  </button>
-                ))}
+            <div className="surface p-6 sm:p-10 rounded-2xl border border-[var(--border)] shadow-sm bg-white text-left flex flex-col justify-center min-h-[320px] relative overflow-hidden">
+              <div className="max-w-2xl">
+                <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+                  What would you like to understand today?
+                </h3>
+                
+                {/* Structured Syllabus Groups */}
+                <div className="mt-8 space-y-6">
+                  {/* Category 1 */}
+                  <div>
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block mb-2.5">
+                      Thermal & Fluid Sciences
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Entropy & Irreversibility", query: "Explain entropy and irreversibility" },
+                        { label: "Vapour Compression Cycle", query: "Vapour compression refrigeration cycle" }
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            setTopic(item.query);
+                            void triggerQuery(item.query);
+                          }}
+                          className="explainer-suggested-pill focus-ring rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition cursor-pointer"
+                        >
+                          <span>{item.label}</span>
+                          <span className="arrow">→</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Category 2 */}
+                  <div>
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block mb-2.5">
+                      Applied Mechanics & Design
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Mohr’s Stress Circle", query: "Mohr’s circle for plane stress" },
+                        { label: "Vibration Natural Frequency", query: "Explain natural frequency of mechanical systems" }
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            setTopic(item.query);
+                            void triggerQuery(item.query);
+                          }}
+                          className="explainer-suggested-pill focus-ring rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition cursor-pointer"
+                        >
+                          <span>{item.label}</span>
+                          <span className="arrow">→</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Category 3 */}
+                  <div>
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block mb-2.5">
+                      Manufacturing & Math
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "Casting Defects & Remedies", query: "Casting defects and remedies" },
+                        { label: "Orthogonal Metal Cutting", query: "Orthogonal cutting mechanics and force analysis" }
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            setTopic(item.query);
+                            void triggerQuery(item.query);
+                          }}
+                          className="explainer-suggested-pill focus-ring rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition cursor-pointer"
+                        >
+                          <span>{item.label}</span>
+                          <span className="arrow">→</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1043,8 +1057,9 @@ function SectionRenderer({ section, copiedText, onCopy }: { section: Section; co
   if (section.type === "formula" && section.data) {
     const expression = section.data.expression || "";
     return (
-      <div className="py-3 px-4 border-l-2 border-[var(--accent)] bg-[var(--bg-elevated)]/40 rounded-r-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex-1 text-center md:text-left py-1 overflow-x-auto relative group">
+      <div className="py-2.5 px-3.5 border border-[var(--border)] bg-[var(--bg-elevated)]/20 rounded-xl flex flex-col gap-2.5 text-xs">
+        {/* Row 1: Centered Formula */}
+        <div className="text-center py-1 overflow-x-auto relative group w-full">
           <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition">
             {expression ? (
               <button
@@ -1058,16 +1073,19 @@ function SectionRenderer({ section, copiedText, onCopy }: { section: Section; co
           </div>
           <AiMarkdown content={expression.includes("$") ? expression : `$$${expression}$$`} />
         </div>
+        
+        {/* Row 2: Notation block underneath */}
         {section.data.variables && Object.keys(section.data.variables).length > 0 ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[var(--text-secondary)] border-t md:border-t-0 md:border-l border-[var(--border)]/65 pt-2.5 md:pt-0 md:pl-4 min-w-[200px] max-w-md">
-            <span className="font-bold text-[10px] uppercase tracking-wider text-[var(--text-faint)] w-full block md:inline mb-0.5 select-none">Notation:</span>
-            {Object.entries(section.data.variables).map(([key, value]) => (
-              <span key={key} className="inline-flex items-center gap-1.5 whitespace-nowrap bg-white border border-[var(--border)]/50 px-2 py-0.5 rounded text-[11px] shadow-sm">
-                <span className="font-bold text-[var(--text-primary)]">
+          <div className="text-[11px] text-[var(--text-secondary)] border-t border-[var(--border)]/40 pt-2 flex flex-wrap justify-center items-center gap-x-3 gap-y-1.5 w-full">
+            <span className="font-bold text-[9px] text-[var(--text-faint)] select-none">where:</span>
+            {Object.entries(section.data.variables).map(([key, value], idx, arr) => (
+              <span key={key} className="inline-flex items-center gap-1">
+                <span className="font-semibold text-[var(--text-primary)]">
                   <AiMarkdown content={key.includes("$") ? key : `$${key}$`} />
                 </span>
                 <span className="text-[var(--text-faint)]">=</span>
-                <span className="text-[var(--text-secondary)] font-medium">{String(value)}</span>
+                <span className="text-[var(--text-secondary)]">{String(value)}</span>
+                {idx < arr.length - 1 && <span className="text-[var(--text-faint)] ml-1">;</span>}
               </span>
             ))}
           </div>
@@ -1242,21 +1260,11 @@ function QuizWidget({
 
 function ThinkingPanel() {
   return (
-    <div className="p-6 border border-[var(--border)] rounded-xl bg-[var(--bg-elevated)]/40 flex flex-col gap-4">
-      <div className="flex items-center gap-2 text-stone-500 uppercase tracking-widest text-[9px] font-mono font-bold">
-        <span className="h-1 w-1 rounded-full bg-[var(--accent)]" />
-        Formulating explanation
-      </div>
-      <div className="flex flex-col gap-2 font-mono text-[11px] text-[var(--text-secondary)]">
-        <div className="flex items-center gap-1.5">
-          <span className="explainer-loader-typewriter-line1">Analyzing conceptual constraints...</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="explainer-loader-typewriter-line2">Retrieving syllabus benchmarks...</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="explainer-loader-typewriter-line3">Drafting mathematical steps...</span>
-        </div>
+    <div className="p-6 border border-[var(--border)] rounded-xl bg-[var(--bg-elevated)]/40 flex flex-col gap-3 animate-pulse">
+      <div className="h-2 bg-[var(--border)] rounded w-1/4" />
+      <div className="space-y-2 mt-2">
+        <div className="h-2 bg-[var(--border)] rounded w-3/4" />
+        <div className="h-2 bg-[var(--border)] rounded w-5/6" />
       </div>
     </div>
   );

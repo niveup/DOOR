@@ -82,6 +82,23 @@ function getKolkataDate(date: Date = new Date()): Date {
   return new Date(dateString);
 }
 
+// Timezone-safe helper to get Monday of the current week in Asia/Kolkata
+function getKolkataMonday(date: Date = new Date()): Date {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const dateString = formatter.format(date); // YYYY-MM-DD
+  const parts = dateString.split("-").map(Number);
+  const kolkataDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  const day = kolkataDate.getUTCDay();
+  const diff = kolkataDate.getUTCDate() - day + (day === 0 ? -6 : 1);
+  kolkataDate.setUTCDate(diff);
+  return kolkataDate;
+}
+
 // Timezone-safe helper for current hour in Asia/Kolkata (0-23)
 function getKolkataHour(date: Date = new Date()): number {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -1797,10 +1814,7 @@ app.post("/api/tracker/rating", async (req: Request, res: Response) => {
   }
 
   try {
-    const today = getKolkataDate();
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(today.setDate(diff));
+    const monday = getKolkataMonday();
 
     const rating = await prisma.progressRating.upsert({
       where: {
@@ -1825,6 +1839,13 @@ app.post("/api/tracker/rating", async (req: Request, res: Response) => {
         confidenceLevel: Number(confidenceLevel || 3),
         notes: notes || null
       }
+    });
+
+    // Mark AI analysis as stale in global settings
+    await prisma.settings.upsert({
+      where: { id: "default" },
+      update: { analysisStale: true },
+      create: { id: "default", name: "GATE Aspirant", analysisStale: true }
     });
 
     trackerStatusCache = null;
@@ -1855,6 +1876,20 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
         },
       }),
     ]);
+
+    // Group to calculate cumulative stats (single query)
+    const cumulativeStats = await prisma.progressRating.groupBy({
+      by: ["subjectId"],
+      _sum: {
+        hoursStudied: true,
+        questionsSolved: true,
+      },
+    });
+    const cumulativeMap = new Map<number, { hoursStudied: number | null, questionsSolved: number | null }>();
+    for (const c of cumulativeStats) {
+      cumulativeMap.set(c.subjectId, c._sum);
+    }
+
     const now = getKolkataDate();
     const threeWeeksAgo = new Date(now);
     threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
@@ -1862,20 +1897,34 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
     const ratingsBySubject = new Map<number, typeof ratings>();
     for (const rating of ratings) {
       const subjectRatings = ratingsBySubject.get(rating.subjectId) || [];
-      if (subjectRatings.length < 2) {
+      if (subjectRatings.length < 5) { // Fetch enough history to check for avoidance warning
         subjectRatings.push(rating);
         ratingsBySubject.set(rating.subjectId, subjectRatings);
       }
     }
 
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+
     const ratingsList = subjects.map((subject) => {
       const recentRatings = ratingsBySubject.get(subject.subjectId) || [];
       const latestRating = recentRatings[0] || null;
+      
       const isNeglected = latestRating
         ? latestRating.weekStartDate < threeWeeksAgo
         : true;
-      const hasAvoidanceWarning = recentRatings.length >= 2
-        && recentRatings.every((rating) => rating.selfRating <= 2);
+
+      // hasAvoidanceWarning: rating <= 2 logged in 3 or more consecutive weeks in history
+      const hasAvoidanceWarning = recentRatings.length >= 3 &&
+        recentRatings.slice(0, 3).every((r) => r.selfRating <= 2);
+
+      const cumulative = cumulativeMap.get(subject.subjectId);
+      const cumulativeHours = cumulative?.hoursStudied || 0;
+      const cumulativeQuestions = cumulative?.questionsSolved || 0;
+
+      const ratingValue = latestRating ? latestRating.selfRating : 0;
+      totalWeightedScore += (ratingValue / 5) * 100 * subject.importanceLevel;
+      totalWeight += subject.importanceLevel;
 
       return {
         subjectId: subject.subjectId,
@@ -1887,19 +1936,75 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
         questionsSolved: latestRating ? latestRating.questionsSolved : 0,
         confidenceLevel: latestRating ? latestRating.confidenceLevel : null,
         isNeglected,
-        hasAvoidanceWarning
+        hasAvoidanceWarning,
+        cumulativeHours,
+        cumulativeQuestions,
       };
     });
 
-    const sumRatings = ratingsList.reduce((acc, r) => acc + (r.latestRating || 0), 0);
-    const overallReadiness = Math.round((sumRatings / 70) * 100);
+    const overallReadiness = totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : 0;
+
+    // Retrieve settings cache
+    let settings = await prisma.settings.findUnique({ where: { id: "default" } });
+    if (!settings) {
+      settings = await prisma.settings.create({
+        data: { id: "default", name: "GATE Aspirant" },
+      });
+    }
+
+    // Determine Monday of current week in Asia/Kolkata timezone
+    const currentMonday = getKolkataMonday();
+
+    const isStale = settings.analysisStale ||
+      !settings.weeklyAnalysis ||
+      !settings.analysisWeekOf ||
+      settings.analysisWeekOf.getTime() !== currentMonday.getTime();
+
+    let weeklyAnalysis = settings.weeklyAnalysis || "";
+
+    if (isStale) {
+      try {
+        let subjectsTable = "| Subject | Weight | Rating | Hours (Weekly) | Questions (Weekly) | Neglected? | Avoidance? |\n";
+        subjectsTable += "|---|---|---|---|---|---|---|\n";
+        for (const r of ratingsList) {
+          subjectsTable += `| ${r.subjectName} | ${Math.round(r.importanceLevel * 100)}% | ${r.latestRating || "Not rated"} | ${r.hoursStudied}h | ${r.questionsSolved} | ${r.isNeglected ? "Yes" : "No"} | ${r.hasAvoidanceWarning ? "Yes" : "No"} |\n`;
+        }
+
+        const sysPrompt = loadPrompt("tracker_analysis.md", {
+          user_name: settings.name,
+          readiness: overallReadiness,
+          subjects_table: subjectsTable,
+        });
+
+        const aiResponse = await aiChat(sysPrompt, "Review my progress and give me honest feedback.", {
+          model: "openrouter/free"
+        });
+
+        weeklyAnalysis = aiResponse.replace(/```(?:markdown)?/gi, "").replace(/```/g, "").trim();
+
+        // Update cached values in settings
+        settings = await prisma.settings.update({
+          where: { id: "default" },
+          data: {
+            weeklyAnalysis,
+            analysisWeekOf: currentMonday,
+            analysisStale: false,
+          },
+        });
+      } catch (aiError) {
+        console.error("Failed to generate tracker AI analysis:", aiError);
+        weeklyAnalysis = settings.weeklyAnalysis || "Unable to generate AI analysis at this time.";
+      }
+    }
+
     const value = {
       overallReadiness,
-      subjects: ratingsList
+      subjects: ratingsList,
+      weeklyAnalysis,
     };
 
     trackerStatusCache = { value, expiresAt: Date.now() + 300_000 };
-    res.setHeader("Cache-Control", "private, max-age=300");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.setHeader("X-Tracker-Cache", "miss");
     res.json(value);
   } catch (error: any) {

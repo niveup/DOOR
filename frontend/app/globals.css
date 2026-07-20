@@ -763,8 +763,28 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
   overflow-x: auto;
 }
 
+/* Styled horizontal scrollbars on Explainer page */
+.explainer-page .overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.explainer-page .overflow-x-auto::-webkit-scrollbar {
+  height: 5px;
+  width: 5px;
+}
+.explainer-page .overflow-x-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+.explainer-page .overflow-x-auto::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+.explainer-page .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
 @media (max-width: 900px) {
-  .explainer-formula-block { overflow-x: auto; }
+  .explainer-formula-block { overflow: visible; }
   .explainer-page .ai-markdown { max-width: none; }
   .explainer-page .ai-markdown table { display: block; max-width: 100%; overflow-x: auto; }
 }
@@ -781,16 +801,15 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
 
 /* 1. Learning Mode Buttons */
 .explainer-mode-btn {
-  transition: transform 140ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 140ms ease, border-color 140ms ease !important;
+  transition: transform 140ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease !important;
 }
 .explainer-mode-btn:hover {
-  transform: translateY(-1px) rotate(0.8deg);
-}
-.explainer-mode-btn:nth-child(even):hover {
-  transform: translateY(-1px) rotate(-0.8deg);
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(63, 111, 209, 0.08);
 }
 .explainer-mode-btn:active {
-  transform: translateY(1px) scale(0.97) rotate(0deg) !important;
+  transform: translateY(0.5px) scale(0.98) !important;
+  box-shadow: none;
 }
 
 /* 2. Suggested Prompt Chips */
@@ -939,4 +958,97 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
 
 @keyframes explainer-hide-cursor {
   to { border-color: transparent }
+}
+
+/* --- SAGE GRAPH PAPER / LOGBOOK THEME FOR EXPLAINER --- */
+
+:root:not([data-theme="dark"]) .explainer-log-card, 
+:root:not([data-theme="dark"]) .explainer-query-form,
+:root:not([data-theme="dark"]) .explainer-session-bar {
+  background-color: #f4faf8 !important; /* Sage-tinted light paper */
+  border-color: #cce3de !important;      /* Sage border */
+  background-image: 
+    linear-gradient(rgba(22, 133, 111, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 133, 111, 0.035) 1px, transparent 1px) !important;
+  background-size: 20px 20px !important;
+}
+
+/* Explicit resets for Dark Mode to keep theme variables untouched */
+:root[data-theme="dark"] .explainer-log-card,
+:root[data-theme="dark"] .explainer-query-form,
+:root[data-theme="dark"] .explainer-session-bar {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  background-image: none !important;
+}
+
+/* Left accent margin line for the Logbook entry */
+:root:not([data-theme="dark"]) .explainer-log-card {
+  border-left: 4px solid var(--mint) !important;
+  box-shadow: 0 8px 30px rgba(22, 133, 111, 0.045) !important;
+}
+
+:root[data-theme="dark"] .explainer-log-card {
+  border-left: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-tight) !important;
+}
+
+/* Make topic titles stand out in forest green / mint */
+:root:not([data-theme="dark"]) .explainer-log-card h2 {
+  color: var(--mint) !important;
+}
+
+:root[data-theme="dark"] .explainer-log-card h2 {
+  color: var(--text-primary) !important;
+}
+
+/* Calm, micro-interactive suggested prompts */
+.explainer-suggested-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.explainer-suggested-pill span.arrow {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  transition: max-width 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease, margin 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 10px;
+  line-height: 1;
+}
+.explainer-suggested-pill:hover {
+  transform: translateY(-1.5px);
+  border-color: var(--accent) !important;
+  background-color: var(--accent-soft) !important;
+  color: var(--accent) !important;
+  box-shadow: 0 4px 10px rgba(63, 111, 209, 0.06);
+}
+.explainer-suggested-pill:hover span.arrow {
+  max-width: 12px;
+  opacity: 1;
+  margin-left: 6px;
+}
+.explainer-suggested-pill:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Crisp high-contrast black overrides for light-theme explainer log cards */
+:root:not([data-theme="dark"]) .explainer-log-card,
+:root:not([data-theme="dark"]) .explainer-log-card p,
+:root:not([data-theme="dark"]) .explainer-log-card li,
+:root:not([data-theme="dark"]) .explainer-log-card td {
+  color: #000000 !important; /* Pure solid black for maximum contrast */
+  font-size: 15px !important;  /* Increased size for better readability */
+  font-weight: 600 !important; /* Boldness increased to semibold */
+  line-height: 1.75 !important; /* Elegant spacing for bold text */
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+:root:not([data-theme="dark"]) .explainer-log-card .katex {
+  color: #000000 !important;
+  font-weight: 600 !important;
 }

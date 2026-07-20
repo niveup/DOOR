@@ -24,6 +24,9 @@ model Settings {
  prepLevel String @default("Beginner")
  scoreWeights Json?
  pushSubscription Json?
+ weeklyAnalysis String?
+ analysisWeekOf DateTime? @db.Date
+ analysisStale Boolean @default(false)
  createdAt DateTime @default(now())
  updatedAt DateTime @updatedAt
 }

@@ -7,10 +7,10 @@ import { type ReactNode, useEffect, useState } from "react";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", mobileLabel: "Today", helper: "Today", mark: "D", icon: "home" },
   { href: "/journal", label: "Journal", mobileLabel: "Journal", helper: "Evening", mark: "J", icon: "journal" },
-  { href: "/explainer", label: "Explainer", mobileLabel: "Explain", helper: "Midday", mark: "E", icon: "explain" },
   { href: "/tracker", label: "Tracker", mobileLabel: "Progress", helper: "Weekly", mark: "T", icon: "progress" },
   { href: "/interview", label: "Interview", mobileLabel: "Interview", helper: "PSU prep", mark: "I", icon: "interview" },
   { href: "/chat", label: "AI Coach", mobileLabel: "Coach", helper: "General", mark: "C", icon: "chat" },
+  { href: "/explainer", label: "Explainer", mobileLabel: "Explain", helper: "Midday", mark: "E", icon: "explain" },
   { href: "/settings/ai", label: "AI Control", mobileLabel: "Settings", helper: "Provider", mark: "S", icon: "settings" },
 ];
 const mobileItems = navItems.filter(item => item.icon !== "settings");
@@ -55,12 +55,14 @@ export function AppShell({
   title,
   subtitle,
   actions,
+  titleClassName = "text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl",
 }: {
   children: ReactNode;
   eyebrow?: string;
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
+  titleClassName?: string;
 }) {
   const pathname = usePathname();
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -233,7 +235,7 @@ export function AppShell({
             <header className="surface mb-4 flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-end lg:p-4">
               <div className="min-w-0">
                 {eyebrow ? <p className="section-label mb-2">{eyebrow}</p> : null}
-                {title ? <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">{title}</h1> : null}
+                {title ? <h1 className={titleClassName}>{title}</h1> : null}
                 {subtitle ? <p className="mt-1.5 max-w-3xl text-xs font-medium leading-5 text-[var(--text-secondary)]">{subtitle}</p> : null}
               </div>
               {actions ? <div className="hidden shrink-0 items-center gap-2 lg:flex">{actions}</div> : null}
@@ -265,19 +267,23 @@ export function PageSection({
   action,
   children,
   className = "",
+  titleClassName = "text-base font-semibold tracking-tight text-[var(--text-primary)]",
+  headerClassName = "mb-3",
 }: {
   title: string;
   eyebrow?: string;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  titleClassName?: string;
+  headerClassName?: string;
 }) {
   return (
     <section className={className}>
-      <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
+      <div className={`${headerClassName} flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end`}>
         <div>
           {eyebrow ? <p className="section-label mb-1.5">{eyebrow}</p> : null}
-          <h2 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">{title}</h2>
+          {title ? <h2 className={titleClassName}>{title}</h2> : null}
         </div>
         {action ? <div className="w-full overflow-x-auto sm:w-auto sm:shrink-0">{action}</div> : null}
       </div>
