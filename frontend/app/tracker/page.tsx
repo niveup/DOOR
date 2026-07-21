@@ -345,11 +345,12 @@ export default function TrackerPage() {
       const result = (await response.json()) as TrackerData & { error?: string };
       if (!response.ok) throw new Error(result.error || "Study progress could not be loaded.");
       setData(result);
-      if (Array.isArray(result.logs) && result.logs.length > 0) {
+      if (Array.isArray(result.logs)) {
         const cleanLogs = dedupeLogs(result.logs);
         setSessionLogs(cleanLogs);
         localStorage.setItem(logsCacheKey, JSON.stringify(cleanLogs));
       }
+
       setError("");
       localStorage.setItem(cacheKey, JSON.stringify(result));
     } catch (loadError) {
