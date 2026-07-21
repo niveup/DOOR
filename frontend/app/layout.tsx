@@ -29,7 +29,7 @@ export default function RootLayout({
               (function() {
                 var theme = localStorage.getItem('jujum-theme');
                 if (!theme) {
-                  theme = 'light';
+                  theme = 'dark';
                 }
                 document.documentElement.dataset.theme = theme;
               })();

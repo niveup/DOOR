@@ -3,25 +3,31 @@
 import React, { memo, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "motion/react";
 
-export function AnimatedNumber({ value, instant = false }: { value: number; instant?: boolean }) {
+export function AnimatedNumber({ value, decimals, instant = false }: { value: number; decimals?: number; instant?: boolean }) {
   const motionValue = useMotionValue(value);
   const shouldReduceMotion = useReducedMotion();
   const springValue = useSpring(motionValue, {
     stiffness: shouldReduceMotion ? 99999 : 90,
     damping: shouldReduceMotion ? 999 : 18,
   });
-  const displayValue = useTransform(springValue, (latest) => Math.round(latest));
+
+  const numDecimals = decimals !== undefined ? decimals : Number.isInteger(value) ? 0 : 1;
+
+  const displayValue = useTransform(springValue, (latest) =>
+    numDecimals > 0 ? latest.toFixed(numDecimals) : Math.round(latest).toString()
+  );
 
   useEffect(() => {
     motionValue.set(value);
   }, [value, motionValue]);
 
-  if (instant) {
-    return <span className="tabular-nums">{Math.round(value)}</span>;
+  if (instant || numDecimals > 0) {
+    return <span className="tabular-nums">{value.toFixed(numDecimals)}</span>;
   }
 
   return <motion.span className="tabular-nums">{displayValue}</motion.span>;
 }
+
 
 interface MicroInteractionButtonProps
   extends Omit<

@@ -65,12 +65,20 @@ export function PlanChatModal({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  useEffect(() => {
+    const originalStyle = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
   const totalMinutes = draftTasks.reduce((sum, t) => sum + t.durationMin, 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-3 sm:p-4 backdrop-blur-xs animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-3 sm:p-4 backdrop-blur-xs animate-fade-in overscroll-contain"
       onMouseDown={onClose}
     >
       <motion.div

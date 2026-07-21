@@ -699,8 +699,7 @@ export default function JournalPage() {
       <AnimatePresence>
         {isLocking && (
           <motion.div
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center text-[#392920] overflow-hidden"
-            style={{ background: "radial-gradient(circle at 20% 20%, rgba(223, 185, 128, .24), transparent 27%), linear-gradient(145deg, #f4eee4, #e9dfce)" }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center text-[var(--text-primary)] bg-[var(--bg-page)] overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -738,7 +737,7 @@ export default function JournalPage() {
                   strokeWidth="1.8" 
                   strokeLinecap="round" 
                   strokeLinejoin="round" 
-                  className="w-12 h-12 text-[#6b503d]"
+                  className="w-12 h-12 text-[var(--accent)]"
                   style={{ overflow: "visible" }}
                 >
                   {/* Animatable lock shackle */}

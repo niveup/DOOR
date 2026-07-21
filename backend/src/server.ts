@@ -9,6 +9,7 @@ import { createAiProvider, AiProviderName } from "./lib/ai/provider";
 import { decryptApiKey, encryptApiKey } from "./lib/ai/credentials";
 import { jsonrepair } from "jsonrepair";
 import { listPrivateJournalEntries, privateJournalByDate } from "./lib/private-journal-store";
+import { saveStudyLogToD1, fetchStudyLogsFromD1, clearTrackerLogsInD1 } from "./lib/private-tracker-store";
 
 // Stub types for initial compilation prior to running 'prisma generate'
 type Journal = any;
@@ -1855,12 +1856,187 @@ app.post("/api/tracker/rating", async (req: Request, res: Response) => {
   }
 });
 
+app.post("/api/subjects", async (req: Request, res: Response) => {
+  const { subjectName, importanceLevel, topics } = req.body;
+
+  if (!subjectName || typeof subjectName !== "string" || !subjectName.trim()) {
+    return res.status(400).json({ error: "subjectName is required." });
+  }
+
+  try {
+    const maxSubject = await prisma.subject.findFirst({
+      orderBy: { subjectId: "desc" },
+      select: { subjectId: true },
+    });
+    const nextId = (maxSubject?.subjectId || 0) + 1;
+    const importance = typeof importanceLevel === "number" ? importanceLevel : 0.1;
+    const topicList = Array.isArray(topics)
+      ? topics
+      : typeof topics === "string"
+      ? topics.split(",").map((t: string) => t.trim()).filter(Boolean)
+      : [];
+
+    const newSubject = await prisma.subject.create({
+      data: {
+        subjectId: nextId,
+        subjectName: subjectName.trim(),
+        importanceLevel: importance,
+        topics: topicList,
+      },
+    });
+
+    trackerStatusCache = null;
+    res.json(newSubject);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/subjects/:subjectId", async (req: Request, res: Response) => {
+  const subjectId = parseInt(req.params.subjectId, 10);
+  if (isNaN(subjectId)) {
+    return res.status(400).json({ error: "Invalid subjectId" });
+  }
+
+  try {
+    const subject = await prisma.subject.findUnique({
+      where: { subjectId },
+    });
+
+    if (!subject) {
+      return res.status(404).json({ error: "Subject not found" });
+    }
+
+    await prisma.$transaction([
+      prisma.studyLog.deleteMany({ where: { subjectId } }),
+      prisma.progressRating.deleteMany({ where: { subjectId } }),
+      prisma.topicStatus.deleteMany({ where: { subjectId } }),
+      prisma.task.updateMany({ where: { subjectId }, data: { subjectId: null } }),
+      prisma.conceptExplanation.updateMany({ where: { subjectId }, data: { subjectId: null } }),
+      prisma.subject.delete({ where: { subjectId } }),
+    ]);
+
+
+    trackerStatusCache = null;
+    res.json({ success: true, message: `Subject "${subject.subjectName}" deleted successfully.` });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
+function getKolkataDateString(date: Date = new Date()): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(date);
+}
+
+app.post("/api/tracker/log", async (req: Request, res: Response) => {
+  const { logDate, timeBlock, subjectId, subjectName, hoursStudied, questionsSolved, notes } = req.body;
+
+  if (!subjectId || !subjectName) {
+    return res.status(400).json({ error: "subjectId and subjectName are required." });
+  }
+
+  const hours = Number(hoursStudied || 0);
+  const questions = Number(questionsSolved || 0);
+  const dateStr = logDate || getKolkataDateString();
+  const block = timeBlock || "Evening";
+
+  try {
+    const monday = getKolkataMonday();
+
+    // 1. Update cumulative subject progress in database
+    const existing = await prisma.progressRating.findUnique({
+      where: {
+        subjectId_weekStartDate: {
+          subjectId: Number(subjectId),
+          weekStartDate: monday,
+        },
+      },
+    });
+
+    const currentHours = existing?.hoursStudied || 0;
+    const currentQuestions = existing?.questionsSolved || 0;
+
+    await prisma.progressRating.upsert({
+      where: {
+        subjectId_weekStartDate: {
+          subjectId: Number(subjectId),
+          weekStartDate: monday,
+        },
+      },
+      update: {
+        hoursStudied: currentHours + hours,
+        questionsSolved: currentQuestions + questions,
+        notes: notes ? `${existing?.notes ? existing.notes + " | " : ""}${notes}` : existing?.notes,
+      },
+      create: {
+        subjectId: Number(subjectId),
+        weekStartDate: monday,
+        selfRating: 3,
+        hoursStudied: hours,
+        questionsSolved: questions,
+        confidenceLevel: 3,
+        notes: notes || null,
+      },
+    });
+
+    // 2. Save directly to Prisma StudyLog (Primary Store in Postgres)
+    const newStudyLog = await prisma.studyLog.create({
+      data: {
+        logDate: dateStr,
+        timeBlock: block,
+        subjectId: Number(subjectId),
+        subjectName: String(subjectName),
+        hoursStudied: hours,
+        questionsSolved: questions,
+        notes: notes || null,
+      },
+    });
+
+    // Background backup sync to Cloudflare D1 (non-blocking)
+    saveStudyLogToD1({
+      id: newStudyLog.id,
+      logDate: dateStr,
+      timeBlock: block,
+      subjectId: Number(subjectId),
+      subjectName: String(subjectName),
+      hoursStudied: hours,
+      questionsSolved: questions,
+      notes: notes || null,
+      createdAt: newStudyLog.createdAt.getTime(),
+    }).catch(() => {});
+
+    trackerStatusCache = null;
+    res.json({ success: true, logId: newStudyLog.id });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/tracker/reset", async (req: Request, res: Response) => {
+  try {
+    await prisma.studyLog.deleteMany({});
+    await clearTrackerLogsInD1().catch(() => {});
+    await prisma.progressRating.deleteMany({});
+    trackerStatusCache = null;
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
+
 app.get("/api/tracker/status", async (req: Request, res: Response) => {
   try {
-    if (trackerStatusCache && trackerStatusCache.expiresAt > Date.now()) {
-      res.setHeader("X-Tracker-Cache", "hit");
-      return res.json(trackerStatusCache.value);
-    }
 
     const [subjects, ratings] = await Promise.all([
       prisma.subject.findMany({ orderBy: { subjectId: "asc" } }),
@@ -1997,10 +2173,30 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
       }
     }
 
+    // Fetch study logs directly from Prisma Postgres (Primary Store)
+    const prismaLogs = await prisma.studyLog.findMany({
+      orderBy: [{ logDate: "desc" }, { createdAt: "desc" }],
+      take: 300,
+    });
+
+    const logs = prismaLogs.map((l) => ({
+      id: l.id,
+      logDate: l.logDate,
+      timeBlock: l.timeBlock,
+      subjectId: l.subjectId,
+      subjectName: l.subjectName,
+      hoursStudied: l.hoursStudied,
+      questionsSolved: l.questionsSolved,
+      notes: l.notes,
+      createdAt: l.createdAt.getTime(),
+    }));
+
+
     const value = {
       overallReadiness,
       subjects: ratingsList,
       weeklyAnalysis,
+      logs,
     };
 
     trackerStatusCache = { value, expiresAt: Date.now() + 300_000 };

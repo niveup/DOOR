@@ -83,11 +83,86 @@ async function saveEntry(request: Request, env: Env) {
   return json({ entry: saved ? toEntry(saved) : null });
 }
 
+type StudyLogRecord = {
+  id: string;
+  logDate: string;
+  timeBlock: string;
+  subjectId: number;
+  subjectName: string;
+  hoursStudied: number;
+  questionsSolved: number;
+  notes: string | null;
+  createdAt: number;
+};
+
+function toStudyLog(row: Record<string, unknown>): StudyLogRecord {
+  return {
+    id: String(row.id),
+    logDate: String(row.log_date),
+    timeBlock: String(row.time_block || "Evening"),
+    subjectId: Number(row.subject_id),
+    subjectName: String(row.subject_name),
+    hoursStudied: Number(row.hours_studied),
+    questionsSolved: Number(row.questions_solved),
+    notes: row.notes ? String(row.notes) : null,
+    createdAt: Number(row.created_at),
+  };
+}
+
+async function listTrackerLogs(request: Request, env: Env) {
+  if (!await authenticate(request, env, "")) return json({ error: "Unauthorized" }, 401);
+  const requested = Number(new URL(request.url).searchParams.get("limit") || 50);
+  const limit = Math.min(Math.max(Number.isInteger(requested) ? requested : 50, 1), 200);
+  const result = await env.JOURNAL_DB.prepare("SELECT id, log_date, time_block, subject_id, subject_name, hours_studied, questions_solved, notes, created_at FROM tracker_study_logs ORDER BY log_date DESC, created_at DESC LIMIT ?").bind(limit).all();
+  return json({ logs: (result.results || []).map(toStudyLog) });
+}
+
+async function saveTrackerLog(request: Request, env: Env) {
+  const body = await request.text();
+  if (body.length > 32 * 1024) return json({ error: "Request too large" }, 413);
+  if (!await authenticate(request, env, body)) return json({ error: "Unauthorized" }, 401);
+  let input: Partial<StudyLogRecord>;
+  try {
+    input = JSON.parse(body) as Partial<StudyLogRecord>;
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  if (!input.id || !input.logDate || typeof input.subjectId !== "number" || typeof input.subjectName !== "string") {
+    return json({ error: "Invalid tracker log record" }, 400);
+  }
+  const id = input.id;
+  const logDate = input.logDate;
+  const timeBlock = input.timeBlock || "Evening";
+  const subjectId = input.subjectId;
+  const subjectName = input.subjectName;
+  const hoursStudied = Number(input.hoursStudied || 0);
+  const questionsSolved = Number(input.questionsSolved || 0);
+  const notes = input.notes || null;
+  const createdAt = input.createdAt || Date.now();
+
+  await env.JOURNAL_DB.prepare(
+    "INSERT INTO tracker_study_logs (id, log_date, time_block, subject_id, subject_name, hours_studied, questions_solved, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET hours_studied = excluded.hours_studied, questions_solved = excluded.questions_solved, notes = excluded.notes"
+  ).bind(id, logDate, timeBlock, subjectId, subjectName, hoursStudied, questionsSolved, notes, createdAt).run();
+
+  return json({ success: true, id });
+}
+
+async function clearTrackerLogs(request: Request, env: Env) {
+  if (!await authenticate(request, env, "")) return json({ error: "Unauthorized" }, 401);
+  await env.JOURNAL_DB.prepare("DELETE FROM tracker_study_logs").run();
+  return json({ success: true, message: "Tracker study logs cleared." });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/v1/entries") return listEntries(request, env);
     if (request.method === "POST" && url.pathname === "/v1/entries") return saveEntry(request, env);
+    if (request.method === "GET" && url.pathname === "/v1/tracker/logs") return listTrackerLogs(request, env);
+    if (request.method === "POST" && url.pathname === "/v1/tracker/logs") return saveTrackerLog(request, env);
+    if (request.method === "DELETE" && url.pathname === "/v1/tracker/logs") return clearTrackerLogs(request, env);
     return json({ error: "Not found" }, 404);
   },
 };
+
+

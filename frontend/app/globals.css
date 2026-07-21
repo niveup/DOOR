@@ -7,9 +7,9 @@
  --text-primary: #202124;
  --text-secondary: #687076;
  --text-faint: #99a1a8;
- --accent: #3f6fd1;
- --accent-hover: #2f56a7;
- --accent-soft: #eaf0ff;
+ --accent: #b8860b;
+ --accent-hover: #966b04;
+ --accent-soft: #fdf6e6;
  --mint: #16856f;
  --mint-soft: #e8f6ef;
  --teal: #087980;
@@ -38,16 +38,16 @@
  --ease-out: cubic-bezier(0, 0, 0.2, 1);
 
  /* Light Mode Theme-Aware Helper Tokens */
- --selection-bg: rgba(63, 111, 209, 0.16);
- --focus-shadow: rgba(63, 111, 209, 0.13);
+ --selection-bg: rgba(184, 134, 11, 0.16);
+ --focus-shadow: rgba(184, 134, 11, 0.13);
  --error-shadow: rgba(194, 65, 91, 0.11);
- --pill-blue-border: rgba(63, 111, 209, 0.22);
+ --pill-blue-border: rgba(184, 134, 11, 0.22);
  --pill-teal-border: rgba(8, 121, 128, 0.2);
  --pill-green-border: rgba(31, 122, 77, 0.18);
  --pill-amber-border: rgba(184, 111, 24, 0.22);
  --pill-rose-border: rgba(189, 73, 102, 0.2);
- --code-bg: rgba(63, 111, 209, 0.08);
- --code-border: rgba(63, 111, 209, 0.12);
+ --code-bg: rgba(184, 134, 11, 0.08);
+ --code-border: rgba(184, 134, 11, 0.12);
 }
 
 :root[data-theme="dark"] {
@@ -57,9 +57,9 @@
   --text-primary: #f3f0ea;
   --text-secondary: #aba69c;
   --text-faint: #756f63;
-  --accent: #6c93e0;
-  --accent-hover: #86a8ea;
-  --accent-soft: #22314d;
+  --accent: #dfb15b;
+  --accent-hover: #edd089;
+  --accent-soft: #382d18;
   --mint: #4fc9a9;
   --mint-soft: #163229;
   --teal: #4bc3cc;
@@ -81,16 +81,16 @@
   --shadow-tight: 0 4px 16px rgba(0, 0, 0, 0.24);
 
   /* Dark Mode Theme-Aware Helper Tokens */
-  --selection-bg: rgba(108, 147, 224, 0.24);
-  --focus-shadow: rgba(108, 147, 224, 0.2);
+  --selection-bg: rgba(223, 177, 91, 0.24);
+  --focus-shadow: rgba(223, 177, 91, 0.2);
   --error-shadow: rgba(232, 130, 155, 0.16);
-  --pill-blue-border: rgba(108, 147, 224, 0.25);
+  --pill-blue-border: rgba(223, 177, 91, 0.25);
   --pill-teal-border: rgba(75, 195, 204, 0.25);
   --pill-green-border: rgba(79, 201, 138, 0.25);
   --pill-amber-border: rgba(224, 168, 85, 0.25);
   --pill-rose-border: rgba(232, 130, 155, 0.25);
-  --code-bg: rgba(108, 147, 224, 0.12);
-  --code-border: rgba(108, 147, 224, 0.22);
+  --code-bg: rgba(223, 177, 91, 0.12);
+  --code-border: rgba(223, 177, 91, 0.22);
 }
 
 /* Dark mode Tailwind utility overrides for hardcoded bg-white values */
@@ -99,6 +99,9 @@
 }
 :root[data-theme="dark"] .hover\:bg-white:hover {
   background-color: var(--bg-elevated) !important;
+}
+:root[data-theme="dark"] .group:hover .group-hover\:bg-white {
+  background-color: var(--bg-card) !important;
 }
 :root[data-theme="dark"] .bg-white\/75 {
   background-color: rgba(34, 31, 26, 0.75) !important;
@@ -136,6 +139,261 @@
 :root[data-theme="dark"] .soft-lavender {
   background: var(--bg-card) !important;
   background-image: none !important;
+}
+
+/* Dark mode styles for Journal, Past Pages, Prompt Sheets, Unlock Page, and Paper elements */
+:root[data-theme="dark"] .journal-paper.brand-fixed,
+:root[data-theme="dark"] .journal-reflection.brand-fixed,
+:root[data-theme="dark"] .journal-unlock-card.brand-fixed {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-paper {
+  background-color: var(--bg-card);
+  background-image: linear-gradient(90deg, transparent 0, transparent 76px, rgba(223, 177, 91, 0.15) 76px, rgba(223, 177, 91, 0.15) 78px, transparent 78px);
+  border-color: var(--border);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4), 2px 2px 0 var(--border);
+}
+
+:root[data-theme="dark"] .journal-paper::after {
+  opacity: 0.12;
+}
+
+:root[data-theme="dark"] .journal-paper-topline {
+  border-bottom-color: var(--border);
+}
+
+:root[data-theme="dark"] .journal-paper-topline h2 {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-paper-overline,
+:root[data-theme="dark"] .journal-panel-kicker,
+:root[data-theme="dark"] .journal-unlock-kicker {
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .journal-privacy-seal {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .journal-meta-label {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-stamp,
+:root[data-theme="dark"] .journal-activity-stamp,
+:root[data-theme="dark"] .journal-tag {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-stamp:hover,
+:root[data-theme="dark"] .journal-activity-stamp:hover,
+:root[data-theme="dark"] .journal-tag:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-stamp.is-selected,
+:root[data-theme="dark"] .journal-activity-stamp.is-marked,
+:root[data-theme="dark"] .journal-tag.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: 2px 2px 0 rgba(223, 177, 91, 0.2);
+}
+
+:root[data-theme="dark"] .journal-textarea {
+  color: var(--text-primary);
+  caret-color: var(--accent);
+  background-image: linear-gradient(rgba(223, 177, 91, 0.12) 1px, transparent 1px);
+}
+
+:root[data-theme="dark"] .journal-textarea::placeholder {
+  color: var(--text-faint);
+}
+
+:root[data-theme="dark"] .journal-paper-footer {
+  border-top-color: var(--border);
+}
+
+:root[data-theme="dark"] .journal-ink-status {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-tab-btn {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-tab-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-tab-btn.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: 2px 2px 0 rgba(223, 177, 91, 0.2);
+}
+
+:root[data-theme="dark"] .journal-drawer,
+:root[data-theme="dark"] .journal-history-panel {
+  border-color: var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="dark"] .journal-drawer-heading h2,
+:root[data-theme="dark"] .journal-history-heading h2 {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-drawer-copy {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-prompt-card {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-prompt-card:hover {
+  background: var(--bg-card);
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme="dark"] .journal-prompt-card span {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-prompt-card strong {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-prompt-card i {
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .journal-refresh {
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .journal-timeline::before {
+  background: var(--border);
+}
+
+:root[data-theme="dark"] .journal-history-dot {
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+:root[data-theme="dark"] .journal-history-entry[open] .journal-history-dot {
+  background: var(--accent);
+}
+
+:root[data-theme="dark"] .journal-history-entry time {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-history-entry summary p {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-history-content {
+  border-left-color: var(--border);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-history-content > div {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-history-content > div span {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-lock-button {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-lock-button:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-card);
+}
+
+:root[data-theme="dark"] .journal-reflection {
+  border-color: var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="dark"] .journal-reflection .ai-markdown {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-next-promise {
+  border-top-color: var(--border);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-next-promise span {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-unlock-page {
+  background: var(--bg-page);
+}
+
+:root[data-theme="dark"] .journal-unlock-card {
+  border-color: var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="dark"] .journal-lock-mark {
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .journal-unlock-card h1 {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-unlock-card > p:not(.journal-unlock-kicker) {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-unlock-label {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .journal-unlock-input {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-date-display {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .journal-scroll-down-btn {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border);
 }
 
 @theme {

@@ -40,6 +40,7 @@ model Subject {
  tasks Task[]
  topicStatuses TopicStatus[]
  explanations ConceptExplanation[]
+ studyLogs StudyLog[]
 }
 
 model Journal {
@@ -189,4 +190,20 @@ model InterviewAttempt {
  createdAt DateTime @default(now())
  @@unique([sessionId, questionIndex])
  @@index([sessionId, createdAt])
+}
+
+model StudyLog {
+  id              String   @id @default(uuid())
+  logDate         String   // Always "YYYY-MM-DD" format
+  timeBlock       String   @default("Evening")
+  subjectId       Int
+  subject         Subject  @relation(fields: [subjectId], references: [subjectId], onDelete: Cascade)
+  subjectName     String
+  hoursStudied    Float    @default(0)
+  questionsSolved Int      @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@index([logDate])
+  @@index([subjectId])
 }

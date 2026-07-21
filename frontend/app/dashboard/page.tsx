@@ -102,13 +102,6 @@ const sampleTasks: Task[] = [
   },
 ];
 
-const modules = [
-  { href: "/journal", mark: "J", title: "Journal", note: "Evening review", tone: "green" },
-  { href: "/explainer", mark: "E", title: "Ask AI", note: "Concept help", tone: "blue" },
-  { href: "/tracker", mark: "T", title: "Tracker", note: "Subject ratings", tone: "amber" },
-  { href: "/interview", mark: "I", title: "Interview", note: "PSU practice", tone: "lavender" },
-] as const;
-
 const toneClass: Record<Tone, string> = {
   blue: "soft-blue",
   green: "soft-mint",
@@ -143,10 +136,7 @@ function taskTypeLabel(taskType: TaskType) {
   return "Routine";
 }
 
-function explainerHref(topic: string) {
-  const safeTopic = topic && !topic.toLowerCase().includes("no weak") ? topic : "Thermodynamics";
-  return `/explainer?topic=${encodeURIComponent(safeTopic)}`;
-}
+
 
 export default function Dashboard() {
   const [plan, setPlan] = useState<RoutinePlan | null>(null);
@@ -202,21 +192,57 @@ export default function Dashboard() {
     }
   };
 
+function getSessionCachedPlan(dateStr: string): RoutinePlan | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(`routine_plan_${dateStr}`);
+    return raw ? (JSON.parse(raw) as RoutinePlan) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (plan) {
+      sessionStorage.setItem(`routine_plan_${dateStr}`, JSON.stringify(plan));
+    } else {
+      sessionStorage.removeItem(`routine_plan_${dateStr}`);
+    }
+  } catch {
+    // Ignore quota errors
+  }
+}
+
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
-  const fetchTodayPlan = useCallback(async (dateStr?: string) => {
+  const fetchTodayPlan = useCallback(async (dateStr?: string, forceRefresh = false) => {
+    const queryDate = dateStr || selectedDate;
+
+    if (!forceRefresh) {
+      const cached = getSessionCachedPlan(queryDate);
+      if (cached) {
+        setPlan(cached);
+        setLoading(false);
+        setError("");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      const queryDate = dateStr || selectedDate;
       const res = await fetch(`${backendUrl}/api/routine/today?date=${queryDate}`, {
         headers: {},
       });
       if (res.ok) {
         const data = (await res.json()) as RoutinePlan | null;
         setPlan(data);
+        setSessionCachedPlan(queryDate, data);
         setError("");
       } else {
         setPlan(null);
+        setSessionCachedPlan(queryDate, null);
         setError("Plan could not be loaded.");
       }
     } catch {
@@ -300,13 +326,15 @@ export default function Dashboard() {
   const handleToggleTask = (taskId: string, currentStatus: TaskStatus) => {
     const nextStatus: TaskStatus = currentStatus === "NOT" ? "PARTIAL" : currentStatus === "PARTIAL" ? "COMPLETED" : "NOT";
 
-    setPlan((currentPlan) => currentPlan
-      ? {
+    setPlan((currentPlan) => {
+      if (!currentPlan) return currentPlan;
+      const updatedPlan = {
         ...currentPlan,
         tasks: currentPlan.tasks.map((task) => task.taskId === taskId ? { ...task, status: nextStatus } : task),
-      }
-      : currentPlan
-    );
+      };
+      setSessionCachedPlan(selectedDate, updatedPlan);
+      return updatedPlan;
+    });
     setError("");
 
     if (nextStatus === "COMPLETED") {
@@ -415,7 +443,9 @@ export default function Dashboard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "The agreed plan could not be saved.");
 
-      setPlan(result as RoutinePlan);
+      const resultPlan = result as RoutinePlan;
+      setPlan(resultPlan);
+      setSessionCachedPlan(selectedDate, resultPlan);
       setPlanChatOpen(false);
       toast.success("Your agreed plan is ready");
     } catch (chatSaveError) {
@@ -453,7 +483,9 @@ export default function Dashboard() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Manual plan could not be saved.");
 
-      setPlan(result as RoutinePlan);
+      const resultPlan = result as RoutinePlan;
+      setPlan(resultPlan);
+      setSessionCachedPlan(selectedDate, resultPlan);
       setManualPlanOpen(false);
       toast.success("Manual plan saved");
     } catch (saveError) {
@@ -484,6 +516,7 @@ export default function Dashboard() {
       });
       if (res.ok) {
         setPlan(null);
+        setSessionCachedPlan(selectedDate, null);
         toast.success("Today's plan deleted");
       } else {
         toast.error("Failed to delete today's plan.");
@@ -536,12 +569,12 @@ export default function Dashboard() {
       subtitle="Plan, tasks, readiness, and AI help in one compact view."
       actions={
         <>
-          <MicroInteractionButton onClick={() => void fetchTodayPlan()} className="btn-secondary">
+          <MicroInteractionButton onClick={() => void fetchTodayPlan(selectedDate, true)} className="btn-secondary">
             Refresh
           </MicroInteractionButton>
           {isTodaySelected && (
             <>
-              <MicroInteractionButton onClick={() => setManualPlanOpen(true)} className="btn-secondary">
+              <MicroInteractionButton onClick={() => { if (plan) { handleEditPlan(); } else { setManualPlanOpen(true); } }} className="btn-secondary">
                 Create manually
               </MicroInteractionButton>
               <span className="btn-ai-wrapper">
@@ -565,7 +598,7 @@ export default function Dashboard() {
         </div>
       ) : null}
 
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <MetricTile index={0} label="Readiness" value={readiness} suffix="%" note={weakArea} progress={readiness} tone={hasAvoidance ? "amber" : "green"} />
         <MetricTile
           index={1}
@@ -588,7 +621,7 @@ export default function Dashboard() {
         />
       </section>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
         <PageSection
           title={isTodaySelected ? "Today's Plan" : `${formatSelectedDate(selectedDate)}'s Plan`}
           eyebrow={isTodaySelected ? "Routine coach" : "Plan history"}
@@ -637,82 +670,8 @@ export default function Dashboard() {
             />
           )}
         </PageSection>
-
-        <div className="space-y-4 xl:col-span-5">
-          <PageSection title="AI Actions" eyebrow="Next move">
-            <div className="surface soft-lavender p-4">
-              <div className="flex flex-col gap-3 sm:flex-row xl:flex-col 2xl:flex-row">
-                <span className="btn-ai-wrapper flex-1">
-                  <MicroInteractionButton onClick={openPlanChat} className="btn-ai-custom brand-fixed w-full shadow-xs group">
-                    <span className="w-4 h-4 flex items-center justify-center shrink-0">
-                      <svg className="h-4 w-4 text-amber-500 transition-transform duration-500 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" />
-                      </svg>
-                    </span>
-                    <span className="btn-text-slide">Plan with AI</span>
-                  </MicroInteractionButton>
-                </span>
-                <Link href={explainerHref(weakArea)} className="btn-secondary flex-1">
-                  Ask AI about weak subject
-                </Link>
-              </div>
-            </div>
-          </PageSection>
-
-          <PageSection title="Focus Signal" eyebrow="Tracker">
-            <div className="surface p-4">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold text-[var(--text-secondary)]">Weak subject</p>
-                  <h3 className="mt-1 line-clamp-2 text-base font-semibold text-[var(--text-primary)]">{weakArea}</h3>
-                </div>
-                <StatusBadge label={hasAvoidance ? "Avoided" : "Current"} tone={hasAvoidance ? "amber" : "green"} />
-              </div>
-              <ProgressBar value={readiness} tone={hasAvoidance ? "amber" : "green"} />
-              <p className="mt-3 text-xs font-medium leading-5 text-[var(--text-secondary)]">
-                {hasAvoidance ? "Give this one direct attention this week." : "Based on the latest tracker status."}
-              </p>
-            </div>
-          </PageSection>
-
-          <PageSection title="Plan Maker" eyebrow="Easy start">
-            <div className="surface soft-blue p-4">
-              <div className="grid gap-2">
-                <Link href="/journal" className="interactive-surface rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text-primary)]">
-                  Write entry
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setManualPlanOpen(true)}
-                  className="focus-ring interactive-surface rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-left text-xs font-semibold text-[var(--text-primary)]"
-                >
-                  Create plan manually
-                </button>
-              </div>
-            </div>
-          </PageSection>
-        </div>
       </div>
 
-      <PageSection title="Study Tools" eyebrow="Shortcuts" className="mt-4">
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          {modules.map((module, index) => (
-            <Link key={module.href} href={module.href} className="block">
-              <MotionCard index={index} className={`interactive-surface h-full p-3 ${toneClass[module.tone]}`}>
-                <div className="flex items-center gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/75 text-xs font-semibold text-[var(--text-primary)]">
-                    {module.mark}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">{module.title}</span>
-                    <span className="block truncate text-[11px] font-medium text-[var(--text-secondary)]">{module.note}</span>
-                  </span>
-                </div>
-              </MotionCard>
-            </Link>
-          ))}
-        </div>
-      </PageSection>
 
       <AnimatePresence>
         {manualPlanOpen && (
@@ -776,6 +735,52 @@ function ManualPlanModal({
         durationMin: "30",
       },
     ]);
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    }, 60);
+  };
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const isOverflowing = el.scrollHeight > el.clientHeight + 10;
+    const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 15;
+    setCanScrollDown(isOverflowing && !isAtBottom);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(() => checkScroll());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [tasks, checkScroll]);
+
+  useEffect(() => {
+    const originalStyle = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   };
 
   const removeTask = (id: string) => {
@@ -791,7 +796,7 @@ function ManualPlanModal({
       animate={{ opacity: 1, backdropFilter: "blur(5px)" }}
       exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
       transition={{ duration: 0.22, ease: "easeInOut" }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,18,24,0.3)] p-3"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,18,24,0.3)] p-3 overscroll-contain"
       onMouseDown={onClose}
     >
       <motion.form
@@ -801,7 +806,7 @@ function ManualPlanModal({
         transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
         onSubmit={onSubmit}
         onMouseDown={(event) => event.stopPropagation()}
-        className="surface flex flex-col h-[80vh] w-full max-w-2xl overflow-hidden p-4 sm:p-5"
+        className="surface flex flex-col h-[80vh] w-full max-w-2xl overflow-hidden p-4 sm:p-5 overscroll-contain"
       >
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4 shrink-0">
           <div>
@@ -820,7 +825,12 @@ function ManualPlanModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto no-scrollbar my-4 space-y-2.5 pr-1">
+        <div className="relative flex-1 min-h-0 my-4 flex flex-col">
+          <div
+            ref={scrollRef}
+            onScroll={checkScroll}
+            className="flex-1 overflow-y-auto overscroll-contain no-scrollbar space-y-2.5 pr-1"
+          >
           {tasks.map((task, index) => (
             <div key={task.id} className="grid grid-cols-[24px_1fr] gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5 sm:grid-cols-[24px_minmax(0,1fr)_120px_88px_32px] sm:items-center">
               <span className="text-center text-[11px] font-semibold text-[var(--text-secondary)]">{index + 1}</span>
@@ -868,6 +878,26 @@ function ManualPlanModal({
               </button>
             </div>
           ))}
+          </div>
+
+          <AnimatePresence>
+            {canScrollDown && (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0, scale: 0.8, y: 6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 6 }}
+                onClick={scrollToBottom}
+                title="Scroll down for more tasks"
+                aria-label="Scroll down"
+                className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-stone-700 bg-stone-850 text-stone-100 bg-stone-900 shadow-xl shadow-black/30 hover:bg-black hover:scale-105 active:scale-95 transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4 shrink-0">
@@ -887,7 +917,7 @@ function ManualPlanModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-full font-bold text-xs text-[var(--text-secondary)] bg-[var(--bg-elevated)] hover:bg-[var(--border)] transition cursor-pointer"
+              className="px-5 py-2.5 rounded-full font-bold text-xs text-[var(--text-primary)] border border-[var(--border)] bg-white hover:bg-[var(--bg-elevated)] hover:border-[var(--border-strong)] active:scale-[0.98] transition cursor-pointer shadow-2xs"
             >
               Cancel
             </button>
@@ -923,7 +953,7 @@ const PlanPanel = memo(function PlanPanel({
   onDeletePlan: () => void;
 }) {
   return (
-    <div className="surface p-4 relative">
+    <div className="surface p-5 relative">
       {/* Header row — title left, buttons pinned right */}
       <div className="mb-3 border-b border-[var(--border)] pb-3 pr-[170px]">
         <h3 className="line-clamp-2 text-base font-semibold text-[var(--text-primary)]"><Latex text={priority} /></h3>
@@ -947,7 +977,7 @@ const PlanPanel = memo(function PlanPanel({
         </button>
       </div>
 
-      <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+      <div className="max-h-[400px] space-y-2.5 overflow-y-auto pr-1">
         {plan.tasks.map((task) => {
           const isDone = task.status === "COMPLETED";
           const isPartial = task.status === "PARTIAL";
@@ -1010,11 +1040,11 @@ const MetricTile = memo(function MetricTile({
   const progressTone = tone === "lavender" ? "blue" : tone === "rose" ? "rose" : tone === "amber" ? "amber" : tone === "teal" ? "teal" : tone === "green" ? "green" : "blue";
 
   return (
-    <MotionCard index={index} className={`interactive-surface min-h-[128px] p-3 ${toneClass[tone]}`}>
-      <div className="flex h-full flex-col justify-between gap-3">
+    <MotionCard index={index} className={`interactive-surface min-h-[140px] p-4 ${toneClass[tone]}`}>
+      <div className="flex h-full flex-col justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">{label}</p>
-          <p className="mt-1 text-xl font-semibold tracking-tight text-[var(--text-primary)]">
+          <p className="mt-1.5 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
             <AnimatedNumber value={value} instant />
             <span className="ml-1 text-xs font-medium text-[var(--text-secondary)]">{suffix}</span>
           </p>

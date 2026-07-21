@@ -57,20 +57,20 @@ export default function JournalUnlockPage() {
           title="Go back"
         >
           {/* Round Circle Container with Arrow */}
-          <div className="w-9 h-9 rounded-full border border-[#dac7a8] bg-[#fffdf5] flex items-center justify-center shadow-sm transition-all duration-300 group-hover:border-[#9b664c] group-hover:bg-[#fff7e9] group-hover:shadow">
+          <div className="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-center shadow-sm transition-all duration-300 group-hover:border-[var(--border-strong)] group-hover:bg-[var(--bg-elevated)] group-hover:shadow">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
               fill="none" 
               viewBox="0 0 24 24" 
               stroke="currentColor" 
               strokeWidth="2" 
-              className="w-4 h-4 text-[#745842] transition-transform duration-300 group-hover:-translate-x-1"
+              className="w-4 h-4 text-[var(--text-secondary)] transition-transform duration-300 group-hover:-translate-x-1 group-hover:text-[var(--text-primary)]"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
           </div>
           {/* Back text next to it */}
-          <span className="text-[10px] font-sans font-bold tracking-wider uppercase text-[#745842] transition-colors duration-300 group-hover:text-[#392920] select-none">
+          <span className="text-[10px] font-sans font-bold tracking-wider uppercase text-[var(--text-secondary)] transition-colors duration-300 group-hover:text-[var(--text-primary)] select-none">
             Back
           </span>
         </button>
@@ -99,7 +99,7 @@ export default function JournalUnlockPage() {
               strokeWidth="1.8" 
               strokeLinecap="round" 
               strokeLinejoin="round" 
-              className="w-12 h-12 text-[#6b503d]"
+              className="w-12 h-12 text-[var(--accent)]"
               style={{ overflow: "visible" }}
             >
               {/* Shackle */}
