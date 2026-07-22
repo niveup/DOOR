@@ -6,6 +6,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 model Settings {
@@ -13,13 +14,19 @@ model Settings {
   name                String
   targetExam          String    @default("GATE")
   targetYear          Int       @default(2026)
-  examDate            DateTime?
   dailyAvailableHours Float     @default(4.0)
+  preferredLanguage   String    @default("hinglish")
+  timezone            String    @default("Asia/Kolkata")
+  wakeTime            String    @default("06:00")
+  sleepTime           String    @default("22:00")
+  exerciseGoal        String?
+  otherGoals          Json?
+  prepLevel           String    @default("Beginner")
+  scoreWeights        Json?
+  pushSubscription    Json?
   weeklyAnalysis      String?
-  analysisWeekOf      DateTime?
-  analysisStale       Boolean   @default(true)
-  systemPrompt        String?
-  customPrompt        String?
+  analysisWeekOf      DateTime? @db.Date
+  analysisStale       Boolean   @default(false)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 }
@@ -41,6 +48,7 @@ model Subject {
 
 model ProgressRating {
   id              String   @id @default(uuid())
+  ratingId        String   @default(uuid())
   subjectId       Int
   subject         Subject  @relation(fields: [subjectId], references: [subjectId])
   weekStartDate   DateTime
@@ -48,7 +56,9 @@ model ProgressRating {
   hoursStudied    Float    @default(0.0)
   questionsSolved Int      @default(0)
   confidenceLevel Int      @default(3)
+  revisionStatus  String   @default("NOT_STARTED")
   notes           String?
+  aiRecommendation String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

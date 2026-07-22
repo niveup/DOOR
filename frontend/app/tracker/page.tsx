@@ -394,6 +394,7 @@ export default function TrackerPage() {
       setData(result);
       if (typeof result.dailyAvailableHours === "number" && result.dailyAvailableHours > 0) {
         setDailyGoal(result.dailyAvailableHours);
+        try { localStorage.setItem("door_daily_goal_hours", result.dailyAvailableHours.toString()); } catch {}
       }
 
       let effectiveLogs: NonNullable<TrackerData["logs"]>[number][] = [];
@@ -575,6 +576,7 @@ export default function TrackerPage() {
       return;
     }
     setDailyGoal(parsed);
+    try { localStorage.setItem("door_daily_goal_hours", parsed.toString()); } catch {}
     setIsGoalModalOpen(false);
     toast.success(`Daily goal updated to ${parsed.toFixed(1)} hours / day!`);
 
@@ -584,7 +586,6 @@ export default function TrackerPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dailyAvailableHours: parsed }),
       });
-      await refresh(true);
     } catch (err) {
       console.warn("Could not save daily goal to cloud database:", err);
     }
