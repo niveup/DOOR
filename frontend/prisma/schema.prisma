@@ -1,19 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
-}
-
 model Settings {
   id                  String    @id @default("default")
   name                String
   targetExam          String    @default("GATE")
-  targetYear          Int       @default(2026)
+  targetYear          Int       @default(2027)
   dailyAvailableHours Float     @default(4.0)
   preferredLanguage   String    @default("hinglish")
   timezone            String    @default("Asia/Kolkata")
@@ -24,43 +24,38 @@ model Settings {
   prepLevel           String    @default("Beginner")
   scoreWeights        Json?
   pushSubscription    Json?
-  weeklyAnalysis      String?
-  analysisWeekOf      DateTime? @db.Date
-  analysisStale       Boolean   @default(false)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+  analysisStale       Boolean   @default(false)
+  analysisWeekOf      DateTime? @db.Date
+  weeklyAnalysis      String?
 }
 
 model Subject {
-  id              String               @id @default(uuid())
-  subjectId       Int                  @unique
-  subjectName     String               @unique
-  importanceLevel Float                @default(0.1)
-  topics          String[]
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  ratings         ProgressRating[]
-  topicStatuses   TopicStatus[]
-  tasks           Task[]
+  subjectId       Int                  @id
+  subjectName     String
+  importanceLevel Float
+  topics          Json
   explanations    ConceptExplanation[]
+  ratings         ProgressRating[]
   StudyLog        StudyLog[]
+  tasks           Task[]
+  topicStatuses   TopicStatus[]
 }
 
 model ProgressRating {
-  id              String   @id @default(uuid())
-  ratingId        String   @default(uuid())
-  subjectId       Int
-  subject         Subject  @relation(fields: [subjectId], references: [subjectId])
-  weekStartDate   DateTime
-  selfRating      Int
-  hoursStudied    Float    @default(0.0)
-  questionsSolved Int      @default(0)
-  confidenceLevel Int      @default(3)
-  revisionStatus  String   @default("NOT_STARTED")
-  notes           String?
+  ratingId         String   @id @default(uuid())
+  subjectId        Int
+  weekStartDate    DateTime @db.Date
+  selfRating       Int
+  hoursStudied     Float    @default(0.0)
+  questionsSolved  Int      @default(0)
+  confidenceLevel  Int      @default(3)
+  revisionStatus   String   @default("NOT_STARTED")
+  notes            String?
   aiRecommendation String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  subject          Subject  @relation(fields: [subjectId], references: [subjectId])
 
   @@unique([subjectId, weekStartDate])
 }
@@ -70,45 +65,149 @@ model StudyLog {
   logDate         String
   timeBlock       String   @default("Evening")
   subjectId       Int
-  subject         Subject  @relation(fields: [subjectId], references: [subjectId])
   subjectName     String
-  hoursStudied    Float
+  hoursStudied    Float    @default(0)
   questionsSolved Int      @default(0)
   notes           String?
   createdAt       DateTime @default(now())
+  subject         Subject  @relation(fields: [subjectId], references: [subjectId], onDelete: Cascade)
+
+  @@index([logDate])
+  @@index([subjectId])
 }
 
 model TopicStatus {
-  id        String   @id @default(uuid())
-  subjectId Int
-  subject   Subject  @relation(fields: [subjectId], references: [subjectId])
-  topicName String
-  status    String   @default("NOT_STARTED")
-  updatedAt DateTime @updatedAt
+  topicStatusId     String   @id
+  subjectId         Int
+  topicId           String
+  status            String   @default("NOT_STARTED")
+  lastExplanationId String?
+  lastScore         Int?
+  updatedAt         DateTime @updatedAt
+  subject           Subject  @relation(fields: [subjectId], references: [subjectId])
 
-  @@unique([subjectId, topicName])
+  @@unique([subjectId, topicId])
 }
 
 model Task {
-  id          String    @id @default(uuid())
+  taskId      String      @id
+  date        DateTime    @db.Date
+  planId      String
   title       String
-  description String?
+  taskType    String
   subjectId   Int?
-  subject     Subject?  @relation(fields: [subjectId], references: [subjectId])
-  priority    String    @default("MEDIUM")
-  status      String    @default("PENDING")
-  dueDate     DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  topicId     String?
+  durationMin Int
+  status      String      @default("NOT")
+  isPriority  Boolean     @default(false)
+  isCarryover Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  finalizedAt DateTime?
+  RoutinePlan RoutinePlan @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  subject     Subject?    @relation(fields: [subjectId], references: [subjectId])
 }
 
 model ConceptExplanation {
-  id          String   @id @default(uuid())
-  concept     String
-  subjectId   Int?
-  subject     Subject? @relation(fields: [subjectId], references: [subjectId])
-  explanation String
-  analogy     String?
-  keyTakeaway String?
-  createdAt   DateTime @default(now())
+  explanationId      String   @id
+  topicInput         String
+  normalizedTopic    String
+  subjectId          Int?
+  mode               String
+  difficulty         String   @default("Medium")
+  explanationText    String
+  questions          Json?
+  finalScore         Int?
+  topicStatusSet     Boolean  @default(false)
+  formulaGuardPassed Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  subject            Subject? @relation(fields: [subjectId], references: [subjectId])
+}
+
+model AiCallLog {
+  logId           String   @id
+  surface         String
+  latencyMs       Int
+  success         Boolean
+  errorMessage    String?
+  promptPreview   String?
+  responsePreview String?
+  createdAt       DateTime @default(now())
+}
+
+model AiProviderCredential {
+  provider        String   @id
+  encryptedApiKey String
+  encryptionIv    String
+  authTag         String
+  keyHint         String
+  model           String
+  isActive        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([isActive])
+}
+
+model InterviewAttempt {
+  attemptId            String   @id
+  sessionId            String
+  company              String
+  mode                 String
+  questionIndex        Int
+  questionText         String
+  userAnswer           String
+  skipped              Boolean  @default(false)
+  score                Float
+  dimensions           Json?
+  missingPoints        Json?
+  improvedAnswer       String?
+  improvedAnswerViewed Boolean  @default(false)
+  createdAt            DateTime @default(now())
+
+  @@unique([sessionId, questionIndex])
+  @@index([sessionId, createdAt])
+}
+
+model Journal {
+  journalId       String    @id
+  date            DateTime  @unique @db.Date
+  entryText       String
+  mood            String?
+  tags            Json?
+  aiFeedback      String?
+  tomorrowTask    String?
+  patternDetected String?
+  studyDone       Boolean   @default(false)
+  exerciseDone    Boolean   @default(false)
+  readingDone     Boolean   @default(false)
+  helpfulness     Int?
+  createdAt       DateTime  @default(now())
+  editedAt        DateTime
+  lockedAt        DateTime?
+}
+
+model RoutinePlan {
+  planId            String   @id
+  date              DateTime @unique @db.Date
+  greeting          String
+  planText          String
+  mainPriority      String
+  totalEstimatedMin Int      @default(0)
+  isWeekend         Boolean  @default(false)
+  generatedAt       DateTime @default(now())
+  Task              Task[]
+}
+
+model WeeklyReport {
+  reportId           String   @id
+  weekStartDate      DateTime @unique @db.Date
+  avgDailyScore      Float
+  totalStudyHours    Float
+  completedTasks     Int
+  missedTasks        Int
+  streaksSummary     Json
+  biggestImprovement String
+  biggestProblem     String
+  aiSummary          String
+  generatedAt        DateTime @default(now())
 }
