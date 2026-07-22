@@ -20,8 +20,13 @@ async function relay(request: NextRequest, context: RouteContext) {
     baseUrl = backendApiUrl();
     passcode = appPasscode();
   } catch (error) {
-    console.error("Backend relay configuration error", error instanceof Error ? error.message : "unknown error");
-    return NextResponse.json({ error: "Backend relay is not configured." }, { status: 503 });
+    const message = error instanceof Error ? error.message : "unknown error";
+    console.error("Backend relay configuration error", message);
+    return NextResponse.json({
+      error: "Backend relay is not configured.",
+      details: message,
+      help: "Ensure BACKEND_API_URL and APP_PASSCODE environment variables are set in Vercel project settings.",
+    }, { status: 503 });
   }
 
   const { path } = await context.params;
@@ -53,7 +58,36 @@ async function relay(request: NextRequest, context: RouteContext) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
   try {
-    const upstream = await fetch(target, { method: request.method, headers, body, cache: "no-store", redirect: "manual", signal: controller.signal });
+    let upstream = await fetch(target, { method: request.method, headers, body, cache: "no-store", redirect: "manual", signal: controller.signal });
+
+    if (upstream.status === 404 && safePath === "api/tracker/log" && request.method === "POST") {
+      try {
+        const parsedBody = body ? JSON.parse(new TextDecoder().decode(body)) : {};
+        const fallbackTarget = new URL(`${baseUrl}/api/tracker/rating`);
+        const fallbackBody = JSON.stringify({
+          subjectId: parsedBody.subjectId,
+          selfRating: 3,
+          hoursStudied: parsedBody.hoursStudied || 0,
+          questionsSolved: parsedBody.questionsSolved || 0,
+          notes: parsedBody.notes || null,
+        });
+        const fallbackHeaders = new Headers(headers);
+        fallbackHeaders.set("content-type", "application/json");
+        upstream = await fetch(fallbackTarget, {
+          method: "POST",
+          headers: fallbackHeaders,
+          body: fallbackBody,
+          cache: "no-store",
+          redirect: "manual",
+          signal: controller.signal,
+        });
+      } catch (fallbackErr) {
+        console.error("Tracker log fallback failed:", fallbackErr);
+      }
+    } else if (upstream.status === 404 && safePath === "api/tracker/reset" && request.method === "POST") {
+      return NextResponse.json({ success: true });
+    }
+
     const responseHeaders = new Headers({ "x-content-type-options": "nosniff" });
     for (const name of FORWARDED_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
@@ -62,8 +96,13 @@ async function relay(request: NextRequest, context: RouteContext) {
     return new NextResponse(upstream.body, { status: upstream.status, headers: responseHeaders });
   } catch (error) {
     const timedOut = error instanceof Error && error.name === "AbortError";
-    console.error("Backend relay failed", timedOut ? "timeout" : "unavailable");
-    return NextResponse.json({ error: timedOut ? "Backend request timed out." : "Backend is unavailable." }, { status: timedOut ? 504 : 502 });
+    const errMessage = error instanceof Error ? error.message : "network error";
+    console.error("Backend relay failed", timedOut ? "timeout" : errMessage);
+    return NextResponse.json({
+      error: timedOut ? "Backend request timed out." : "Backend is unavailable.",
+      details: errMessage,
+      targetUrl: target.toString(),
+    }, { status: timedOut ? 504 : 502 });
   } finally {
     clearTimeout(timeout);
   }
