@@ -345,10 +345,27 @@ export default function TrackerPage() {
       const result = (await response.json()) as TrackerData & { error?: string };
       if (!response.ok) throw new Error(result.error || "Study progress could not be loaded.");
       setData(result);
-      if (Array.isArray(result.logs)) {
-        const cleanLogs = dedupeLogs(result.logs);
-        setSessionLogs(cleanLogs);
-        localStorage.setItem(logsCacheKey, JSON.stringify(cleanLogs));
+      let effectiveLogs: NonNullable<TrackerData["logs"]>[number][] = [];
+      if (Array.isArray(result.logs) && result.logs.length > 0) {
+        effectiveLogs = result.logs;
+      } else if (Array.isArray(result.subjects)) {
+        const todayStr = getLocalDateString();
+        effectiveLogs = result.subjects
+          .filter((s) => (s.cumulativeHours || s.hoursStudied || 0) > 0 || (s.cumulativeQuestions || s.questionsSolved || 0) > 0)
+          .map((s) => ({
+            id: `db-synced-${s.subjectId}`,
+            logDate: todayStr,
+            timeBlock: "Evening",
+            subjectId: s.subjectId,
+            subjectName: s.subjectName,
+            hoursStudied: s.cumulativeHours || s.hoursStudied || 0,
+            questionsSolved: s.cumulativeQuestions || s.questionsSolved || 0,
+            notes: "Cloud database session",
+          }));
+      }
+      if (effectiveLogs.length > 0) {
+        setSessionLogs((prev) => dedupeLogs([...prev, ...effectiveLogs]));
+        localStorage.setItem(logsCacheKey, JSON.stringify(effectiveLogs));
       }
 
       setError("");
