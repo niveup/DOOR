@@ -189,7 +189,47 @@ function dedupeLogs<T extends { id: string; logDate: string; timeBlock: string; 
   return deduplicated;
 }
 
+const offlineQueueKey = "door_offline_logs_queue_v1";
 
+function getOfflineQueue(): Array<Record<string, any>> {
+  try {
+    const raw = localStorage.getItem(offlineQueueKey);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue: Array<Record<string, any>>) {
+  try {
+    localStorage.setItem(offlineQueueKey, JSON.stringify(queue));
+  } catch {}
+}
+
+function enqueueOfflineLog(log: Record<string, any>) {
+  const queue = getOfflineQueue();
+  queue.push(log);
+  saveOfflineQueue(queue);
+}
+
+async function flushOfflineQueue(backendUrl: string) {
+  const queue = getOfflineQueue();
+  if (queue.length === 0) return;
+  const remaining: Array<Record<string, any>> = [];
+  for (const log of queue) {
+    try {
+      const res = await fetch(`${backendUrl}/api/tracker/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(log),
+      });
+      if (!res.ok) remaining.push(log);
+    } catch {
+      remaining.push(log);
+    }
+  }
+  saveOfflineQueue(remaining);
+}
 
 function formatTimerDisplay(totalSecs: number): { hrs: string; mins: string; secs: string } {
   const h = Math.floor(totalSecs / 3600);
@@ -339,6 +379,8 @@ export default function TrackerPage() {
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
+      await flushOfflineQueue(backendUrl);
+
       const response = await fetch(`${backendUrl}/api/tracker/status?t=${Date.now()}`, {
         headers: { "Cache-Control": "no-cache" },
       });
@@ -363,9 +405,16 @@ export default function TrackerPage() {
             notes: "Cloud database session",
           }));
       }
-      if (effectiveLogs.length > 0) {
-        setSessionLogs((prev) => dedupeLogs([...prev, ...effectiveLogs]));
-        localStorage.setItem(logsCacheKey, JSON.stringify(effectiveLogs));
+
+      const queueItems = getOfflineQueue() as NonNullable<TrackerData["logs"]>[number][];
+      const combinedLogs = [...queueItems, ...effectiveLogs];
+
+      if (combinedLogs.length > 0) {
+        setSessionLogs((prev) => {
+          const merged = dedupeLogs([...combinedLogs, ...prev]);
+          localStorage.setItem(logsCacheKey, JSON.stringify(merged));
+          return merged;
+        });
       }
 
       setError("");
@@ -571,61 +620,88 @@ export default function TrackerPage() {
     setIsLogModalOpen(true);
   };
 
-  const handleSaveSessionLog = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedSubject) return;
-
+  const executeSavePipeline = async (
+    targetSubject: Subject,
+    rawDateStr: string,
+    timeBlockLabel: string,
+    hoursNum: number,
+    qNum: number,
+    notesStr: string | null,
+    isTimer = false
+  ) => {
     setSaving(true);
-    const hoursNum = Number(logHours) || 0;
-    const qNum = Number(logQuestions) || 0;
+    const cleanDate = formatDateKey(rawDateStr);
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const newLogRecord = {
+      id: tempId,
+      logDate: cleanDate,
+      timeBlock: timeBlockLabel,
+      subjectId: targetSubject.subjectId,
+      subjectName: targetSubject.subjectName,
+      hoursStudied: hoursNum,
+      questionsSolved: qNum,
+      notes: notesStr,
+    };
 
+    // Step 2: Optimistic UI & Local Cache Update
+    setSessionLogs((prev) => {
+      const updated = dedupeLogs([newLogRecord, ...prev]);
+      localStorage.setItem(logsCacheKey, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isTimer) {
+      handleResetTimer();
+    }
+    setIsLogModalOpen(false);
+    toast.success(`Logged ${hoursNum}h of ${targetSubject.subjectName}!`);
+
+    // Step 3 & 4: Async Cloud Persistence & Real ID Reconciliation
     try {
       const response = await fetch(`${backendUrl}/api/tracker/log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          logDate,
-          timeBlock: logTimeBlock,
-          subjectId: selectedSubject.subjectId,
-          subjectName: selectedSubject.subjectName,
+          logDate: cleanDate,
+          timeBlock: timeBlockLabel,
+          subjectId: targetSubject.subjectId,
+          subjectName: targetSubject.subjectName,
           hoursStudied: hoursNum,
           questionsSolved: qNum,
-          notes: logNotes,
+          notes: notesStr,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Could not save study log to database.");
-      }
-
+      if (!response.ok) throw new Error("Cloud save failed.");
       const resJson = await response.json().catch(() => ({}));
-      const cleanDate = formatDateKey(logDate);
-      const newLogRecord = {
-        id: resJson.logId || `log-${Date.now()}`,
-        logDate: cleanDate,
-        timeBlock: logTimeBlock,
-        subjectId: selectedSubject.subjectId,
-        subjectName: selectedSubject.subjectName,
-        hoursStudied: hoursNum,
-        questionsSolved: qNum,
-        notes: logNotes || null,
-      };
+      const realId = resJson.logId || resJson.ratingId || tempId;
 
       setSessionLogs((prev) => {
-        const updatedLogs = dedupeLogs([newLogRecord, ...prev]);
-        localStorage.setItem(logsCacheKey, JSON.stringify(updatedLogs));
-        return updatedLogs;
+        const updated = prev.map((item) => (item.id === tempId ? { ...item, id: realId } : item));
+        localStorage.setItem(logsCacheKey, JSON.stringify(updated));
+        return updated;
       });
 
-      setIsLogModalOpen(false);
-      await refresh(true);
-      toast.success(`Logged ${hoursNum}h of ${selectedSubject.subjectName}!`);
-
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Tracker database offline.");
+      void refresh(true);
+    } catch {
+      // Step 5: Offline Queue Fallback
+      enqueueOfflineLog(newLogRecord);
+      toast.info("Saved locally. Will sync to cloud when connected.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveSessionLog = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedSubject) return;
+    const hoursNum = Number(logHours) || 0;
+    const qNum = Number(logQuestions) || 0;
+    if (hoursNum <= 0) {
+      toast.error("Please enter study hours greater than 0.");
+      return;
+    }
+    await executeSavePipeline(selectedSubject, logDate, logTimeBlock, hoursNum, qNum, logNotes || null, false);
   };
 
   const handleStartTimer = () => {
@@ -647,8 +723,6 @@ export default function TrackerPage() {
     setTimerStartTimeStr(null);
   };
 
-
-
   const handleFinishTimerSession = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedSubject) return;
@@ -656,55 +730,11 @@ export default function TrackerPage() {
       toast.error("Please run the clock for at least a few seconds before saving.");
       return;
     }
-
-    setSaving(true);
     const hoursNum = Number((timerSeconds / 3600).toFixed(2)) || 0.01;
     const qNum = Number(logQuestions) || 0;
     const timeBlockLabel = timerStartTimeStr ? `@ ${timerStartTimeStr}` : "Live";
-
-    try {
-      const response = await fetch(`${backendUrl}/api/tracker/log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          logDate: getLocalDateString(),
-          timeBlock: timeBlockLabel,
-          subjectId: selectedSubject.subjectId,
-          subjectName: selectedSubject.subjectName,
-          hoursStudied: hoursNum,
-          questionsSolved: qNum,
-          notes: logNotes || `Live clock session (${Math.ceil(timerSeconds / 60)} mins)`,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Could not save study log to database.");
-      }
-
-      const resJson = await response.json().catch(() => ({}));
-      const cleanDate = getLocalDateString();
-      const newLogRecord = {
-        id: resJson.logId || `log-${Date.now()}`,
-        logDate: cleanDate,
-        timeBlock: timeBlockLabel,
-        subjectId: selectedSubject.subjectId,
-        subjectName: selectedSubject.subjectName,
-        hoursStudied: hoursNum,
-        questionsSolved: qNum,
-        notes: logNotes || `Live clock session (${Math.ceil(timerSeconds / 60)} mins)`,
-      };
-
-      setSessionLogs((prev) => dedupeLogs([newLogRecord, ...prev]));
-
-      handleResetTimer();
-      setIsLogModalOpen(false);
-      await refresh(true);
-      toast.success(`Recorded ${hoursNum}h (${Math.ceil(timerSeconds / 60)} mins) of ${selectedSubject.subjectName}!`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Tracker database offline.");
-    } finally {
-      setSaving(false);
-    }
+    const notesStr = logNotes || `Live clock session (${Math.ceil(timerSeconds / 60)} mins)`;
+    await executeSavePipeline(selectedSubject, getLocalDateString(), timeBlockLabel, hoursNum, qNum, notesStr, true);
   };
 
 
