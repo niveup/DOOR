@@ -63,7 +63,7 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
       _sum: { hoursStudied: true, questionsSolved: true },
     });
     const cumulativeMap = new Map<number, { hoursStudied: number | null; questionsSolved: number | null }>();
-    for (const c of cumulativeStats) {
+    for (const c of cumulativeStats as any[]) {
       cumulativeMap.set(c.subjectId, c._sum);
     }
 
@@ -72,7 +72,7 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
     threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
 
     const ratingsBySubject = new Map<number, typeof ratings>();
-    for (const rating of ratings) {
+    for (const rating of ratings as any[]) {
       const subjectRatings = ratingsBySubject.get(rating.subjectId) || [];
       if (subjectRatings.length < 5) {
         subjectRatings.push(rating);
@@ -117,7 +117,7 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
 
     let settings = await prisma.settings.findUnique({ where: { id: "default" } });
     if (!settings) {
-      settings = await prisma.settings.create({ data: { id: "default", name: "GATE Aspirant" } });
+      settings = await prisma.settings.create({ data: { id: "default", name: "GATE Aspirant", dailyAvailableHours: 4.0 } });
     }
 
     const prismaLogs = await prisma.studyLog.findMany({
@@ -151,6 +151,7 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
 
   // 2. POST /api/tracker/log
   if (safePath === "api/tracker/log" && method === "POST") {
+    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
     const { logDate, timeBlock, subjectId, subjectName, hoursStudied, questionsSolved, notes } = parsedBody;
     if (!subjectId || !subjectName) {
       return NextResponse.json({ error: "subjectId and subjectName are required." }, { status: 400 });
@@ -214,6 +215,7 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
 
   // 3. POST /api/tracker/goal
   if (safePath === "api/tracker/goal" && method === "POST") {
+    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
     const hours = Number(parsedBody.dailyAvailableHours);
     if (isNaN(hours) || hours <= 0 || hours > 24) {
       return NextResponse.json({ error: "dailyAvailableHours must be between 0.5 and 24." }, { status: 400 });
@@ -237,6 +239,7 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
 
   // 5. POST /api/subjects
   if (safePath === "api/subjects" && method === "POST") {
+    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
     const { subjectName, importanceLevel, topics } = parsedBody;
     if (!subjectName || typeof subjectName !== "string" || !subjectName.trim()) {
       return NextResponse.json({ error: "subjectName is required." }, { status: 400 });
@@ -302,13 +305,22 @@ async function relay(request: NextRequest, context: RouteContext) {
   }
 
   const safePath = path.map(encodeURIComponent).join("/");
+  let bodyBuffer: ArrayBuffer | undefined;
   let parsedBody: any = null;
 
   if (!["GET", "HEAD"].includes(request.method)) {
     try {
-      const cloned = request.clone();
-      parsedBody = await cloned.json();
-    } catch {}
+      bodyBuffer = await request.arrayBuffer();
+      if (bodyBuffer.byteLength > MAX_BODY_BYTES) {
+        return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
+      }
+      const text = new TextDecoder().decode(bodyBuffer);
+      if (text && text.trim()) {
+        parsedBody = JSON.parse(text);
+      }
+    } catch (e) {
+      console.error("Body parsing error in route proxy:", e);
+    }
   }
 
   // Try direct native Prisma database execution first for 100% reliable cloud sync
@@ -333,23 +345,21 @@ async function relay(request: NextRequest, context: RouteContext) {
   const target = new URL(`${baseUrl}/${safePath}`);
   request.nextUrl.searchParams.forEach((value, key) => target.searchParams.append(key, value));
 
-  const declaredLength = Number(request.headers.get("content-length") || 0);
-  if (declaredLength > MAX_BODY_BYTES) return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
-
   const headers = new Headers({ accept: "application/json", "x-passcode": passcode });
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
 
-  let body: ArrayBuffer | undefined;
-  if (!["GET", "HEAD"].includes(request.method)) {
-    body = await request.arrayBuffer();
-    if (body.byteLength > MAX_BODY_BYTES) return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
-  }
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
   try {
-    const upstream = await fetch(target, { method: request.method, headers, body, cache: "no-store", redirect: "manual", signal: controller.signal });
+    const upstream = await fetch(target, {
+      method: request.method,
+      headers,
+      body: bodyBuffer,
+      cache: "no-store",
+      redirect: "manual",
+      signal: controller.signal,
+    });
     const responseHeaders = new Headers({ "x-content-type-options": "nosniff" });
     for (const name of FORWARDED_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
