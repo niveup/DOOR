@@ -13,7 +13,7 @@ model Settings {
  id String @id @default("default")
  name String
  targetExam String @default("GATE")
- targetYear Int @default(2027)
+ targetYear Int @default(2026)
  dailyAvailableHours Float @default(4.0)
  preferredLanguage String @default("hinglish")
  timezone String @default("Asia/Kolkata")

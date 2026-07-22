@@ -12,7 +12,7 @@ model Settings {
   id                  String    @id @default("default")
   name                String
   targetExam          String    @default("GATE")
-  targetYear          Int       @default(2026")
+  targetYear          Int       @default(2026)
   examDate            DateTime?
   dailyAvailableHours Float     @default(4.0)
   weeklyAnalysis      String?
