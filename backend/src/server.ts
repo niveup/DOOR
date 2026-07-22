@@ -1817,29 +1817,43 @@ app.post("/api/tracker/rating", async (req: Request, res: Response) => {
   try {
     const monday = getKolkataMonday();
 
+    const existing = await prisma.progressRating.findUnique({
+      where: {
+        subjectId_weekStartDate: {
+          subjectId: Number(subjectId),
+          weekStartDate: monday,
+        },
+      },
+    });
+
+    const currentHours = existing?.hoursStudied || 0;
+    const currentQuestions = existing?.questionsSolved || 0;
+    const addHours = Number(hoursStudied || 0.0);
+    const addQuestions = Number(questionsSolved || 0);
+
     const rating = await prisma.progressRating.upsert({
       where: {
         subjectId_weekStartDate: {
           subjectId: Number(subjectId),
-          weekStartDate: monday
-        }
+          weekStartDate: monday,
+        },
       },
       update: {
         selfRating: Number(selfRating),
-        hoursStudied: Number(hoursStudied || 0.0),
-        questionsSolved: Number(questionsSolved || 0),
+        hoursStudied: currentHours + addHours,
+        questionsSolved: currentQuestions + addQuestions,
         confidenceLevel: Number(confidenceLevel || 3),
-        notes: notes || null
+        notes: notes ? `${existing?.notes ? existing.notes + " | " : ""}${notes}` : existing?.notes,
       },
       create: {
         subjectId: Number(subjectId),
         weekStartDate: monday,
         selfRating: Number(selfRating),
-        hoursStudied: Number(hoursStudied || 0.0),
-        questionsSolved: Number(questionsSolved || 0),
+        hoursStudied: addHours,
+        questionsSolved: addQuestions,
         confidenceLevel: Number(confidenceLevel || 3),
-        notes: notes || null
-      }
+        notes: notes || null,
+      },
     });
 
     // Mark AI analysis as stale in global settings
