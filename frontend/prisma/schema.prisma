@@ -1,0 +1,104 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Settings {
+  id                  String    @id @default("default")
+  name                String
+  targetExam          String    @default("GATE")
+  targetYear          Int       @default(2026")
+  examDate            DateTime?
+  dailyAvailableHours Float     @default(4.0)
+  weeklyAnalysis      String?
+  analysisWeekOf      DateTime?
+  analysisStale       Boolean   @default(true)
+  systemPrompt        String?
+  customPrompt        String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Subject {
+  id              String               @id @default(uuid())
+  subjectId       Int                  @unique
+  subjectName     String               @unique
+  importanceLevel Float                @default(0.1)
+  topics          String[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  ratings         ProgressRating[]
+  topicStatuses   TopicStatus[]
+  tasks           Task[]
+  explanations    ConceptExplanation[]
+  StudyLog        StudyLog[]
+}
+
+model ProgressRating {
+  id              String   @id @default(uuid())
+  subjectId       Int
+  subject         Subject  @relation(fields: [subjectId], references: [subjectId])
+  weekStartDate   DateTime
+  selfRating      Int
+  hoursStudied    Float    @default(0.0)
+  questionsSolved Int      @default(0)
+  confidenceLevel Int      @default(3)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([subjectId, weekStartDate])
+}
+
+model StudyLog {
+  id              String   @id @default(uuid())
+  logDate         String
+  timeBlock       String   @default("Evening")
+  subjectId       Int
+  subject         Subject  @relation(fields: [subjectId], references: [subjectId])
+  subjectName     String
+  hoursStudied    Float
+  questionsSolved Int      @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+}
+
+model TopicStatus {
+  id        String   @id @default(uuid())
+  subjectId Int
+  subject   Subject  @relation(fields: [subjectId], references: [subjectId])
+  topicName String
+  status    String   @default("NOT_STARTED")
+  updatedAt DateTime @updatedAt
+
+  @@unique([subjectId, topicName])
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  subjectId   Int?
+  subject     Subject?  @relation(fields: [subjectId], references: [subjectId])
+  priority    String    @default("MEDIUM")
+  status      String    @default("PENDING")
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ConceptExplanation {
+  id          String   @id @default(uuid())
+  concept     String
+  subjectId   Int?
+  subject     Subject? @relation(fields: [subjectId], references: [subjectId])
+  explanation String
+  analogy     String?
+  keyTakeaway String?
+  createdAt   DateTime @default(now())
+}
