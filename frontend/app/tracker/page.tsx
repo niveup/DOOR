@@ -21,6 +21,7 @@ interface Subject {
 interface TrackerData {
   subjects: Subject[];
   weeklyAnalysis?: string | null;
+  dailyAvailableHours?: number;
   logs?: Array<{
     id: string;
     logDate: string;
@@ -379,14 +380,22 @@ export default function TrackerPage() {
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      await flushOfflineQueue(backendUrl);
+      try {
+        localStorage.removeItem("door_study_tracker_data_v2");
+        localStorage.removeItem("door_study_logs_history_v1");
+        localStorage.removeItem("door_offline_logs_queue_v1");
+      } catch {}
 
       const response = await fetch(`${backendUrl}/api/tracker/status?t=${Date.now()}`, {
-        headers: { "Cache-Control": "no-cache" },
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
       });
       const result = (await response.json()) as TrackerData & { error?: string };
       if (!response.ok) throw new Error(result.error || "Study progress could not be loaded.");
       setData(result);
+      if (typeof result.dailyAvailableHours === "number" && result.dailyAvailableHours > 0) {
+        setDailyGoal(result.dailyAvailableHours);
+      }
+
       let effectiveLogs: NonNullable<TrackerData["logs"]>[number][] = [];
       if (Array.isArray(result.logs) && result.logs.length > 0) {
         effectiveLogs = result.logs;
@@ -406,19 +415,8 @@ export default function TrackerPage() {
           }));
       }
 
-      const queueItems = getOfflineQueue() as NonNullable<TrackerData["logs"]>[number][];
-      const combinedLogs = [...queueItems, ...effectiveLogs];
-
-      if (combinedLogs.length > 0) {
-        setSessionLogs((prev) => {
-          const merged = dedupeLogs([...combinedLogs, ...prev]);
-          localStorage.setItem(logsCacheKey, JSON.stringify(merged));
-          return merged;
-        });
-      }
-
+      setSessionLogs(dedupeLogs(effectiveLogs));
       setError("");
-      localStorage.setItem(cacheKey, JSON.stringify(result));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to connect to study tracker database.");
     } finally {
@@ -427,24 +425,11 @@ export default function TrackerPage() {
   }, [backendUrl]);
 
   useEffect(() => {
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-      try {
-        setData(JSON.parse(cached));
-        setLoading(false);
-      } catch {
-        localStorage.removeItem(cacheKey);
-      }
-    }
-    
-    const cachedLogs = localStorage.getItem(logsCacheKey);
-    if (cachedLogs) {
-      try {
-        setSessionLogs(dedupeLogs(JSON.parse(cachedLogs)));
-      } catch {
-        localStorage.removeItem(logsCacheKey);
-      }
-    }
+    try {
+      localStorage.removeItem("door_study_tracker_data_v2");
+      localStorage.removeItem("door_study_logs_history_v1");
+      localStorage.removeItem("door_offline_logs_queue_v1");
+    } catch {}
 
     const savedGoal = localStorage.getItem("door_daily_goal_hours");
     if (savedGoal) {
@@ -452,7 +437,7 @@ export default function TrackerPage() {
       if (!isNaN(parsed) && parsed > 0) setDailyGoal(parsed);
     }
     
-    void refresh(Boolean(cached));
+    void refresh(false);
   }, [refresh]);
 
   const subjects = useMemo(() => data?.subjects || [], [data]);
@@ -582,7 +567,7 @@ export default function TrackerPage() {
     return Math.ceil(maxVal);
   }, [dailyChartData, dailyGoal]);
 
-  const handleSaveDailyGoal = (e: React.FormEvent) => {
+  const handleSaveDailyGoal = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseFloat(tempGoalInput);
     if (isNaN(parsed) || parsed <= 0 || parsed > 24) {
@@ -590,9 +575,19 @@ export default function TrackerPage() {
       return;
     }
     setDailyGoal(parsed);
-    localStorage.setItem("door_daily_goal_hours", parsed.toString());
     setIsGoalModalOpen(false);
     toast.success(`Daily goal updated to ${parsed.toFixed(1)} hours / day!`);
+
+    try {
+      await fetch(`${backendUrl}/api/tracker/goal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dailyAvailableHours: parsed }),
+      });
+      await refresh(true);
+    } catch (err) {
+      console.warn("Could not save daily goal to cloud database:", err);
+    }
   };
 
   // Filtered Subjects
@@ -631,32 +626,12 @@ export default function TrackerPage() {
   ) => {
     setSaving(true);
     const cleanDate = formatDateKey(rawDateStr);
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const newLogRecord = {
-      id: tempId,
-      logDate: cleanDate,
-      timeBlock: timeBlockLabel,
-      subjectId: targetSubject.subjectId,
-      subjectName: targetSubject.subjectName,
-      hoursStudied: hoursNum,
-      questionsSolved: qNum,
-      notes: notesStr,
-    };
-
-    // Step 2: Optimistic UI & Local Cache Update
-    setSessionLogs((prev) => {
-      const updated = dedupeLogs([newLogRecord, ...prev]);
-      localStorage.setItem(logsCacheKey, JSON.stringify(updated));
-      return updated;
-    });
 
     if (isTimer) {
       handleResetTimer();
     }
     setIsLogModalOpen(false);
-    toast.success(`Logged ${hoursNum}h of ${targetSubject.subjectName}!`);
 
-    // Step 3 & 4: Async Cloud Persistence & Real ID Reconciliation
     try {
       const response = await fetch(`${backendUrl}/api/tracker/log`, {
         method: "POST",
@@ -672,21 +647,12 @@ export default function TrackerPage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Cloud save failed.");
-      const resJson = await response.json().catch(() => ({}));
-      const realId = resJson.logId || resJson.ratingId || tempId;
+      if (!response.ok) throw new Error("Cloud database save failed.");
 
-      setSessionLogs((prev) => {
-        const updated = prev.map((item) => (item.id === tempId ? { ...item, id: realId } : item));
-        localStorage.setItem(logsCacheKey, JSON.stringify(updated));
-        return updated;
-      });
-
-      void refresh(true);
-    } catch {
-      // Step 5: Offline Queue Fallback
-      enqueueOfflineLog(newLogRecord);
-      toast.info("Saved locally. Will sync to cloud when connected.");
+      toast.success(`Logged ${hoursNum}h of ${targetSubject.subjectName} to cloud!`);
+      await refresh(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Cloud database save failed.");
     } finally {
       setSaving(false);
     }

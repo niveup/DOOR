@@ -2211,12 +2211,33 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
       subjects: ratingsList,
       weeklyAnalysis,
       logs,
+      dailyAvailableHours: settings.dailyAvailableHours || 4.0,
     };
 
     trackerStatusCache = { value, expiresAt: Date.now() + 300_000 };
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.setHeader("X-Tracker-Cache", "miss");
     res.json(value);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/tracker/goal", async (req: Request, res: Response) => {
+  const { dailyAvailableHours } = req.body;
+  const hours = Number(dailyAvailableHours);
+  if (isNaN(hours) || hours <= 0 || hours > 24) {
+    return res.status(400).json({ error: "dailyAvailableHours must be between 0.5 and 24." });
+  }
+
+  try {
+    const updated = await prisma.settings.upsert({
+      where: { id: "default" },
+      update: { dailyAvailableHours: hours },
+      create: { id: "default", name: "GATE Aspirant", dailyAvailableHours: hours },
+    });
+    trackerStatusCache = null;
+    res.json({ success: true, dailyAvailableHours: updated.dailyAvailableHours });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

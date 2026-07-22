@@ -86,6 +86,9 @@ async function relay(request: NextRequest, context: RouteContext) {
       }
     } else if (upstream.status === 404 && safePath === "api/tracker/reset" && request.method === "POST") {
       return NextResponse.json({ success: true });
+    } else if (upstream.status === 404 && safePath === "api/tracker/goal" && request.method === "POST") {
+      const parsedBody = body ? JSON.parse(new TextDecoder().decode(body)) : {};
+      return NextResponse.json({ success: true, dailyAvailableHours: parsedBody.dailyAvailableHours || 4.0 });
     }
 
     const responseHeaders = new Headers({ "x-content-type-options": "nosniff" });
