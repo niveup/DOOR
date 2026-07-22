@@ -4,7 +4,7 @@
   "description": "Backend API and Cron Worker for Jujum AI",
   "main": "dist/gateway.js",
   "scripts": {
-    "build": "tsc",
+    "build": "prisma generate --schema=../prisma/schema.prisma && tsc",
     "start": "node dist/gateway.js",
     "dev": "nodemon --watch src/**/*.ts --exec ts-node src/gateway.ts",
     "prisma:generate": "prisma generate --schema=../prisma/schema.prisma",
