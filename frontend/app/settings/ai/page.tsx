@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { motion } from "motion/react";
 import { AppShell, PageSection } from "@/components/AppShell";
 import { MicroInteractionButton } from "@/components/MotionComponents";
 
@@ -194,21 +195,31 @@ export default function AiSettingsPage() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <PageSection title="Provider" eyebrow="Active connection">
           <form onSubmit={saveConfiguration} className="surface p-4 sm:p-5">
-            <div className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-1">
-              {(["openrouter", "nvidia", "cerebras"] as ProviderName[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => chooseProvider(item)}
-                  className={`focus-ring rounded-md px-3 py-1.5 text-[11px] font-semibold transition ${
-                    provider === item
-                      ? "bg-white text-[var(--accent)] shadow-sm"
-                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {providerLabels[item]}
-                </button>
-              ))}
+            <div className="relative inline-flex rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] p-1">
+              {(["openrouter", "nvidia", "cerebras"] as ProviderName[]).map((item) => {
+                const isSelected = provider === item;
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => chooseProvider(item)}
+                    className={`focus-ring relative z-10 rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors duration-200 ${
+                      isSelected
+                        ? "text-[var(--accent)] font-bold"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {isSelected && (
+                      <motion.div
+                        layoutId="activeProviderTab"
+                        className="absolute inset-0 rounded-md bg-white shadow-sm -z-10"
+                        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                      />
+                    )}
+                    {providerLabels[item]}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="mt-5 grid gap-4">

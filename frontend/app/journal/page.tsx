@@ -357,7 +357,7 @@ export default function JournalPage() {
                       Past Page
                     </button>
                   </div>
-                  <h2>{new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" }).format(new Date())}</h2>
+                  <h2 suppressHydrationWarning>{new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Kolkata" }).format(new Date())}</h2>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="journal-privacy-seal">Private</span>

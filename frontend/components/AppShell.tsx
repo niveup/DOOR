@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 
 const primaryNavItems = [
   { href: "/dashboard", label: "Dashboard", mobileLabel: "Today", helper: "Today", mark: "D", icon: "home" },
@@ -115,26 +116,27 @@ export function AppShell({
           <div>
             <div className="flex items-center justify-between gap-1">
               <Link href="/dashboard" className="brand-mark brand-fixed focus-ring interactive-surface flex items-center gap-2.5 rounded-lg p-2.5 flex-1 min-w-0">
-                <div className="h-8 w-8 rounded-md bg-stone-900 flex items-center justify-center text-white shadow-sm shrink-0">
+                <div className="h-8 w-8 rounded-md bg-stone-900 dark:bg-stone-950 flex items-center justify-center text-white shadow-sm shrink-0">
                   <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
                     {/* Background Arch Fill (white light coming through) */}
                     <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
                     {/* Frame */}
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 21V9a8 8 0 0116 0v12M2 21h20" />
-                    {/* Open Door Leaf (dark wood/stone) */}
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#2d2c2a" />
+                    {/* Open Door Leaf */}
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#1a1917" />
                     {/* Small Knob (gold) */}
                     <circle cx="12.5" cy="12.5" r="1.1" fill="#dfb15b" stroke="none" />
                   </svg>
                 </div>
-                <span className="text-sm font-extrabold tracking-[0.22em] text-stone-850 uppercase font-sans">DOOR</span>
+                <span className="text-[16px] font-black tracking-[0.22em] text-[#000000] dark:text-[#ffffff] uppercase font-sans">DOOR</span>
               </Link>
               
               <button
                 type="button"
                 onClick={toggleTheme}
+                suppressHydrationWarning
                 title={!mounted ? "Switch to dark mode" : `Switch to ${theme === "light" ? "dark" : "light"} mode`}
-                className="focus-ring interactive-surface border border-transparent text-[var(--text-secondary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] rounded-lg p-2 transition flex items-center justify-center h-9 w-9 shrink-0 cursor-pointer"
+                className="focus-ring interactive-surface border border-transparent text-zinc-950 dark:text-[var(--text-secondary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)] dark:hover:text-[var(--text-primary)] rounded-lg p-2 transition flex items-center justify-center h-9 w-9 shrink-0 cursor-pointer"
               >
                 {!mounted || theme === "light" ? (
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
@@ -148,31 +150,38 @@ export function AppShell({
               </button>
             </div>
 
-            <nav className="mt-5 space-y-1" aria-label="Primary navigation">
+            <nav className="mt-4 space-y-1" aria-label="Primary navigation">
               {primaryNavItems.map((item) => {
                 const active = isActive(pathname, item.href);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`focus-ring interactive-surface group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition ${
+                    className={`focus-ring relative group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition ${
                       active
-                        ? "border-[var(--accent)]/25 bg-[var(--accent-soft)] text-[var(--accent)] shadow-xs font-semibold"
-                        : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] font-medium"
+                        ? "border-[var(--accent)]/25 shadow-xs text-[var(--accent)]"
+                        : "border-transparent text-[#000000] dark:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
                     }`}
                   >
-                    <span className={`flex h-7 w-7 items-center justify-center rounded-md transition ${active ? "bg-[var(--bg-card)] text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] group-hover:bg-[var(--bg-card)]"}`}>
+                    {active && (
+                      <motion.div
+                        layoutId="activeSidebarPill"
+                        className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0"
+                        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                      />
+                    )}
+                    <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
                       <TabIcon name={item.icon} />
                     </span>
-                    <span className="truncate text-xs font-semibold">{item.label}</span>
+                    <span className={`relative z-10 truncate text-[13px] font-semibold ${active ? "text-[#000000] dark:text-[var(--accent)]" : "text-[#000000] dark:text-[var(--text-primary)]"}`}>{item.label}</span>
                   </Link>
                 );
               })}
 
               {/* On Progress Divider Line */}
-              <div className="my-3 flex items-center gap-2 px-1 py-1">
+              <div className="mt-36 mb-2.5 flex items-center gap-2 px-1 py-1">
                 <div className="h-px flex-1 bg-[var(--border)]" />
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-secondary)] shrink-0">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#000000] dark:text-[var(--text-secondary)] shrink-0">
                   On Progress
                 </span>
                 <div className="h-px flex-1 bg-[var(--border)]" />
@@ -184,30 +193,37 @@ export function AppShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`focus-ring interactive-surface group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition ${
+                    className={`focus-ring relative group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition ${
                       active
-                        ? "border-[var(--accent)]/25 bg-[var(--accent-soft)] text-[var(--accent)] shadow-xs font-semibold"
-                        : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] font-medium"
+                        ? "border-[var(--accent)]/25 shadow-xs text-[var(--accent)]"
+                        : "border-transparent text-[#000000] dark:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
                     }`}
                   >
-                    <span className={`flex h-7 w-7 items-center justify-center rounded-md transition ${active ? "bg-[var(--bg-card)] text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] group-hover:bg-[var(--bg-card)]"}`}>
+                    {active && (
+                      <motion.div
+                        layoutId="activeSidebarPill"
+                        className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0"
+                        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                      />
+                    )}
+                    <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
                       <TabIcon name={item.icon} />
                     </span>
-                    <span className="truncate text-xs font-semibold">{item.label}</span>
+                    <span className={`relative z-10 truncate text-[13px] font-semibold ${active ? "text-[#000000] dark:text-[var(--accent)]" : "text-[#000000] dark:text-[var(--text-primary)]"}`}>{item.label}</span>
                   </Link>
                 );
               })}
             </nav>
           </div>
 
-          <div className="soft-mint rounded-lg border border-[var(--border)] p-3">
+          <div className="soft-mint rounded-lg border border-[var(--border)] p-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="section-label">Quick start</span>
-              <span className="text-[11px] font-bold text-[var(--text-secondary)]">{todayLabel()}</span>
+              <span className="section-label text-zinc-950 dark:text-inherit font-semibold text-[12px]">Quick start</span>
+              <span suppressHydrationWarning className="text-[12px] font-semibold text-zinc-950 dark:text-[var(--text-secondary)]">{mounted ? todayLabel() : ""}</span>
             </div>
-            <div className="mt-3 grid gap-2">
-              <Link href="/journal" className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Write today&apos;s entry</Link>
-              <Link href="/dashboard" className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Make today&apos;s plan</Link>
+            <div className="mt-2.5 grid gap-1.5">
+              <Link href="/journal" className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Write today&apos;s entry</Link>
+              <Link href="/dashboard" className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Make today&apos;s plan</Link>
             </div>
           </div>
         </aside>
@@ -217,21 +233,21 @@ export function AppShell({
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <Link href="/dashboard" className="brand-mark brand-fixed focus-ring flex items-center gap-2.5 rounded-lg">
-                  <div className="h-8 w-8 rounded-md bg-stone-900 flex items-center justify-center text-white shadow-sm shrink-0">
+                  <div className="h-8 w-8 rounded-md bg-stone-900 dark:bg-stone-950 flex items-center justify-center text-white shadow-sm shrink-0">
                     <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
                       {/* Background Arch Fill (white light coming through) */}
                       <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
                       {/* Frame */}
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 21V9a8 8 0 0116 0v12M2 21h20" />
-                      {/* Open Door Leaf (dark wood/stone) */}
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#2d2c2a" />
+                      {/* Open Door Leaf */}
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#1a1917" />
                       {/* Small Knob (gold) */}
                       <circle cx="12.5" cy="12.5" r="1.1" fill="#dfb15b" stroke="none" />
                     </svg>
                   </div>
                   <span>
-                    <span className="block text-sm font-extrabold tracking-[0.22em] text-stone-850 uppercase font-sans leading-none">DOOR</span>
-                    <span className="block text-[9px] font-bold text-[var(--text-secondary)] mt-1">{todayLabel()}</span>
+                    <span className="block text-sm font-black tracking-[0.22em] text-[#000000] dark:text-[#ffffff] uppercase font-sans leading-none">DOOR</span>
+                    <span suppressHydrationWarning className="block text-[9px] font-bold text-[var(--text-secondary)] mt-1">{mounted ? todayLabel() : ""}</span>
                   </span>
                 </Link>
                 
@@ -258,8 +274,15 @@ export function AppShell({
               {primaryNavItems.map((item) => {
                 const active = isActive(pathname, item.href);
                 return (
-                  <Link key={item.href} href={item.href} className={`focus-ring rounded-lg border px-3 py-2 text-xs font-semibold ${active ? "border-[var(--accent)]/25 bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
-                    {item.label}
+                  <Link key={item.href} href={item.href} className={`focus-ring relative rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? "border-[var(--accent)]/25 text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
+                    {active && (
+                      <motion.div
+                        layoutId="activeTabletPill"
+                        className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0"
+                        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                      />
+                    )}
+                    <span className="relative z-10">{item.label}</span>
                   </Link>
                 );
               })}
@@ -267,24 +290,40 @@ export function AppShell({
               {progressNavItems.map((item) => {
                 const active = isActive(pathname, item.href);
                 return (
-                  <Link key={item.href} href={item.href} className={`focus-ring rounded-lg border px-3 py-2 text-xs font-semibold ${active ? "border-[var(--accent)]/25 bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
-                    {item.label}
+                  <Link key={item.href} href={item.href} className={`focus-ring relative rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? "border-[var(--accent)]/25 text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
+                    {active && (
+                      <motion.div
+                        layoutId="activeTabletPill"
+                        className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0"
+                        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                      />
+                    )}
+                    <span className="relative z-10">{item.label}</span>
                   </Link>
                 );
               })}
             </nav>
           </div>
 
-          {title || actions ? (
-            <header className="surface mb-5 flex flex-col justify-between gap-3 p-5 sm:flex-row sm:items-end lg:p-5">
-              <div className="min-w-0">
-                {eyebrow ? <p className="section-label mb-2">{eyebrow}</p> : null}
-                {title ? <h1 className={titleClassName}>{title}</h1> : null}
-                {subtitle ? <p className="mt-1.5 max-w-3xl text-xs font-medium leading-5 text-[var(--text-secondary)]">{subtitle}</p> : null}
-              </div>
-              {actions ? <div className="hidden shrink-0 items-center gap-2 lg:flex">{actions}</div> : null}
-            </header>
-          ) : null}
+          <AnimatePresence mode="wait">
+            {title || actions ? (
+              <motion.header
+                key={pathname + (title || "")}
+                initial={{ opacity: 0.95, y: -2 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0.95, y: 2 }}
+                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="surface mb-5 flex flex-col justify-between gap-3 p-5 sm:flex-row sm:items-end lg:p-5"
+              >
+                <div className="min-w-0">
+                  {eyebrow ? <p className="section-label mb-2">{eyebrow}</p> : null}
+                  {title ? <h1 className={titleClassName}>{title}</h1> : null}
+                  {subtitle ? <p className="mt-1.5 max-w-3xl text-xs font-medium leading-5 text-[var(--text-secondary)]">{subtitle}</p> : null}
+                </div>
+                {actions ? <div className="hidden shrink-0 items-center gap-2 lg:flex">{actions}</div> : null}
+              </motion.header>
+            ) : null}
+          </AnimatePresence>
 
           {children}
         </main>
@@ -294,9 +333,18 @@ export function AppShell({
         {mobileItems.map((item) => {
           const active = isActive(pathname, item.href);
           return (
-            <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`mobile-tab focus-ring ${active ? "is-active" : ""}`}>
-              <TabIcon name={item.icon} />
-              <span>{item.mobileLabel}</span>
+            <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`mobile-tab focus-ring relative ${active ? "is-active" : ""}`}>
+              {active && (
+                <motion.div
+                  layoutId="activeMobilePill"
+                  className="absolute inset-0 rounded-lg bg-[var(--accent-soft)] -z-0"
+                  transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                />
+              )}
+              <span className="relative z-10 flex flex-col items-center justify-center gap-0.5">
+                <TabIcon name={item.icon} />
+                <span>{item.mobileLabel}</span>
+              </span>
             </Link>
           );
         })}

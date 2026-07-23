@@ -89,8 +89,13 @@ export async function POST(request: NextRequest) {
     // Persist the encrypted writing first: an AI outage must never lose a draft.
     await saveJournalEntry(date, payload);
   } catch (error) {
-    console.error("Encrypted journal save failed", error instanceof Error ? error.message : "unknown error");
-    return privateJson({ error: "Private journal storage is unavailable. Your draft has not been sent." }, 503);
+    const errMessage = error instanceof Error ? error.message : "unknown error";
+    console.error("Encrypted journal save failed", errMessage);
+    return privateJson({
+      error: "Private journal storage is unavailable. Your draft has not been sent.",
+      details: errMessage,
+      help: "Ensure CF_JOURNAL_STORE_URL, CF_JOURNAL_STORE_SECRET, and JOURNAL_ENCRYPTION_KEY are configured in Vercel environment variables.",
+    }, 503);
   }
 
   try {

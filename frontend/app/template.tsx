@@ -7,13 +7,14 @@ export default function Template({ children }: { children: React.ReactNode }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: shouldReduceMotion ? 1 : 0.9, y: shouldReduceMotion ? 0 : 4 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: shouldReduceMotion ? 0.01 : 0.15,
-        ease: [0.4, 0, 0.2, 1] as [number, number, number, number], // ease-standard
+        duration: shouldReduceMotion ? 0.01 : 0.18,
+        ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
       }}
-      className="flex-1 flex flex-col w-full"
+      style={{ willChange: "opacity, transform" }}
+      className="flex-1 flex flex-col w-full min-h-0"
     >
       {children}
     </motion.div>
