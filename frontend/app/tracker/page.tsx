@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
 import { AppShell, PageSection } from "@/components/AppShell";
@@ -363,6 +364,25 @@ export default function TrackerPage() {
   const [isLogsHistoryModalOpen, setIsLogsHistoryModalOpen] = useState(false);
   const logsHistoryMouseDownRef = useRef(false);
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const isAnyModalOpen = isLogsHistoryModalOpen || isLogModalOpen || isAddSubjectModalOpen || isGoalModalOpen || isDeleteModalOpen || isDeleteSubjectModalOpen;
+
+  useEffect(() => {
+    if (!isMounted) return;
+    if (isAnyModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMounted, isAnyModalOpen]);
 
 
   const toggleDateExpand = (dateStr: string) => {
@@ -2005,172 +2025,166 @@ export default function TrackerPage() {
       </AnimatePresence>
 
       {/* Full Session Logs History Modal — Crisp 1-Liner Rows & Chart Table */}
-      <AnimatePresence>
-        {isLogsHistoryModalOpen ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            onMouseDown={(e) => {
-              logsHistoryMouseDownRef.current = e.target === e.currentTarget;
-            }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget && logsHistoryMouseDownRef.current) {
-                setIsLogsHistoryModalOpen(false);
-              }
-            }}
-            className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 6 }}
-              transition={{ type: "spring", stiffness: 450, damping: 32, mass: 0.6 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-xl max-h-[80vh] flex flex-col space-y-3.5 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-xl text-[var(--text-primary)]"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
-                <div>
-                  <h3 className="text-lg font-black tracking-tight text-[var(--text-primary)]">
-                    All Recorded Sessions
-                  </h3>
-                  <p className="text-xs font-semibold text-[var(--text-secondary)]">
-                    {sessionLogs.length} logged {sessionLogs.length === 1 ? "session" : "sessions"} ({formatHumanDuration(totalHours)} total)
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsLogsHistoryModalOpen(false)}
-                  className="rounded-full p-1.5 text-[var(--text-secondary)] hover:bg-[var(--track)] hover:text-[var(--text-primary)] transition"
+      {isMounted && typeof document !== "undefined"
+        ? createPortal(
+            <AnimatePresence>
+              {isLogsHistoryModalOpen ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  onMouseDown={(e) => {
+                    logsHistoryMouseDownRef.current = e.target === e.currentTarget;
+                  }}
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget && logsHistoryMouseDownRef.current) {
+                      setIsLogsHistoryModalOpen(false);
+                    }
+                  }}
+                  className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
                 >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Date-Wise Collapsible Grouped Views */}
-              <div className="max-h-[60vh] overflow-y-auto space-y-2.5 pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {logsByDateGroups.map((group, groupIdx) => {
-                  const isExpanded = expandedDates[group.date] ?? (groupIdx === 0);
-                  return (
-                    <div
-                      key={group.date}
-                      className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden shadow-xs"
-                    >
-                      {/* Collapsible Date Header */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 6 }}
+                    transition={{ type: "spring", stiffness: 450, damping: 32, mass: 0.6 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full max-w-xl max-h-[85vh] flex flex-col space-y-3.5 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 sm:p-6 shadow-2xl text-[var(--text-primary)] relative z-[10000] overflow-hidden"
+                  >
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+                      <div>
+                        <h3 className="text-lg font-black tracking-tight text-[var(--text-primary)]">
+                          All Recorded Sessions
+                        </h3>
+                        <p className="text-xs font-semibold text-[var(--text-secondary)]">
+                          {sessionLogs.length} logged {sessionLogs.length === 1 ? "session" : "sessions"} ({formatHumanDuration(totalHours)} total)
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => toggleDateExpand(group.date)}
-                        className="w-full flex items-center justify-between p-3 text-left transition hover:bg-[var(--track)]/50 select-none"
+                        onClick={() => setIsLogsHistoryModalOpen(false)}
+                        className="rounded-full p-1.5 text-[var(--text-secondary)] hover:bg-[var(--track)] hover:text-[var(--text-primary)] transition"
                       >
-                        <div className="flex items-center gap-2.5">
-                          <span className="font-extrabold text-sm text-[var(--text-primary)]">
-                            {formatDisplayDate(group.date)}
-                          </span>
-                          <span className="text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--track)] px-2 py-0.5 rounded-full border border-[var(--border)]/40">
-                            {group.logs.length} {group.logs.length === 1 ? "session" : "sessions"}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-black text-[var(--accent)]">
-                            {formatHumanDuration(group.dayTotalHours)}
-                          </span>
-                          {group.dayTotalQuestions > 0 && (
-                            <span className="text-[11px] font-bold text-[var(--text-secondary)]">
-                              · {group.dayTotalQuestions} Qs
-                            </span>
-                          )}
-                          <motion.svg
-                            animate={{ rotate: isExpanded ? 180 : 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="h-4 w-4 text-[var(--text-secondary)] shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2.5}
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                          </motion.svg>
-                        </div>
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
-
-                      {/* Collapsible Inner Session Rows */}
-                      <AnimatePresence initial={false}>
-                        {isExpanded && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                            className="overflow-hidden border-t border-[var(--border)]/50 divide-y divide-[var(--border)]/30 bg-[var(--bg-card)]"
-                          >
-                            {group.logs.map((log) => (
-                              <div
-                                key={log.id}
-                                className="grid grid-cols-12 items-center px-3.5 py-2.5 text-xs font-medium"
-                              >
-                                {/* Time Block */}
-                                <div className="col-span-3 flex items-center gap-1.5 truncate">
-                                  <span className="text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--track)] px-2 py-0.5 rounded-md">
-                                    {log.timeBlock}
-                                  </span>
-                                </div>
-
-                                {/* Subject & Notes */}
-                                <div className="col-span-5 truncate pr-2">
-                                  <span className="font-bold text-[var(--text-primary)] block truncate">
-                                    {log.subjectName}
-                                  </span>
-                                  {log.notes && (
-                                    <span className="text-[10px] text-[var(--text-secondary)] italic truncate block">
-                                      "{log.notes}"
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Study Time */}
-                                <div className="col-span-2 text-right font-black text-[var(--accent)]">
-                                  {formatHumanDuration(log.hoursStudied)}
-                                </div>
-
-
-                                {/* Questions */}
-                                <div className="col-span-2 text-right font-bold text-[var(--text-primary)]">
-                                  {log.questionsSolved > 0 ? (
-                                    <span>{log.questionsSolved} <span className="text-[10px] text-[var(--text-secondary)]">Qs</span></span>
-                                  ) : (
-                                    <span className="text-[var(--text-secondary)]">-</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
                     </div>
-                  );
-                })}
-              </div>
 
+                    {/* Date-Wise Collapsible Grouped Views */}
+                    <div className="max-h-[60vh] overflow-y-auto space-y-2.5 pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {logsByDateGroups.map((group, groupIdx) => {
+                        const isExpanded = expandedDates[group.date] ?? (groupIdx === 0);
+                        return (
+                          <div
+                            key={group.date}
+                            className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden shadow-xs"
+                          >
+                            {/* Collapsible Date Header */}
+                            <button
+                              type="button"
+                              onClick={() => toggleDateExpand(group.date)}
+                              className="w-full flex items-center justify-between p-3 text-left transition hover:bg-[var(--track)]/50 select-none"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="font-extrabold text-sm text-[var(--text-primary)]">
+                                  {formatDisplayDate(group.date)}
+                                </span>
+                                <span className="text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--track)] px-2 py-0.5 rounded-full border border-[var(--border)]/40">
+                                  {group.logs.length} {group.logs.length === 1 ? "session" : "sessions"}
+                                </span>
+                              </div>
 
-              {/* Close Button */}
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsLogsHistoryModalOpen(false)}
-                  className="rounded-xl bg-[var(--accent)] px-5 py-2 text-xs font-extrabold text-stone-950 shadow-md hover:brightness-110 transition"
-                >
-                  Done
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-black text-[var(--accent)]">
+                                  {formatHumanDuration(group.dayTotalHours)}
+                                </span>
+                                {group.dayTotalQuestions > 0 && (
+                                  <span className="text-[11px] font-bold text-[var(--text-secondary)]">
+                                    · {group.dayTotalQuestions} Qs
+                                  </span>
+                                )}
+                                <motion.svg
+                                  animate={{ rotate: isExpanded ? 180 : 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="h-4 w-4 text-[var(--text-secondary)] shrink-0"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2.5}
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                </motion.svg>
+                              </div>
+                            </button>
+
+                            {/* Expandable Session Rows Table */}
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="border-t border-[var(--border)] bg-[var(--bg-card)] divide-y divide-[var(--border)]/50"
+                                >
+                                  {group.logs.map((log) => (
+                                    <div
+                                      key={log.id}
+                                      className="grid grid-cols-12 items-center px-3.5 py-2 text-xs transition hover:bg-[var(--track)]/30"
+                                    >
+                                      {/* Subject */}
+                                      <div className="col-span-5 font-bold text-[var(--text-primary)] truncate">
+                                        {log.subjectName}
+                                      </div>
+
+                                      {/* Time Block */}
+                                      <div className="col-span-3 text-[11px] font-semibold text-[var(--text-secondary)]">
+                                        {log.timeBlock || "Session"}
+                                      </div>
+
+                                      {/* Hours */}
+                                      <div className="col-span-2 text-right font-black text-[var(--accent)]">
+                                        {formatHumanDuration(log.hoursStudied)}
+                                      </div>
+
+                                      {/* Questions */}
+                                      <div className="col-span-2 text-right font-bold text-[var(--text-primary)]">
+                                        {log.questionsSolved > 0 ? (
+                                          <span>{log.questionsSolved} <span className="text-[10px] text-[var(--text-secondary)]">Qs</span></span>
+                                        ) : (
+                                          <span className="text-[var(--text-secondary)]">-</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Close Button */}
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsLogsHistoryModalOpen(false)}
+                        className="rounded-xl bg-[var(--accent)] px-5 py-2 text-xs font-extrabold text-stone-950 shadow-md hover:brightness-110 transition"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>,
+            document.body
+          )
+        : null}
     </AppShell>
 
   );
