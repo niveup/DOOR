@@ -108,7 +108,7 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
     return () => observer.disconnect();
   }, [mounted]);
 
-  if (pathname === "/passcode") {
+  if (pathname === "/passcode" || pathname === "/journal/unlock") {
     return <>{children}</>;
   }
 
