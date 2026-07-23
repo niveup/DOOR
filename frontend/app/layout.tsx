@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { Toaster } from "sonner";
+import { AppShellLayout } from "@/components/AppShell";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -52,7 +53,7 @@ export default function RootLayout({
             },
           }}
         />
-        {children}
+        <AppShellLayout>{children}</AppShellLayout>
       </body>
     </html>
   );
