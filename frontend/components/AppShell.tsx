@@ -180,12 +180,10 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                   );
                 })}
 
-                <div className="mt-36 mb-2.5 flex items-center gap-2 px-1 py-1">
-                  <div className="h-px flex-1 bg-[var(--border)]" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#000000] dark:text-[var(--text-secondary)] shrink-0">
+                <div className="pt-5 pb-1 px-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#000000] dark:text-[var(--text-secondary)]">
                     On Progress
                   </span>
-                  <div className="h-px flex-1 bg-[var(--border)]" />
                 </div>
 
                 {progressNavItems.map((item) => {

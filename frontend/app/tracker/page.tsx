@@ -2020,15 +2020,15 @@ export default function TrackerPage() {
                 setIsLogsHistoryModalOpen(false);
               }
             }}
-            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md"
+            className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.94, y: 15 }}
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 10 }}
-              transition={{ type: "spring", stiffness: 380, damping: 28, mass: 0.8 }}
+              exit={{ opacity: 0, scale: 0.96, y: 6 }}
+              transition={{ type: "spring", stiffness: 450, damping: 32, mass: 0.6 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl space-y-4 rounded-3xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-2xl backdrop-blur-xl text-[var(--text-primary)]"
+              className="w-full max-w-xl max-h-[80vh] flex flex-col space-y-3.5 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-xl text-[var(--text-primary)]"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
