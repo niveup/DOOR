@@ -164,14 +164,16 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                           : "border-transparent text-[#000000] dark:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
                       }`}
                     >
-                      {active && (
+                      {active && mounted ? (
                         <motion.div
                           layoutId="activeSidebarPill"
                           className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none"
                           transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
                           style={{ willChange: "transform, opacity" }}
                         />
-                      )}
+                      ) : active ? (
+                        <div className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none" />
+                      ) : null}
                       <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-150 ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
                         <TabIcon name={item.icon} />
                       </span>
@@ -199,14 +201,16 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                           : "border-transparent text-[#000000] dark:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
                       }`}
                     >
-                      {active && (
+                      {active && mounted ? (
                         <motion.div
                           layoutId="activeSidebarPill"
                           className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none"
                           transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
                           style={{ willChange: "transform, opacity" }}
                         />
-                      )}
+                      ) : active ? (
+                        <div className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none" />
+                      ) : null}
                       <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-150 ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
                         <TabIcon name={item.icon} />
                       </span>
@@ -271,14 +275,16 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                   const active = isNavActive(item.href);
                   return (
                     <Link key={item.href} href={item.href} onClick={() => setOptimisticPathname(item.href)} className={`focus-ring relative rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 ${active ? "border-[var(--accent)]/25 text-[var(--accent)] font-bold" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
-                      {active && (
+                      {active && mounted ? (
                         <motion.div
                           layoutId="activeTabletPill"
                           className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0 pointer-events-none"
                           transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
                           style={{ willChange: "transform, opacity" }}
                         />
-                      )}
+                      ) : active ? (
+                        <div className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0 pointer-events-none" />
+                      ) : null}
                       <span className="relative z-10">{item.label}</span>
                     </Link>
                   );
@@ -288,14 +294,16 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                   const active = isNavActive(item.href);
                   return (
                     <Link key={item.href} href={item.href} onClick={() => setOptimisticPathname(item.href)} className={`focus-ring relative rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 ${active ? "border-[var(--accent)]/25 text-[var(--accent)] font-bold" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
-                      {active && (
+                      {active && mounted ? (
                         <motion.div
                           layoutId="activeTabletPill"
                           className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0 pointer-events-none"
                           transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
                           style={{ willChange: "transform, opacity" }}
                         />
-                      )}
+                      ) : active ? (
+                        <div className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0 pointer-events-none" />
+                      ) : null}
                       <span className="relative z-10">{item.label}</span>
                     </Link>
                   );
@@ -312,14 +320,16 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
             const active = isNavActive(item.href);
             return (
               <Link key={item.href} href={item.href} onClick={() => setOptimisticPathname(item.href)} aria-current={active ? "page" : undefined} className={`mobile-tab focus-ring relative ${active ? "is-active" : ""}`}>
-                {active && (
+                {active && mounted ? (
                   <motion.div
                     layoutId="activeMobilePill"
                     className="absolute inset-0 rounded-lg bg-[var(--accent-soft)] -z-0 pointer-events-none"
                     transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
                     style={{ willChange: "transform, opacity" }}
                   />
-                )}
+                ) : active ? (
+                  <div className="absolute inset-0 rounded-lg bg-[var(--accent-soft)] -z-0 pointer-events-none" />
+                ) : null}
                 <span className="relative z-10 flex flex-col items-center justify-center gap-0.5">
                   <TabIcon name={item.icon} />
                   <span>{item.mobileLabel}</span>
