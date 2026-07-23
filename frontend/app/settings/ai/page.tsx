@@ -212,8 +212,9 @@ export default function AiSettingsPage() {
                     {isSelected && (
                       <motion.div
                         layoutId="activeProviderTab"
-                        className="absolute inset-0 rounded-md bg-white shadow-sm -z-10"
-                        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                        className="absolute inset-0 rounded-md bg-white shadow-sm -z-10 pointer-events-none"
+                        transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
+                        style={{ willChange: "transform, opacity" }}
                       />
                     )}
                     {providerLabels[item]}

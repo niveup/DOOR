@@ -61,8 +61,19 @@ function TabIcon({ name }: { name: string }) {
 
 export function AppShellLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [optimisticPathname, setOptimisticPathname] = useState(pathname);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setOptimisticPathname(pathname);
+  }, [pathname]);
+
+  const isNavActive = (href: string) => {
+    const current = optimisticPathname || pathname;
+    if (href === "/dashboard") return current === href || current === "/";
+    return current.startsWith(href);
+  };
 
   useEffect(() => {
     const currentTheme = (document.documentElement.dataset.theme as "light" | "dark") || "dark";
@@ -108,7 +119,7 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
           <aside className="surface hidden w-[240px] lg:w-[250px] shrink-0 flex-col justify-between p-4 lg:flex sticky top-0 h-screen rounded-none border-t-0 border-b-0 border-l-0 border-r border-[var(--border)] z-30">
             <div>
               <div className="flex items-center justify-between gap-1">
-                <Link href="/dashboard" className="brand-mark brand-fixed focus-ring interactive-surface flex items-center gap-2.5 rounded-lg p-2.5 flex-1 min-w-0">
+                <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="brand-mark brand-fixed focus-ring interactive-surface flex items-center gap-2.5 rounded-lg p-2.5 flex-1 min-w-0">
                   <div className="h-8 w-8 rounded-md bg-stone-900 dark:bg-stone-950 flex items-center justify-center text-white shadow-sm shrink-0">
                     <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
                       <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
@@ -141,25 +152,27 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
 
               <nav className="mt-4 space-y-1" aria-label="Primary navigation">
                 {primaryNavItems.map((item) => {
-                  const active = isActive(pathname, item.href);
+                  const active = isNavActive(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`focus-ring relative group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition ${
+                      onClick={() => setOptimisticPathname(item.href)}
+                      className={`focus-ring relative group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition-colors duration-150 ${
                         active
-                          ? "border-[var(--accent)]/25 shadow-xs text-[var(--accent)]"
+                          ? "border-[var(--accent)]/25 shadow-xs text-[var(--accent)] font-bold"
                           : "border-transparent text-[#000000] dark:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
                       }`}
                     >
                       {active && (
                         <motion.div
                           layoutId="activeSidebarPill"
-                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0"
-                          transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none"
+                          transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
+                          style={{ willChange: "transform, opacity" }}
                         />
                       )}
-                      <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
+                      <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-150 ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
                         <TabIcon name={item.icon} />
                       </span>
                       <span className={`relative z-10 truncate text-[13px] font-semibold ${active ? "text-[#000000] dark:text-[var(--accent)]" : "text-[#000000] dark:text-[var(--text-primary)]"}`}>{item.label}</span>
@@ -176,25 +189,27 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                 </div>
 
                 {progressNavItems.map((item) => {
-                  const active = isActive(pathname, item.href);
+                  const active = isNavActive(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`focus-ring relative group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition ${
+                      onClick={() => setOptimisticPathname(item.href)}
+                      className={`focus-ring relative group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition-colors duration-150 ${
                         active
-                          ? "border-[var(--accent)]/25 shadow-xs text-[var(--accent)]"
+                          ? "border-[var(--accent)]/25 shadow-xs text-[var(--accent)] font-bold"
                           : "border-transparent text-[#000000] dark:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
                       }`}
                     >
                       {active && (
                         <motion.div
                           layoutId="activeSidebarPill"
-                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0"
-                          transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none"
+                          transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
+                          style={{ willChange: "transform, opacity" }}
                         />
                       )}
-                      <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
+                      <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-150 ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
                         <TabIcon name={item.icon} />
                       </span>
                       <span className={`relative z-10 truncate text-[13px] font-semibold ${active ? "text-[#000000] dark:text-[var(--accent)]" : "text-[#000000] dark:text-[var(--text-primary)]"}`}>{item.label}</span>
@@ -210,8 +225,8 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                 <span suppressHydrationWarning className="text-[12px] font-semibold text-zinc-950 dark:text-[var(--text-secondary)]">{mounted ? todayLabel() : ""}</span>
               </div>
               <div className="mt-2.5 grid gap-1.5">
-                <Link href="/journal" className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Write today&apos;s entry</Link>
-                <Link href="/dashboard" className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Make today&apos;s plan</Link>
+                <Link href="/journal" onClick={() => setOptimisticPathname("/journal")} className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Write today&apos;s entry</Link>
+                <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Make today&apos;s plan</Link>
               </div>
             </div>
           </aside>
@@ -220,7 +235,7 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
             <div className="surface mb-3 flex flex-col gap-3 p-3 lg:hidden">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <Link href="/dashboard" className="brand-mark brand-fixed focus-ring flex items-center gap-2.5 rounded-lg">
+                  <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="brand-mark brand-fixed focus-ring flex items-center gap-2.5 rounded-lg">
                     <div className="h-8 w-8 rounded-md bg-stone-900 dark:bg-stone-950 flex items-center justify-center text-white shadow-sm shrink-0">
                       <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
                         <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
@@ -255,14 +270,15 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
               </div>
               <nav className="tablet-nav flex flex-wrap items-center gap-1.5" aria-label="Tablet navigation">
                 {primaryNavItems.map((item) => {
-                  const active = isActive(pathname, item.href);
+                  const active = isNavActive(item.href);
                   return (
-                    <Link key={item.href} href={item.href} className={`focus-ring relative rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? "border-[var(--accent)]/25 text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
+                    <Link key={item.href} href={item.href} onClick={() => setOptimisticPathname(item.href)} className={`focus-ring relative rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 ${active ? "border-[var(--accent)]/25 text-[var(--accent)] font-bold" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
                       {active && (
                         <motion.div
                           layoutId="activeTabletPill"
-                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0"
-                          transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0 pointer-events-none"
+                          transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
+                          style={{ willChange: "transform, opacity" }}
                         />
                       )}
                       <span className="relative z-10">{item.label}</span>
@@ -271,14 +287,15 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                 })}
                 <span className="px-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-secondary)]">On Progress</span>
                 {progressNavItems.map((item) => {
-                  const active = isActive(pathname, item.href);
+                  const active = isNavActive(item.href);
                   return (
-                    <Link key={item.href} href={item.href} className={`focus-ring relative rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? "border-[var(--accent)]/25 text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
+                    <Link key={item.href} href={item.href} onClick={() => setOptimisticPathname(item.href)} className={`focus-ring relative rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 ${active ? "border-[var(--accent)]/25 text-[var(--accent)] font-bold" : "border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
                       {active && (
                         <motion.div
                           layoutId="activeTabletPill"
-                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0"
-                          transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0 pointer-events-none"
+                          transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
+                          style={{ willChange: "transform, opacity" }}
                         />
                       )}
                       <span className="relative z-10">{item.label}</span>
@@ -294,14 +311,15 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
 
         <nav className="mobile-tab-bar" aria-label="Mobile navigation">
           {mobileItems.map((item) => {
-            const active = isActive(pathname, item.href);
+            const active = isNavActive(item.href);
             return (
-              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`mobile-tab focus-ring relative ${active ? "is-active" : ""}`}>
+              <Link key={item.href} href={item.href} onClick={() => setOptimisticPathname(item.href)} aria-current={active ? "page" : undefined} className={`mobile-tab focus-ring relative ${active ? "is-active" : ""}`}>
                 {active && (
                   <motion.div
                     layoutId="activeMobilePill"
-                    className="absolute inset-0 rounded-lg bg-[var(--accent-soft)] -z-0"
-                    transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8 }}
+                    className="absolute inset-0 rounded-lg bg-[var(--accent-soft)] -z-0 pointer-events-none"
+                    transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
+                    style={{ willChange: "transform, opacity" }}
                   />
                 )}
                 <span className="relative z-10 flex flex-col items-center justify-center gap-0.5">
