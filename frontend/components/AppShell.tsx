@@ -182,42 +182,46 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                   );
                 })}
 
-                <div className="pt-5 pb-1 px-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#000000] dark:text-[var(--text-secondary)]">
+                <div className="pt-7 pb-2 flex items-center gap-2 px-1">
+                  <div className="flex-1 border-t border-[var(--border)]" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#000000] dark:text-[var(--text-secondary)] shrink-0">
                     On Progress
                   </span>
+                  <div className="flex-1 border-t border-[var(--border)]" />
                 </div>
 
-                {progressNavItems.map((item) => {
-                  const active = isNavActive(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setOptimisticPathname(item.href)}
-                      className={`focus-ring relative group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition-colors duration-150 ${
-                        active
-                          ? "border-[var(--accent)]/25 shadow-xs text-[var(--accent)] font-bold"
-                          : "border-transparent text-[#000000] dark:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
-                      }`}
-                    >
-                      {active && mounted ? (
-                        <motion.div
-                          layoutId="activeSidebarPill"
-                          className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none"
-                          transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
-                          style={{ willChange: "transform, opacity" }}
-                        />
-                      ) : active ? (
-                        <div className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none" />
-                      ) : null}
-                      <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-150 ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
-                        <TabIcon name={item.icon} />
-                      </span>
-                      <span className={`relative z-10 truncate text-[13px] font-semibold ${active ? "text-[#000000] dark:text-[var(--accent)]" : "text-[#000000] dark:text-[var(--text-primary)]"}`}>{item.label}</span>
-                    </Link>
-                  );
-                })}
+                <div className="mt-6 space-y-1">
+                  {progressNavItems.map((item) => {
+                    const active = isNavActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setOptimisticPathname(item.href)}
+                        className={`focus-ring relative group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition-colors duration-150 ${
+                          active
+                            ? "border-[var(--accent)]/25 shadow-xs text-[var(--accent)] font-bold"
+                            : "border-transparent text-[#000000] dark:text-[var(--text-primary)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
+                        }`}
+                      >
+                        {active && mounted ? (
+                          <motion.div
+                            layoutId="activeSidebarPill"
+                            className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none"
+                            transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
+                            style={{ willChange: "transform, opacity" }}
+                          />
+                        ) : active ? (
+                          <div className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] shadow-xs -z-0 pointer-events-none" />
+                        ) : null}
+                        <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-150 ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
+                          <TabIcon name={item.icon} />
+                        </span>
+                        <span className={`relative z-10 truncate text-[13px] font-semibold ${active ? "text-[#000000] dark:text-[var(--accent)]" : "text-[#000000] dark:text-[var(--text-primary)]"}`}>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
               </nav>
             </div>
 

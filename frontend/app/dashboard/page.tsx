@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { toast } from "sonner";
 import { AppShell, PageSection } from "@/components/AppShell";
@@ -788,9 +789,14 @@ function ManualPlanModal({
     onChange(tasks.filter((task) => task.id !== id));
   };
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const totalMinutes = tasks.reduce((total, task) => total + (Number(task.durationMin) || 0), 0);
 
-  return (
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
     <motion.div
       initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
       animate={{ opacity: 1, backdropFilter: "blur(5px)" }}
@@ -884,16 +890,25 @@ function ManualPlanModal({
             {canScrollDown && (
               <motion.button
                 type="button"
-                initial={{ opacity: 0, scale: 0.8, y: 6 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8, y: 6 }}
                 onClick={scrollToBottom}
-                title="Scroll down for more tasks"
-                aria-label="Scroll down"
-                className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-stone-700 bg-stone-850 text-stone-100 bg-stone-900 shadow-xl shadow-black/30 hover:bg-black hover:scale-105 active:scale-95 transition cursor-pointer"
+                className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900/90 text-white shadow-lg backdrop-blur-xs transition hover:bg-zinc-950 focus-ring cursor-pointer"
+                initial={{ opacity: 0, y: 8, scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.8 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                aria-label="Scroll to bottom"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  className="w-4 h-4 text-inherit"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m0 0l-4-4m4 4l4-4" />
                 </svg>
               </motion.button>
             )}
@@ -901,19 +916,21 @@ function ManualPlanModal({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4 shrink-0">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={addTask}
-              disabled={tasks.length >= 30}
-              className="px-4 py-2 rounded-full font-bold text-xs border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition disabled:opacity-40 cursor-pointer"
-            >
-              Add task
-            </button>
-            <span className="text-xs font-semibold text-[var(--text-secondary)]">{totalMinutes} minutes total</span>
-          </div>
-
+          <button
+            type="button"
+            onClick={addTask}
+            disabled={tasks.length >= 30}
+            className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add another task
+          </button>
           <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-medium text-[var(--text-secondary)] mr-2 hidden sm:inline">
+              Total: {(totalMinutes / 60).toFixed(1)}h ({totalMinutes}m)
+            </span>
             <button
               type="button"
               onClick={onClose}
@@ -931,7 +948,8 @@ function ManualPlanModal({
           </div>
         </div>
       </motion.form>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }
 

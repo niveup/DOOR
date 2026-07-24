@@ -293,13 +293,59 @@ export default function TrackerPage() {
   const [saving, setSaving] = useState(false);
 
   // Live Timer Mode State
-  const [logMode, setLogMode] = useState<"manual" | "timer">("manual");
+  const [logMode, setLogMode] = useState<"manual" | "timer">("timer");
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerStartTimeStr, setTimerStartTimeStr] = useState<string | null>(null);
   const [timerType, setTimerType] = useState<"countup" | "pomodoro">("countup");
+  const [activeRunningTimerType, setActiveRunningTimerType] = useState<"countup" | "pomodoro" | null>(null);
   const [pomodoroMinutes, setPomodoroMinutes] = useState<number>(25);
+  const [isPomodoroDropdownOpen, setIsPomodoroDropdownOpen] = useState(false);
+  const [pomodoroTargetTimeMs, setPomodoroTargetTimeMs] = useState<number | null>(null);
+  const [floatingClockMode, setFloatingClockMode] = useState<"compact" | "medium">("compact");
+  const [dragBounds, setDragBounds] = useState({ left: -300, right: 0, top: 0, bottom: 500 });
   const [nowDate, setNowDate] = useState(() => new Date());
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (floatingClockMode === "medium") {
+      inactivityTimerRef.current = setTimeout(() => {
+        setFloatingClockMode("compact");
+      }, 4000);
+    }
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [floatingClockMode]);
+
+  const handleFloatingWidgetActivity = () => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    if (floatingClockMode === "medium") {
+      inactivityTimerRef.current = setTimeout(() => {
+        setFloatingClockMode("compact");
+      }, 4000);
+    }
+  };
+
+  useEffect(() => {
+    const updateBounds = () => {
+      if (typeof window !== "undefined") {
+        setDragBounds({
+          left: -(window.innerWidth - 80),
+          right: 0,
+          top: 0,
+          bottom: window.innerHeight - 120,
+        });
+      }
+    };
+    updateBounds();
+    window.addEventListener("resize", updateBounds);
+    return () => window.removeEventListener("resize", updateBounds);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -633,6 +679,7 @@ export default function TrackerPage() {
     setLogHours("1.5");
     setLogQuestions("10");
     setLogNotes("");
+    setLogMode("timer");
     setIsLogModalOpen(true);
   };
 
@@ -698,6 +745,10 @@ export default function TrackerPage() {
       setTimerStartTimeStr(timeStr);
     }
     setTimerRunning(true);
+    setActiveRunningTimerType(timerType);
+    if (timerType === "pomodoro" && !pomodoroTargetTimeMs) {
+      setPomodoroTargetTimeMs(Date.now() + pomodoroMinutes * 60 * 1000);
+    }
   };
 
   const handlePauseTimer = () => {
@@ -708,6 +759,8 @@ export default function TrackerPage() {
     setTimerRunning(false);
     setTimerSeconds(0);
     setTimerStartTimeStr(null);
+    setActiveRunningTimerType(null);
+    setPomodoroTargetTimeMs(null);
   };
 
   const handleFinishTimerSession = async (event: React.FormEvent) => {
@@ -1235,62 +1288,81 @@ export default function TrackerPage() {
           </div>
           <MicroInteractionButton
             onClick={openDeleteFlow}
-            className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/20 transition shrink-0"
+            className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/20 transition shrink-0 cursor-pointer"
           >
             Clear D1 Logs
           </MicroInteractionButton>
         </div>
-      </PageSection>      {/* Log Study Session Modal with Whole Popup Blur Depth Emergence */}
-      <AnimatePresence>
-        {isLogModalOpen ? (
-          <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10 sm:pt-14 pb-16 backdrop-blur-sm"
-            onClick={() => setIsLogModalOpen(false)}
-          >
-            <AnimatePresence mode="wait">
+      </PageSection>      {/* Log Study Session Modal with Non-Scrollable Centered Stage */}
+      {isMounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isLogModalOpen ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="fixed inset-0 z-[99999] flex items-center justify-center overflow-hidden bg-black/50 p-4 sm:p-6 backdrop-blur-md"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) setIsLogModalOpen(false);
+              }}
+            >
               <motion.form
-                key={`modal-popup-card-${logMode}`}
-                initial={{ opacity: 0, filter: "blur(24px)", scale: 0.88, y: 12 }}
-                animate={{ opacity: 1, filter: "blur(0px)", scale: 1, y: 0 }}
-                exit={{ opacity: 0, filter: "blur(24px)", scale: 0.88, y: -12 }}
-                transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+                initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 onSubmit={logMode === "manual" ? handleSaveSessionLog : handleFinishTimerSession}
                 onClick={(e) => e.stopPropagation()}
-                className={`surface w-full ${logMode === "timer" ? "max-w-2xl" : "max-w-md"} space-y-4 p-6 shadow-2xl backdrop-blur-2xl border border-[var(--border)]`}
+                className="surface w-full max-w-xl space-y-5 p-6 sm:p-7 shadow-2xl backdrop-blur-2xl border border-[var(--border)] relative overflow-hidden rounded-3xl my-auto"
               >
-                {/* Minimal Segmented Mode Switcher */}
+                {/* Segmented Mode Switcher with Subtle Pill and Colored Text Tags */}
                 <div className="border-b border-[var(--border)] pb-3">
-                  <div className="flex items-center rounded-xl bg-[var(--bg-elevated)] p-1 text-xs font-bold w-full border border-[var(--border)]">
+                  <div className="relative flex items-center rounded-2xl bg-[var(--bg-elevated)] p-1 text-xs font-bold w-full border border-[var(--border)]/60">
                     <button
                       type="button"
                       onClick={() => setLogMode("manual")}
-                      className={`flex-1 rounded-lg py-1.5 text-center transition ${
-                        logMode === "manual"
-                          ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]"
-                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      className={`relative flex-1 rounded-xl py-2 text-center transition-colors z-10 font-bold cursor-pointer ${
+                        logMode === "manual" ? "text-teal-400 font-extrabold" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       }`}
                     >
-                      Manual Log
+                      {logMode === "manual" && (
+                        <motion.div
+                          layoutId="activeLogTabPill"
+                          className="absolute inset-0 rounded-xl bg-[var(--bg-card)] shadow-sm border border-[var(--border)]"
+                          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                        />
+                      )}
+                      <span className="relative z-10 flex items-center justify-center gap-1.5 font-extrabold">
+                        Manual Log
+                      </span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setLogMode("timer")}
-                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-center transition ${
-                        logMode === "timer"
-                          ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]"
-                          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      className={`relative flex-1 rounded-xl py-2 text-center transition-colors z-10 font-bold cursor-pointer ${
+                        logMode === "timer" ? "text-amber-400 font-extrabold" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       }`}
                     >
-                      <span>Live Clock</span>
-                      {timerRunning && <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-ping" />}
+                      {logMode === "timer" && (
+                        <motion.div
+                          layoutId="activeLogTabPill"
+                          className="absolute inset-0 rounded-xl bg-[var(--bg-card)] shadow-sm border border-[var(--border)]"
+                          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                        />
+                      )}
+                      <span className="relative z-10 flex items-center justify-center gap-1.5 font-extrabold">
+                        <span>Live Clock</span>
+                      </span>
                     </button>
                   </div>
                 </div>
 
-                {/* Subject Selection & Questions Solved Side by Side on Same Line */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Shared Top Controls: Subject Selection & Questions Solved */}
+                <div className="grid grid-cols-2 gap-3 pb-1">
                   <div>
-                    <label className="mb-1 block text-xs font-bold text-[var(--text-secondary)]">
+                    <label className="mb-1.5 block text-xs font-bold text-[var(--text-secondary)]">
                       Subject
                     </label>
                     <select
@@ -1299,7 +1371,7 @@ export default function TrackerPage() {
                         const sub = subjects.find((s) => s.subjectId === Number(e.target.value));
                         if (sub) setSelectedSubject(sub);
                       }}
-                      className="app-input w-full px-3 py-2 text-sm font-semibold"
+                      className="app-input w-full px-3.5 py-2.5 text-sm font-semibold"
                     >
                       {subjects.map((s) => (
                         <option key={s.subjectId} value={s.subjectId}>
@@ -1310,7 +1382,7 @@ export default function TrackerPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-bold text-[var(--text-secondary)]">
+                    <label className="mb-1.5 block text-xs font-bold text-[var(--text-secondary)]">
                       Questions Solved
                     </label>
                     <input
@@ -1319,710 +1391,1102 @@ export default function TrackerPage() {
                       step="1"
                       value={logQuestions}
                       onChange={(e) => setLogQuestions(e.target.value)}
-                      className="app-input w-full px-3 py-2 text-sm font-semibold"
+                      placeholder="0"
+                      className="app-input w-full px-3.5 py-2.5 text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                 </div>
 
-                {logMode === "manual" ? (
-                  <div className="space-y-4">
-                    {/* Date & Time Block */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                {/* Continuous Dual Viewport Stage (200% Width GPU Slider) */}
+                <div className="relative w-full overflow-hidden">
+                  <div
+                    className={`flex w-[200%] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                      logMode === "manual" ? "translate-x-0" : "-translate-x-1/2"
+                    }`}
+                  >
+                    {/* PANEL 1: MANUAL LOG FORM */}
+                    <div className="w-1/2 pr-3 flex flex-col justify-between space-y-4">
+                      {/* Date & Time Block with Good Spacing */}
+                      <div className="grid grid-cols-2 gap-3.5 pt-1">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-bold text-[var(--text-secondary)]">
                             Date
                           </label>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setLogDate(getLocalDateString())}
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition ${
-                                logDate === getLocalDateString()
-                                  ? "bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30"
-                                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                              }`}
-                            >
-                              Today
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const y = new Date();
-                                y.setDate(y.getDate() - 1);
-                                setLogDate(getLocalDateString(y));
-                              }}
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition ${
-                                logDate !== getLocalDateString()
-                                  ? "bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30"
-                                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                              }`}
-                            >
-                              Yesterday
-                            </button>
-                          </div>
+                          <input
+                            type="date"
+                            value={logDate}
+                            onChange={(e) => setLogDate(e.target.value)}
+                            className="app-input w-full px-3.5 py-2.5 text-xs font-semibold"
+                          />
                         </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-xs font-bold text-[var(--text-secondary)]">
+                            Time Block
+                          </label>
+                          <select
+                            value={logTimeBlock}
+                            onChange={(e) => setLogTimeBlock(e.target.value)}
+                            className="app-input w-full px-3.5 py-2.5 text-xs font-semibold"
+                          >
+                            {timeBlocks.map((tb) => (
+                              <option key={tb.id} value={tb.id}>
+                                {tb.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Hours Studied */}
+                      <div className="pt-1">
+                        <label className="mb-1.5 block text-xs font-bold text-[var(--text-secondary)]">
+                          Hours Studied
+                        </label>
                         <input
-                          type="date"
-                          value={logDate}
-                          onChange={(e) => setLogDate(e.target.value)}
-                          className="app-input w-full px-3 py-2 text-xs font-semibold"
+                          type="number"
+                          min="0.25"
+                          max="18"
+                          step="0.25"
+                          value={logHours}
+                          onChange={(e) => setLogHours(e.target.value)}
+                          className="app-input w-full px-3.5 py-2.5 text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
 
-                      <div>
+                      {/* Notes / Topics Covered - Generous Height to Fill Frame */}
+                      <div className="pt-1 flex-1 flex flex-col">
                         <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
-                          Time Block
+                          Notes / Sub-topics Covered
                         </label>
-                        <select
-                          value={logTimeBlock}
-                          onChange={(e) => setLogTimeBlock(e.target.value)}
-                          className="app-input w-full px-3 py-2 text-xs font-semibold"
+                        <textarea
+                          value={logNotes}
+                          onChange={(e) => setLogNotes(e.target.value)}
+                          placeholder="e.g. Graph BFS/DFS problems, revised time complexity..."
+                          className="app-input min-h-[140px] sm:min-h-[155px] w-full p-3.5 text-xs leading-relaxed flex-1"
+                        />
+                      </div>
+
+                      {/* Action Buttons Cleanly Anchored at Bottom */}
+                      <div className="flex justify-end gap-2.5 pt-3.5 border-t border-[var(--border)] mt-auto">
+                        <button
+                          type="button"
+                          onClick={() => setIsLogModalOpen(false)}
+                          className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] cursor-pointer"
                         >
-                          {timeBlocks.map((tb) => (
-                            <option key={tb.id} value={tb.id}>
-                              {tb.label}
-                            </option>
-                          ))}
-                        </select>
+                          Cancel
+                        </button>
+                        <MicroInteractionButton
+                          type="submit"
+                          loading={saving}
+                          className="btn-primary px-5 py-2 text-xs font-semibold"
+                        >
+                          Save Log
+                        </MicroInteractionButton>
                       </div>
                     </div>
 
-                    {/* Hours Studied */}
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
-                        Hours Studied
-                      </label>
-                      <input
-                        type="number"
-                        min="0.25"
-                        max="18"
-                        step="0.25"
-                        value={logHours}
-                        onChange={(e) => setLogHours(e.target.value)}
-                        className="app-input w-full px-3 py-2 text-sm font-semibold"
-                      />
-                    </div>
+                    {/* PANEL 2: LIVE CLOCK STOPWATCH */}
+                    <div className="w-1/2 pl-3 flex flex-col items-center justify-between space-y-4">
+                      {/* Segmented Timer Mode Sub-Toggle with Downward Dropdown */}
+                      <div className="relative flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] p-1 text-xs font-bold w-full max-w-xs border border-[var(--border)]/60 shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTimerType("countup");
+                            setIsPomodoroDropdownOpen(false);
+                          }}
+                          className={`relative flex-1 rounded-xl py-2 text-center transition-colors z-10 font-bold cursor-pointer ${
+                            timerType === "countup"
+                              ? "text-[var(--text-primary)] font-extrabold"
+                              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                          }`}
+                        >
+                          Stopwatch
+                          {timerType === "countup" && (
+                            <motion.div
+                              layoutId="activeSubTimerTab"
+                              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                              className="absolute inset-0 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-md -z-10"
+                            />
+                          )}
+                        </button>
 
-                    {/* Notes / Topics Covered */}
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
-                        Notes / Sub-topics Covered
-                      </label>
-                      <textarea
-                        value={logNotes}
-                        onChange={(e) => setLogNotes(e.target.value)}
-                        placeholder="e.g. Graph BFS/DFS problems, revised time complexity..."
-                        className="app-input min-h-[70px] w-full p-3 text-xs"
-                      />
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex justify-end gap-2.5 pt-2 border-t border-[var(--border)]">
-                      <button
-                        type="button"
-                        onClick={() => setIsLogModalOpen(false)}
-                        className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
-                      >
-                        Cancel
-                      </button>
-                      <MicroInteractionButton
-                        type="submit"
-                        loading={saving}
-                        className="btn-primary px-5 py-2 text-xs font-semibold"
-                      >
-                        Save Log
-                      </MicroInteractionButton>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4 py-1 flex flex-col items-center">
-                    {/* Timer Mode Sub-Toggle: Stopwatch vs Pomodoro */}
-                    <div className="flex items-center gap-1 rounded-xl bg-[var(--bg-elevated)] p-1 text-xs font-bold border border-[var(--border)] w-full max-w-xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTimerType("countup");
-                          handleResetTimer();
-                        }}
-                        className={`flex-1 rounded-lg py-1.5 text-center transition ${
-                          timerType === "countup"
-                            ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]"
-                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                        }`}
-                      >
-                        Stopwatch
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTimerType("pomodoro");
-                          handleResetTimer();
-                        }}
-                        className={`flex-1 rounded-lg py-1.5 text-center transition ${
-                          timerType === "pomodoro"
-                            ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]"
-                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                        }`}
-                      >
-                        Pomodoro
-                      </button>
-                    </div>
-
-                    {/* Pomodoro Duration Presets */}
-                    {timerType === "pomodoro" && (
-                      <div className="flex items-center gap-2 text-xs font-bold">
-                        <span className="text-[11px] text-[var(--text-secondary)]">Target:</span>
-                        {[25, 45, 60].map((m) => (
-                          <motion.button
-                            key={m}
-                            type="button"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => {
-                              setPomodoroMinutes(m);
-                              handleResetTimer();
-                            }}
-                            className={`rounded-lg px-3 py-1 text-xs font-extrabold transition ${
-                              pomodoroMinutes === m
-                                ? "bg-[var(--accent)] text-stone-950 shadow-xs"
-                                : "bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        <div className="relative flex-1">
+                          <div
+                            className={`relative w-full flex items-center justify-center gap-1.5 rounded-xl py-2 text-center transition-colors z-10 font-bold ${
+                              timerType === "pomodoro"
+                                ? "text-amber-400 font-extrabold"
+                                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                             }`}
                           >
-                            {m}m
-                          </motion.button>
-                        ))}
+                            <span
+                              onClick={() => {
+                                if (timerType !== "pomodoro") {
+                                  setTimerType("pomodoro");
+                                }
+                              }}
+                              className="cursor-pointer"
+                            >
+                              Pomodoro
+                            </span>
+
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (timerType !== "pomodoro") {
+                                  setTimerType("pomodoro");
+                                }
+                                setIsPomodoroDropdownOpen((prev) => !prev);
+                              }}
+                              className="inline-flex items-center gap-1 cursor-pointer hover:text-amber-300 transition-colors"
+                            >
+                              ({pomodoroMinutes}m)
+                              <svg
+                                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                  isPomodoroDropdownOpen ? "rotate-180 text-amber-400" : "opacity-60 hover:opacity-100"
+                                }`}
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2.5}
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </span>
+
+                            {timerType === "pomodoro" && (
+                              <motion.div
+                                layoutId="activeSubTimerTab"
+                                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                                className="absolute inset-0 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-md -z-10"
+                              />
+                            )}
+                          </div>
+
+                          {/* Invisible Backdrop to Close Dropdown on Click Blank Area */}
+                          {isPomodoroDropdownOpen && (
+                            <div
+                              className="fixed inset-0 z-40 bg-transparent cursor-default"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsPomodoroDropdownOpen(false);
+                              }}
+                            />
+                          )}
+
+                          {/* Downward Dropdown Menu Center-Aligned Directly Under Pomodoro Tab */}
+                          <AnimatePresence>
+                            {isPomodoroDropdownOpen && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                                animate={{ opacity: 1, y: 2, scale: 1 }}
+                                exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                                className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 w-36 rounded-2xl border border-amber-500/30 bg-[var(--bg-card)]/95 p-1.5 shadow-2xl backdrop-blur-2xl space-y-1"
+                              >
+                                {[25, 45, 60].map((m) => (
+                                  <motion.button
+                                    key={m}
+                                    type="button"
+                                    whileTap={{ scale: 0.96 }}
+                                    transition={{ duration: 0.15 }}
+                                    onClick={() => {
+                                      setTimerType("pomodoro");
+                                      setPomodoroMinutes(m);
+                                      if (timerRunning) {
+                                        setPomodoroTargetTimeMs(Date.now() + m * 60 * 1000);
+                                      } else {
+                                        setPomodoroTargetTimeMs(null);
+                                      }
+                                      setTimeout(() => setIsPomodoroDropdownOpen(false), 380);
+                                    }}
+                                    className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
+                                      timerType === "pomodoro" && pomodoroMinutes === m
+                                        ? "bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-stone-950 font-black shadow-md shadow-amber-500/20 border border-amber-300/40"
+                                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+                                    }`}
+                                  >
+                                    <span>{m} minutes</span>
+                                    {timerType === "pomodoro" && pomodoroMinutes === m && <span className="text-xs font-black">✓</span>}
+                                  </motion.button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
-                    )}
 
-                    {/* Glassmorphic Ambient Halo & Precision Real-World Analog Clock */}
-                    <div className="relative flex flex-col items-center justify-center my-2">
-                      <div
-                        className={`absolute h-60 w-60 sm:h-64 sm:w-64 rounded-full bg-[var(--accent)]/15 blur-3xl transition-opacity duration-1000 ${
-                          timerRunning ? "opacity-100 scale-105" : "opacity-30 scale-100"
-                        }`}
-                      />
+                      {/* Glassmorphic Stationary Ambient Halo & Anti-Clockwise Spinning Precision Analog Clock */}
+                      <div className="relative flex flex-col items-center justify-center my-2 [perspective:1000px]">
+                        {/* Stationary Anchored Ambient Halo Shadow (Does NOT rotate or jump) */}
+                        <div
+                          className={`absolute inset-0 m-auto h-52 w-52 sm:h-56 sm:w-56 rounded-full blur-3xl pointer-events-none transition-opacity duration-1000 ${
+                            timerType === "pomodoro" ? "bg-amber-500/20" : "bg-[var(--accent)]/20"
+                          } ${timerRunning ? "opacity-100" : "opacity-35"}`}
+                        />
 
-                      {/* Circular Glassmorphic Dial Container */}
-                      <div className="relative flex h-56 w-56 sm:h-60 sm:w-60 flex-col items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-card)] p-2 shadow-2xl backdrop-blur-3xl transition-all duration-300">
-                        
-                        {/* SVG Analog Wall Clock Face */}
-                        <svg className="absolute inset-0 h-full w-full pointer-events-none p-2" viewBox="0 0 100 100">
-                          <defs>
-                            <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
-                              <feGaussianBlur stdDeviation="0.8" result="blur" />
-                              <feMerge>
-                                <feMergeNode in="blur" />
-                                <feMergeNode in="SourceGraphic" />
-                              </feMerge>
-                            </filter>
-                          </defs>
+                        {/* Anti-Clockwise 360deg Spinning Premium Dial Container (100% Unobstructed Dial Face) */}
+                        <motion.div
+                          key={`clock-dial-spin-${timerType}`}
+                          initial={{ rotate: timerType === "pomodoro" ? -360 : 360, scale: 0.94 }}
+                          animate={{ rotate: 0, scale: 1 }}
+                          transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
+                          className="relative flex h-52 w-52 sm:h-56 sm:w-56 flex-col items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-card)] p-2 shadow-2xl backdrop-blur-3xl"
+                        >
+                          
+                          {/* SVG Analog Wall Clock Face */}
+                          <svg className="absolute inset-0 h-full w-full pointer-events-none p-2" viewBox="0 0 100 100">
+                            <defs>
+                              <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="0.8" result="blur" />
+                                <feMerge>
+                                  <feMergeNode in="blur" />
+                                  <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                              </filter>
+                            </defs>
 
-                          {/* Perimeter Track */}
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r="45"
-                            className="stroke-[var(--border)] fill-none"
-                            strokeWidth="1.2"
-                          />
-
-                          {/* Covered Journey Highlight Arc (Pomodoro mode) */}
-                          {timerType === "pomodoro" && (
+                            {/* Perimeter Track */}
                             <circle
                               cx="50"
                               cy="50"
                               r="45"
-                              className="stroke-[var(--accent)] fill-none transition-all duration-300 -rotate-90 origin-center"
-                              strokeWidth="3.5"
-                              filter="url(#neon-glow)"
-                              strokeDasharray="283"
-                              strokeDashoffset={
-                                283 -
-                                (283 * Math.min((timerSeconds / (pomodoroMinutes * 60)) * 100, 100)) / 100
-                              }
-                              strokeLinecap="round"
+                              className="stroke-[var(--border)] fill-none"
+                              strokeWidth="1.2"
                             />
-                          )}
 
-                          {/* 60 Minute Thin Tick Marks & 12 Main Markers */}
-                          {[...Array(60)].map((_, i) => {
-                            const angle = i * 6;
-                            const rad = (angle - 90) * (Math.PI / 180);
-                            const isMajor = i % 5 === 0;
-                            const tickLength = isMajor ? 5 : 2.5;
-                            const x1 = 50 + (43 - tickLength) * Math.cos(rad);
-                            const y1 = 50 + (43 - tickLength) * Math.sin(rad);
-                            const x2 = 50 + 43 * Math.cos(rad);
-                            const y2 = 50 + 43 * Math.sin(rad);
-                            return (
-                              <line
-                                key={i}
-                                x1={x1}
-                                y1={y1}
-                                x2={x2}
-                                y2={y2}
-                                className={isMajor ? "stroke-[var(--accent)]" : "stroke-[var(--text-secondary)] opacity-40"}
-                                strokeWidth={isMajor ? "1.5" : "0.8"}
-                                strokeLinecap="round"
-                                filter={isMajor ? "url(#neon-glow)" : undefined}
-                              />
-                            );
-                          })}
+                            {/* Hollow Replica Clock Hands (Parallel dotted outline edge lines | | completely empty inside, STATIONARY & FROZEN at target finish time) */}
+                            {((timerRunning && activeRunningTimerType === "pomodoro") || (!timerRunning && timerType === "pomodoro")) && (() => {
+                              let targetMin = 0;
+                              let targetHr = 0;
 
-                          {/* PROMINENT REAL-WORLD TIME ANALOG CLOCK HANDS */}
-                          {(() => {
-                            const curSec = nowDate.getSeconds() + nowDate.getMilliseconds() / 1000;
-                            const curMin = nowDate.getMinutes() + curSec / 60;
-                            const curHr = (nowDate.getHours() % 12) + curMin / 60;
+                              if (pomodoroTargetTimeMs) {
+                                const targetDate = new Date(pomodoroTargetTimeMs);
+                                targetMin = targetDate.getMinutes();
+                                targetHr = (targetDate.getHours() % 12) + targetMin / 60;
+                              } else {
+                                const baseMin = nowDate.getMinutes();
+                                const baseHr = (nowDate.getHours() % 12) + baseMin / 60;
+                                targetMin = (baseMin + pomodoroMinutes) % 60;
+                                targetHr = (baseHr + pomodoroMinutes / 60) % 12;
+                              }
 
-                            const secDeg = curSec * 6;
-                            const minDeg = curMin * 6;
-                            const hrDeg = curHr * 30;
+                              const targetMinDeg = targetMin * 6;
+                              const targetHrDeg = targetHr * 30;
 
-                            return (
-                              <>
-                                {/* Hour Hand (Bold Luminous Accent Pointer) */}
-                                <line
-                                  x1="50"
-                                  y1="50"
-                                  x2="50"
-                                  y2="28"
-                                  className="stroke-[var(--accent)]"
-                                  strokeWidth="3.5"
-                                  strokeLinecap="round"
-                                  filter="url(#neon-glow)"
-                                  transform={`rotate(${hrDeg} 50 50)`}
-                                />
+                              return (
+                                <g className="transition-transform duration-500">
+                                  {/* 1. Hollow Replica Hour Hand (Parallel Dotted Lines | | completely empty inside) */}
+                                  <g transform={`rotate(${targetHrDeg} 50 50)`}>
+                                    {/* Left Dotted Edge */}
+                                    <line
+                                      x1="48.5"
+                                      y1="50"
+                                      x2="48.5"
+                                      y2="28"
+                                      className="stroke-amber-400/85"
+                                      strokeWidth="0.8"
+                                      strokeDasharray="1.5 1.5"
+                                    />
+                                    {/* Right Dotted Edge */}
+                                    <line
+                                      x1="51.5"
+                                      y1="50"
+                                      x2="51.5"
+                                      y2="28"
+                                      className="stroke-amber-400/85"
+                                      strokeWidth="0.8"
+                                      strokeDasharray="1.5 1.5"
+                                    />
+                                    {/* Top Dotted Cap Line */}
+                                    <line
+                                      x1="48.5"
+                                      y1="28"
+                                      x2="51.5"
+                                      y2="28"
+                                      className="stroke-amber-400/85"
+                                      strokeWidth="0.8"
+                                      strokeDasharray="1.5 1.5"
+                                    />
+                                  </g>
 
-                                {/* Minute Hand (Crisp Solid White/Primary Pointer) */}
-                                <line
-                                  x1="50"
-                                  y1="50"
-                                  x2="50"
-                                  y2="18"
-                                  className="stroke-[var(--text-primary)]"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                  filter="url(#neon-glow)"
-                                  transform={`rotate(${minDeg} 50 50)`}
-                                />
-
-                                {/* Second Hand (Vivid Red Accent Pointer) */}
-                                <line
-                                  x1="50"
-                                  y1="50"
-                                  x2="50"
-                                  y2="12"
-                                  className="stroke-rose-500"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  filter="url(#neon-glow)"
-                                  transform={`rotate(${secDeg} 50 50)`}
-                                />
-
-                                {/* Precision Center Pin Cap */}
-                                <circle
-                                  cx="50"
-                                  cy="50"
-                                  r="3.5"
-                                  className="fill-rose-500 stroke-[var(--bg-card)]"
-                                  strokeWidth="1"
-                                />
-                              </>
-                            );
-                          })()}
-                        </svg>
-
-                        {/* Minimal Digital Display Mini-Badge (Clean Font!) */}
-                        <div className="z-20 mt-16 flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-elevated)]/90 px-3 py-1 shadow-xs backdrop-blur-md">
-                          <span className="font-sans text-xs font-semibold tracking-wider text-[var(--text-primary)]">
-                            {(() => {
-                              const dispSecs = timerType === "pomodoro"
-                                ? Math.max(0, pomodoroMinutes * 60 - timerSeconds)
-                                : timerSeconds;
-                              const t = formatTimerDisplay(dispSecs);
-                              return `${t.hrs}h ${t.mins}m ${t.secs}s`;
+                                  {/* 2. Hollow Replica Minute Hand (Parallel Dotted Lines | | completely empty inside) */}
+                                  <g transform={`rotate(${targetMinDeg} 50 50)`}>
+                                    {/* Left Dotted Edge */}
+                                    <line
+                                      x1="48.8"
+                                      y1="50"
+                                      x2="48.8"
+                                      y2="18"
+                                      className="stroke-black dark:stroke-neutral-950/90"
+                                      strokeWidth="0.8"
+                                      strokeDasharray="1.5 1.5"
+                                    />
+                                    {/* Right Dotted Edge */}
+                                    <line
+                                      x1="51.2"
+                                      y1="50"
+                                      x2="51.2"
+                                      y2="18"
+                                      className="stroke-black dark:stroke-neutral-950/90"
+                                      strokeWidth="0.8"
+                                      strokeDasharray="1.5 1.5"
+                                    />
+                                    {/* Top Dotted Cap Line */}
+                                    <line
+                                      x1="48.8"
+                                      y1="18"
+                                      x2="51.2"
+                                      y2="18"
+                                      className="stroke-black dark:stroke-neutral-950/90"
+                                      strokeWidth="0.8"
+                                      strokeDasharray="1.5 1.5"
+                                    />
+                                  </g>
+                                </g>
+                              );
                             })()}
-                          </span>
-                        </div>
+
+                            {/* 60 Minute Thin Tick Marks & 12 Main Markers */}
+                            {[...Array(60)].map((_, i) => {
+                              const angle = i * 6;
+                              const rad = (angle - 90) * (Math.PI / 180);
+                              const isMajor = i % 5 === 0;
+                              const tickLength = isMajor ? 4.5 : 2;
+                              const x1 = 50 + (43 - tickLength) * Math.cos(rad);
+                              const y1 = 50 + (43 - tickLength) * Math.sin(rad);
+                              const x2 = 50 + 43 * Math.cos(rad);
+                              const y2 = 50 + 43 * Math.sin(rad);
+                              return (
+                                <line
+                                  key={i}
+                                  x1={x1}
+                                  y1={y1}
+                                  x2={x2}
+                                  y2={y2}
+                                  className={isMajor ? (timerType === "pomodoro" ? "stroke-amber-400/70" : "stroke-[var(--accent)]/70") : "stroke-[var(--text-secondary)] opacity-30"}
+                                  strokeWidth={isMajor ? "1.2" : "0.7"}
+                                  strokeLinecap="round"
+                                />
+                              );
+                            })}
+
+                            {/* PROMINENT REAL-WORLD TIME ANALOG CLOCK HANDS */}
+                            {(() => {
+                              const curSec = nowDate.getSeconds() + nowDate.getMilliseconds() / 1000;
+                              const curMin = nowDate.getMinutes() + curSec / 60;
+                              const curHr = (nowDate.getHours() % 12) + curMin / 60;
+
+                              const secDeg = curSec * 6;
+                              const minDeg = curMin * 6;
+                              const hrDeg = curHr * 30;
+
+                              return (
+                                <>
+                                  {/* Hour Hand */}
+                                  <line
+                                    x1="50"
+                                    y1="50"
+                                    x2="50"
+                                    y2="28"
+                                    className={timerType === "pomodoro" ? "stroke-amber-400/90" : "stroke-[var(--accent)]"}
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    transform={`rotate(${hrDeg} 50 50)`}
+                                  />
+
+                                  {/* Minute Hand */}
+                                  <line
+                                    x1="50"
+                                    y1="50"
+                                    x2="50"
+                                    y2="18"
+                                    className="stroke-[var(--text-primary)]"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    transform={`rotate(${minDeg} 50 50)`}
+                                  />
+
+                                  {/* Second Hand */}
+                                  <line
+                                    x1="50"
+                                    y1="50"
+                                    x2="50"
+                                    y2="12"
+                                    className="stroke-rose-500/90"
+                                    strokeWidth="1.2"
+                                    strokeLinecap="round"
+                                    transform={`rotate(${secDeg} 50 50)`}
+                                  />
+
+                                  {/* Center Pin Cap */}
+                                  <circle
+                                    cx="50"
+                                    cy="50"
+                                    r="3"
+                                    className="fill-rose-500 stroke-[var(--bg-card)]"
+                                    strokeWidth="1"
+                                  />
+                                </>
+                              );
+                            })()}
+                          </svg>
+                        </motion.div>
+                      </div>
+
+                      {/* Stationary Non-Rotating Digital Display Badge Placed Cleanly Outside Below Analog Clock Dial */}
+                      <motion.div
+                        key={`digital-badge-${timerType}`}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3 }}
+                        className="flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-elevated)]/90 px-4 py-1.5 shadow-xs backdrop-blur-md"
+                      >
+                        <span className="font-sans text-xs font-semibold tracking-wider text-[var(--text-primary)]">
+                          {(() => {
+                            const isPomoDisplay = (timerRunning && activeRunningTimerType === "pomodoro") || (!timerRunning && timerType === "pomodoro");
+                            const dispSecs = isPomoDisplay
+                              ? Math.max(0, pomodoroMinutes * 60 - timerSeconds)
+                              : timerSeconds;
+                            const t = formatTimerDisplay(dispSecs);
+                            return `${t.hrs}h ${t.mins}m ${t.secs}s`;
+                          })()}
+                        </span>
+                      </motion.div>
+
+                      {/* Clean High-Contrast Action Buttons */}
+                      <div className="flex items-center justify-center gap-3 w-full max-w-xs mt-2">
+                        {timerRunning && activeRunningTimerType !== timerType ? (
+                          <button
+                            disabled
+                            type="button"
+                            className="w-full rounded-xl bg-[var(--bg-elevated)] py-2.5 text-xs font-bold text-[var(--text-secondary)] border border-[var(--border)] opacity-50 cursor-not-allowed shadow-xs"
+                          >
+                            {activeRunningTimerType === "pomodoro" ? "Pomodoro Timer Running..." : "Stopwatch Running..."}
+                          </button>
+                        ) : (
+                          <AnimatePresence mode="wait">
+                            {!timerRunning && timerSeconds === 0 ? (
+                              <motion.button
+                                key="start-clock-btn"
+                                type="button"
+                                onClick={handleStartTimer}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.94 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 14 }}
+                                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 py-2.5 text-xs font-black text-stone-950 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+                              >
+                                Start Clock
+                              </motion.button>
+                            ) : (
+                              <motion.div
+                                key="active-clock-controls"
+                                initial={{ opacity: 0, scale: 0.95, y: 4 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 4 }}
+                                transition={{ duration: 0.2, ease: "easeOut" }}
+                                className="flex items-center gap-2.5 w-full"
+                              >
+                                <motion.button
+                                  type="button"
+                                  onClick={timerRunning ? handlePauseTimer : handleStartTimer}
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.94 }}
+                                  transition={{ type: "spring", stiffness: 300, damping: 14 }}
+                                  className="flex-1 rounded-xl py-2.5 px-4 text-xs font-black tracking-wide bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-md shadow-amber-500/20 transition-all cursor-pointer border border-amber-400/40"
+                                >
+                                  {timerRunning ? "Pause Clock" : "Resume Clock"}
+                                </motion.button>
+
+                                <motion.button
+                                  type="button"
+                                  onClick={handleResetTimer}
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.94 }}
+                                  transition={{ type: "spring", stiffness: 300, damping: 14 }}
+                                  className="rounded-xl border-2 border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-xs font-black tracking-wide text-[var(--text-primary)] hover:text-rose-500 hover:border-rose-500/50 transition-all cursor-pointer shadow-xs"
+                                >
+                                  Reset
+                                </motion.button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex justify-end gap-2.5 pt-3.5 border-t border-[var(--border)] w-full mt-auto">
+                        <motion.button
+                          type="button"
+                          onClick={() => setIsLogModalOpen(false)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] cursor-pointer"
+                        >
+                          Cancel
+                        </motion.button>
+                        <MicroInteractionButton
+                          type="submit"
+                          loading={saving}
+                          disabled={timerSeconds < 5}
+                          className="btn-primary px-5 py-2 text-xs font-extrabold"
+                        >
+                          Save Session Log
+                        </MicroInteractionButton>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.form>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Floating Draggable Active Running Clock Widget (Emitted when modal closes while clock is running) */}
+      {isMounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {timerRunning && !isLogModalOpen && (
+            <motion.div
+              drag
+              dragConstraints={dragBounds}
+              dragElastic={0.05}
+              dragMomentum={false}
+              onMouseEnter={handleFloatingWidgetActivity}
+              onMouseMove={handleFloatingWidgetActivity}
+              layout
+              initial={{ opacity: 0, scale: 0.7, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.7, y: -10 }}
+              transition={{
+                layout: { type: "spring", stiffness: 240, damping: 24, mass: 0.8 },
+                opacity: { duration: 0.2 },
+                scale: { type: "spring", stiffness: 280, damping: 24 },
+              }}
+              className="fixed top-6 right-6 z-[99990] flex flex-col items-center justify-center rounded-3xl border border-amber-500/40 bg-[var(--bg-card)]/95 p-2 shadow-2xl backdrop-blur-2xl cursor-grab active:cursor-grabbing select-none overflow-hidden group"
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {floatingClockMode === "compact" ? (
+                  /* Step 1: Ultra-Compact Mini Floating Clock Disc (Shows live hands + dotted finish hand) */
+                  <motion.div
+                    key="compact-clock-disc"
+                    initial={{ opacity: 0, scale: 0.88 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.88 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    onClick={() => setFloatingClockMode("medium")}
+                    className="relative flex h-14 w-14 items-center justify-center rounded-full border border-amber-500/50 bg-[var(--bg-card)] shadow-lg hover:scale-105 transition-transform cursor-pointer"
+                    title="Click to expand clock details"
+                  >
+                    <svg className="h-full w-full p-1 pointer-events-none" viewBox="0 0 100 100">
+                      {/* Mini Perimeter Track */}
+                      <circle cx="50" cy="50" r="45" className="stroke-[var(--border)] fill-none" strokeWidth="1.5" />
+
+                      {/* Dotted Finish Target Replica Hands (Hour & Minute) on Smallest Disc */}
+                      {activeRunningTimerType === "pomodoro" && pomodoroTargetTimeMs && (() => {
+                        const targetDate = new Date(pomodoroTargetTimeMs);
+                        const tMin = targetDate.getMinutes();
+                        const tHr = (targetDate.getHours() % 12) + tMin / 60;
+                        return (
+                          <>
+                            {/* Dotted Hour Hand (Deep Charcoal Black) */}
+                            <g transform={`rotate(${tHr * 30} 50 50)`}>
+                              <line x1="48.5" y1="50" x2="48.5" y2="28" className="stroke-neutral-700 dark:stroke-neutral-300" strokeWidth="1.8" strokeDasharray="2 1.5" strokeLinecap="round" />
+                              <line x1="51.5" y1="50" x2="51.5" y2="28" className="stroke-neutral-700 dark:stroke-neutral-300" strokeWidth="1.8" strokeDasharray="2 1.5" strokeLinecap="round" />
+                              <line x1="48.5" y1="28" x2="51.5" y2="28" className="stroke-neutral-700 dark:stroke-neutral-300" strokeWidth="1.8" strokeDasharray="2 1.5" strokeLinecap="round" />
+                            </g>
+
+                            {/* Dotted Minute Hand (Pitch Black) */}
+                            <g transform={`rotate(${tMin * 6} 50 50)`}>
+                              <line x1="48.5" y1="50" x2="48.5" y2="16" className="stroke-stone-950 dark:stroke-neutral-100" strokeWidth="1.8" strokeDasharray="2.5 1.8" strokeLinecap="round" />
+                              <line x1="51.5" y1="50" x2="51.5" y2="16" className="stroke-stone-950 dark:stroke-neutral-100" strokeWidth="1.8" strokeDasharray="2.5 1.8" strokeLinecap="round" />
+                              <line x1="48.5" y1="16" x2="51.5" y2="16" className="stroke-stone-950 dark:stroke-neutral-100" strokeWidth="1.8" strokeDasharray="2.5 1.8" strokeLinecap="round" />
+                            </g>
+                          </>
+                        );
+                      })()}
+
+                      {/* Live Clock Hands */}
+                      {(() => {
+                        const curSec = nowDate.getSeconds() + nowDate.getMilliseconds() / 1000;
+                        const curMin = nowDate.getMinutes() + curSec / 60;
+                        const curHr = (nowDate.getHours() % 12) + curMin / 60;
+
+                        return (
+                          <>
+                            <line x1="50" y1="50" x2="50" y2="28" className="stroke-amber-400" strokeWidth="3.5" strokeLinecap="round" transform={`rotate(${curHr * 30} 50 50)`} />
+                            <line x1="50" y1="50" x2="50" y2="18" className="stroke-[var(--text-primary)]" strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${curMin * 6} 50 50)`} />
+                            <line x1="50" y1="50" x2="50" y2="12" className="stroke-rose-500" strokeWidth="1.5" strokeLinecap="round" transform={`rotate(${curSec * 6} 50 50)`} />
+                            <circle cx="50" cy="50" r="3" className="fill-rose-500 stroke-[var(--bg-card)]" strokeWidth="1" />
+                          </>
+                        );
+                      })()}
+                    </svg>
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+                    </span>
+                  </motion.div>
+                ) : (
+                  /* Step 2: Medium Expanded View (Shows readout + quick pause + click to open modal) */
+                  <motion.div
+                    key="medium-clock-card"
+                    initial={{ opacity: 0, scale: 0.92 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.92 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col items-center gap-2 w-full p-1"
+                  >
+                    {/* Top Drag & Action Bar */}
+                    <div
+                      onClick={() => setIsLogModalOpen(true)}
+                      className="flex items-center justify-between w-full gap-3 px-1 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                        </span>
+                        <span className="text-[10px] font-extrabold tracking-wider uppercase text-amber-400">
+                          {activeRunningTimerType === "pomodoro" ? `Pomodoro (${pomodoroMinutes}m)` : "Stopwatch"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFloatingClockMode("compact");
+                          }}
+                          className="text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-1 cursor-pointer font-bold"
+                          title="Minimize to disc"
+                        >
+                          —
+                        </button>
+                        <span className="text-[10px] text-[var(--text-secondary)] opacity-60 group-hover:opacity-100 transition">
+                          Expand ↗
+                        </span>
                       </div>
                     </div>
 
-                    {/* Stopwatch Controls with Bouncy Tactile Micro-Interactions */}
-                    <div className="flex items-center justify-center gap-2.5 w-full">
-                      {!timerRunning ? (
-                        <motion.button
-                          type="button"
-                          onClick={handleStartTimer}
-                          whileHover={{ scale: 1.04 }}
-                          whileTap={{ scale: 0.93 }}
-                          transition={{ type: "spring", stiffness: 450, damping: 25 }}
-                          className="flex-1 rounded-xl bg-[var(--accent)] py-2.5 text-xs font-extrabold text-stone-950 shadow-md shadow-[var(--accent)]/30 hover:brightness-110 active:brightness-95 transition"
-                        >
-                          {timerSeconds > 0 ? "Resume Clock" : "Start Clock"}
-                        </motion.button>
-                      ) : (
-                        <motion.button
-                          type="button"
-                          onClick={handlePauseTimer}
-                          whileHover={{ scale: 1.04 }}
-                          whileTap={{ scale: 0.93 }}
-                          transition={{ type: "spring", stiffness: 450, damping: 25 }}
-                          className="flex-1 rounded-xl border border-amber-500/40 bg-amber-500/10 py-2.5 text-xs font-extrabold text-amber-500 hover:bg-amber-500/20 transition"
-                        >
-                          Pause Clock
-                        </motion.button>
-                      )}
+                    {/* Mini Analog Clock Dial */}
+                    <div
+                      onClick={() => setIsLogModalOpen(true)}
+                      className="relative flex h-20 w-20 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] shadow-inner cursor-pointer"
+                    >
+                      <svg className="h-full w-full p-1 pointer-events-none" viewBox="0 0 100 100">
+                        {/* Mini Perimeter Track */}
+                        <circle cx="50" cy="50" r="45" className="stroke-[var(--border)] fill-none" strokeWidth="1.5" />
 
-                      {timerSeconds > 0 && (
-                        <motion.button
-                          type="button"
-                          onClick={handleResetTimer}
-                          whileHover={{ scale: 1.06 }}
-                          whileTap={{ scale: 0.92 }}
-                          transition={{ type: "spring", stiffness: 450, damping: 25 }}
-                          className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-xs font-bold text-[var(--text-secondary)] hover:text-rose-500 transition"
-                        >
-                          Reset
-                        </motion.button>
-                      )}
+                        {/* Dotted Finish Target Replica Hands (Hour & Minute) on Medium View */}
+                        {activeRunningTimerType === "pomodoro" && pomodoroTargetTimeMs && (() => {
+                          const targetDate = new Date(pomodoroTargetTimeMs);
+                          const tMin = targetDate.getMinutes();
+                          const tHr = (targetDate.getHours() % 12) + tMin / 60;
+                          return (
+                            <>
+                              {/* Dotted Hour Hand (Deep Charcoal Black) */}
+                              <g transform={`rotate(${tHr * 30} 50 50)`}>
+                                <line x1="48.5" y1="50" x2="48.5" y2="28" className="stroke-neutral-700 dark:stroke-neutral-300" strokeWidth="1.8" strokeDasharray="2 1.5" strokeLinecap="round" />
+                                <line x1="51.5" y1="50" x2="51.5" y2="28" className="stroke-neutral-700 dark:stroke-neutral-300" strokeWidth="1.8" strokeDasharray="2 1.5" strokeLinecap="round" />
+                                <line x1="48.5" y1="28" x2="51.5" y2="28" className="stroke-neutral-700 dark:stroke-neutral-300" strokeWidth="1.8" strokeDasharray="2 1.5" strokeLinecap="round" />
+                              </g>
+
+                              {/* Dotted Minute Hand (Pitch Black) */}
+                              <g transform={`rotate(${tMin * 6} 50 50)`}>
+                                <line x1="48.5" y1="50" x2="48.5" y2="16" className="stroke-stone-950 dark:stroke-neutral-100" strokeWidth="1.8" strokeDasharray="2.5 1.8" strokeLinecap="round" />
+                                <line x1="51.5" y1="50" x2="51.5" y2="16" className="stroke-stone-950 dark:stroke-neutral-100" strokeWidth="1.8" strokeDasharray="2.5 1.8" strokeLinecap="round" />
+                                <line x1="48.5" y1="16" x2="51.5" y2="16" className="stroke-stone-950 dark:stroke-neutral-100" strokeWidth="1.8" strokeDasharray="2.5 1.8" strokeLinecap="round" />
+                              </g>
+                            </>
+                          );
+                        })()}
+
+                        {/* Live Hands */}
+                        {(() => {
+                          const curSec = nowDate.getSeconds() + nowDate.getMilliseconds() / 1000;
+                          const curMin = nowDate.getMinutes() + curSec / 60;
+                          const curHr = (nowDate.getHours() % 12) + curMin / 60;
+
+                          return (
+                            <>
+                              <line x1="50" y1="50" x2="50" y2="28" className="stroke-amber-400" strokeWidth="3.5" strokeLinecap="round" transform={`rotate(${curHr * 30} 50 50)`} />
+                              <line x1="50" y1="50" x2="50" y2="18" className="stroke-[var(--text-primary)]" strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${curMin * 6} 50 50)`} />
+                              <line x1="50" y1="50" x2="50" y2="12" className="stroke-rose-500" strokeWidth="1.5" strokeLinecap="round" transform={`rotate(${curSec * 6} 50 50)`} />
+                              <circle cx="50" cy="50" r="3" className="fill-rose-500 stroke-[var(--bg-card)]" strokeWidth="1" />
+                            </>
+                          );
+                        })()}
+                      </svg>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)] w-full">
-                      <motion.button
+                    {/* Digital Readout & Quick Action Controls */}
+                    <div className="flex items-center gap-2 w-full">
+                      <div
+                        onClick={() => setIsLogModalOpen(true)}
+                        className="flex-1 rounded-xl bg-[var(--bg-elevated)] py-1 px-2 text-center cursor-pointer border border-[var(--border)]"
+                      >
+                        <span className="font-sans text-xs font-extrabold text-[var(--text-primary)]">
+                          {(() => {
+                            const isPomoDisplay = activeRunningTimerType === "pomodoro";
+                            const dispSecs = isPomoDisplay ? Math.max(0, pomodoroMinutes * 60 - timerSeconds) : timerSeconds;
+                            const t = formatTimerDisplay(dispSecs);
+                            return `${t.hrs > 0 ? t.hrs + "h " : ""}${t.mins}m ${t.secs}s`;
+                          })()}
+                        </span>
+                      </div>
+
+                      {/* Quick Pause / Resume Control */}
+                      <button
                         type="button"
-                        onClick={() => setIsLogModalOpen(false)}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (timerRunning) {
+                            handlePauseTimer();
+                          } else {
+                            handleStartTimer();
+                          }
+                        }}
+                        className="rounded-xl bg-amber-500 p-1.5 text-stone-950 hover:bg-amber-400 transition cursor-pointer shadow-xs"
+                        title="Pause / Resume"
                       >
-                        Cancel
-                      </motion.button>
-                      <MicroInteractionButton
-                        type="submit"
-                        loading={saving}
-                        disabled={timerSeconds < 5}
-                        className="btn-primary px-5 py-2 text-xs font-extrabold"
-                      >
-                        Save Session Log
-                      </MicroInteractionButton>
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                          {timerRunning ? (
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                          ) : (
+                            <path d="M8 5v14l11-7z" />
+                          )}
+                        </svg>
+                      </button>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
-              </motion.form>
-
-            </AnimatePresence>
-          </div>
-        ) : null}
-      </AnimatePresence>
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
 
 
 
 
       {/* Add Custom Subject Modal */}
-      <AnimatePresence>
-        {isAddSubjectModalOpen ? (
-          <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10 sm:pt-14 pb-16 backdrop-blur-xs"
-            onClick={() => setIsAddSubjectModalOpen(false)}
-          >
-            <motion.form
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              onSubmit={handleAddSubject}
-              onClick={(e) => e.stopPropagation()}
-              className="surface w-full max-w-md space-y-4 p-6 shadow-xl"
+      {isMounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isAddSubjectModalOpen ? (
+            <div
+              className="fixed inset-0 z-[99999] flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10 sm:pt-14 pb-16 backdrop-blur-xs"
+              onClick={() => setIsAddSubjectModalOpen(false)}
             >
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
-                  Subject Manager
-                </span>
-                <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
-                  Add Custom Subject
-                </h2>
-              </div>
+              <motion.form
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                onSubmit={handleAddSubject}
+                onClick={(e) => e.stopPropagation()}
+                className="surface w-full max-w-md space-y-4 p-6 shadow-xl"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                    Subject Manager
+                  </span>
+                  <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--text-primary)]">
+                    Add Custom Subject
+                  </h2>
+                </div>
 
-              {/* Subject Name */}
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
-                  Subject Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Computer Networks"
-                  value={newSubjectName}
-                  onChange={(e) => setNewSubjectName(e.target.value)}
-                  className="app-input w-full px-3.5 py-2 text-sm font-semibold"
-                />
-              </div>
+                {/* Subject Name */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
+                    Subject Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Computer Networks"
+                    value={newSubjectName}
+                    onChange={(e) => setNewSubjectName(e.target.value)}
+                    className="app-input w-full px-3.5 py-2 text-sm font-semibold"
+                  />
+                </div>
 
-              {/* Exam Weightage */}
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
-                  Exam Weightage (%)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={newSubjectWeight}
-                  onChange={(e) => setNewSubjectWeight(e.target.value)}
-                  className="app-input w-full px-3.5 py-2 text-sm font-semibold"
-                />
-              </div>
+                {/* Exam Weightage */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
+                    Exam Weightage (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={newSubjectWeight}
+                    onChange={(e) => setNewSubjectWeight(e.target.value)}
+                    className="app-input w-full px-3.5 py-2 text-sm font-semibold"
+                  />
+                </div>
 
-              {/* Topics / Sub-topics */}
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
-                  Topics / Sub-topics (comma-separated)
-                </label>
-                <textarea
-                  value={newSubjectTopics}
-                  onChange={(e) => setNewSubjectTopics(e.target.value)}
-                  placeholder="e.g. IP Addressing, TCP/UDP Protocols, Routing Algorithms"
-                  className="app-input min-h-[80px] w-full p-3 text-xs"
-                />
-              </div>
+                {/* Topics / Sub-topics */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
+                    Topics / Sub-topics (comma-separated)
+                  </label>
+                  <textarea
+                    value={newSubjectTopics}
+                    onChange={(e) => setNewSubjectTopics(e.target.value)}
+                    placeholder="e.g. IP Addressing, TCP/UDP Protocols, Routing Algorithms"
+                    className="app-input min-h-[80px] w-full p-3 text-xs"
+                  />
+                </div>
 
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => setIsAddSubjectModalOpen(false)}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
-                >
-                  Cancel
-                </button>
-                <MicroInteractionButton
-                  type="submit"
-                  loading={savingSubject}
-                  className="btn-primary px-5 py-2 text-xs font-semibold"
-                >
-                  Save Subject
-                </MicroInteractionButton>
-              </div>
-            </motion.form>
-          </div>
-        ) : null}
-      </AnimatePresence>
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-2.5 pt-2 border-t border-[var(--border)]">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSubjectModalOpen(false)}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                  >
+                    Cancel
+                  </button>
+                  <MicroInteractionButton
+                    type="submit"
+                    loading={savingSubject}
+                    className="btn-primary px-5 py-2 text-xs font-semibold"
+                  >
+                    Save Subject
+                  </MicroInteractionButton>
+                </div>
+              </motion.form>
+            </div>
+          ) : null}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Delete Subject Confirmation Modal */}
-      <AnimatePresence>
-        {isDeleteSubjectModalOpen && subjectToDelete ? (
-          <div
-            className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-xs"
-            onClick={() => {
-              setIsDeleteSubjectModalOpen(false);
-              setSubjectToDelete(null);
-            }}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              onClick={(e) => e.stopPropagation()}
-              className="surface w-full max-w-md space-y-4 p-6 shadow-xl border border-rose-500/30"
+      {isMounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isDeleteSubjectModalOpen && subjectToDelete ? (
+            <div
+              className="fixed inset-0 z-[99999] grid place-items-center bg-black/40 p-4 backdrop-blur-xs"
+              onClick={() => {
+                setIsDeleteSubjectModalOpen(false);
+                setSubjectToDelete(null);
+              }}
             >
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
-                  Delete Subject
-                </span>
-                <h2 className="mt-1 text-lg font-bold tracking-tight text-[var(--text-primary)]">
-                  Delete "{subjectToDelete.subjectName}"?
-                </h2>
-                <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                  Are you sure you want to delete <strong className="text-[var(--text-primary)]">{subjectToDelete.subjectName}</strong>? This action will remove the subject from your progress tracker database.
-                </p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                onClick={(e) => e.stopPropagation()}
+                className="surface w-full max-w-md space-y-4 p-6 shadow-xl border border-rose-500/30"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
+                    Delete Subject
+                  </span>
+                  <h2 className="mt-1 text-lg font-bold tracking-tight text-[var(--text-primary)]">
+                    Delete "{subjectToDelete.subjectName}"?
+                  </h2>
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+                    Are you sure you want to delete <strong className="text-[var(--text-primary)]">{subjectToDelete.subjectName}</strong>? This action will remove the subject from your progress tracker database.
+                  </p>
+                </div>
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDeleteSubjectModalOpen(false);
-                    setSubjectToDelete(null);
-                  }}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
-                >
-                  Cancel
-                </button>
-                <MicroInteractionButton
-                  type="button"
-                  loading={deletingSubject}
-                  onClick={handleDeleteSubject}
-                  className="rounded-lg bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition"
-                >
-                  Delete Subject
-                </MicroInteractionButton>
-              </div>
-            </motion.div>
-          </div>
-        ) : null}
-      </AnimatePresence>
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDeleteSubjectModalOpen(false);
+                      setSubjectToDelete(null);
+                    }}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                  >
+                    Cancel
+                  </button>
+                  <MicroInteractionButton
+                    type="button"
+                    loading={deletingSubject}
+                    onClick={handleDeleteSubject}
+                    className="rounded-lg bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition"
+                  >
+                    Delete Subject
+                  </MicroInteractionButton>
+                </div>
+              </motion.div>
+            </div>
+          ) : null}
+        </AnimatePresence>,
+        document.body
+      )}
 
 
       {/* Set Custom Daily Goal Modal with Glassmorphic Liquid Drag Capsule */}
-      <AnimatePresence>
-        {isGoalModalOpen ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            onMouseDown={(e) => {
-              goalModalMouseDownRef.current = e.target === e.currentTarget;
-            }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget && goalModalMouseDownRef.current) {
-                setIsGoalModalOpen(false);
-              }
-            }}
-            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md"
-          >
-            <motion.form
-              initial={{ opacity: 0, scale: 0.9, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 10 }}
-              transition={{
-                type: "spring",
-                stiffness: 380,
-                damping: 26,
-                mass: 0.8,
+      {isMounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isGoalModalOpen ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              onMouseDown={(e) => {
+                goalModalMouseDownRef.current = e.target === e.currentTarget;
               }}
-              onSubmit={handleSaveDailyGoal}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md space-y-5 rounded-3xl border border-stone-200/80 dark:border-white/10 bg-white/95 dark:bg-stone-900/95 p-6 shadow-2xl backdrop-blur-xl text-[var(--text-primary)]"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && goalModalMouseDownRef.current) {
+                  setIsGoalModalOpen(false);
+                }
+              }}
+              className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md"
             >
-              {/* Glassmorphic Liquid Bar Picker */}
-              <GlassmorphicLiquidGoalPicker
-                value={parseFloat(tempGoalInput) || 4.0}
-                onChange={(val) => setTempGoalInput(val.toString())}
-              />
+              <motion.form
+                initial={{ opacity: 0, scale: 0.9, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 380,
+                  damping: 26,
+                  mass: 0.8,
+                }}
+                onSubmit={handleSaveDailyGoal}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md space-y-5 rounded-3xl border border-stone-200/80 dark:border-white/10 bg-white/95 dark:bg-stone-900/95 p-6 shadow-2xl backdrop-blur-xl text-[var(--text-primary)] relative z-10"
+              >
+                {/* Glassmorphic Liquid Bar Picker */}
+                <GlassmorphicLiquidGoalPicker
+                  value={parseFloat(tempGoalInput) || 4.0}
+                  onChange={(val) => setTempGoalInput(val.toString())}
+                />
 
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-3 border-t border-stone-200/60 dark:border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsGoalModalOpen(false)}
-                  className="rounded-xl border border-stone-200 dark:border-white/15 bg-stone-100 dark:bg-stone-800/80 px-4 py-2 text-xs font-semibold text-stone-700 dark:text-stone-300 transition hover:bg-stone-200 dark:hover:bg-stone-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-[var(--accent)] px-6 py-2 text-xs font-extrabold text-stone-950 shadow-md shadow-[var(--accent)]/30 hover:brightness-110 transition"
-                >
-                  Apply Goal
-                </button>
-              </div>
-            </motion.form>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-3 border-t border-stone-200/60 dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsGoalModalOpen(false)}
+                    className="rounded-xl border border-stone-200 dark:border-white/15 bg-stone-100 dark:bg-stone-800/80 px-4 py-2 text-xs font-semibold text-stone-700 dark:text-stone-300 transition hover:bg-stone-200 dark:hover:bg-stone-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-[var(--accent)] px-6 py-2 text-xs font-extrabold text-stone-950 shadow-md shadow-[var(--accent)]/30 hover:brightness-110 transition"
+                  >
+                    Apply Goal
+                  </button>
+                </div>
+              </motion.form>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>,
+        document.body
+      )}
 
 
       {/* 2-Step D1 Logs Clear & Passcode Verification Modal */}
-      <AnimatePresence>
-        {isDeleteModalOpen ? (
-          <div
-            className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-xs"
-            onClick={() => setIsDeleteModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              onClick={(e) => e.stopPropagation()}
-              className="surface w-full max-w-md space-y-4 p-6 shadow-xl border border-rose-500/30"
+      {isMounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isDeleteModalOpen ? (
+            <div
+              className="fixed inset-0 z-[99999] grid place-items-center bg-black/40 p-4 backdrop-blur-xs"
+              onClick={() => setIsDeleteModalOpen(false)}
             >
-              {deleteStep === 1 ? (
-                /* Step 1: Confirmation Prompt */
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
-                      Step 1 of 2 · Danger Zone
-                    </span>
-                    <h2 className="mt-1 text-lg font-bold tracking-tight text-[var(--text-primary)]">
-                      Do you still want to delete all tracker logs?
-                    </h2>
-                    <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-                      This will permanently erase all recorded study session logs from the Cloudflare D1 database. Other project data (journals, settings) will <strong className="text-[var(--text-primary)]">not</strong> be affected.
-                    </p>
-                  </div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                onClick={(e) => e.stopPropagation()}
+                className="surface w-full max-w-md space-y-4 p-6 shadow-xl border border-rose-500/30"
+              >
+                {deleteStep === 1 ? (
+                  /* Step 1: Confirmation Prompt */
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
+                        Step 1 of 2 · Danger Zone
+                      </span>
+                      <h2 className="mt-1 text-lg font-bold tracking-tight text-[var(--text-primary)]">
+                        Do you still want to delete all tracker logs?
+                      </h2>
+                      <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+                        This will permanently erase all recorded study session logs from the Cloudflare D1 database. Other project data (journals, settings) will <strong className="text-[var(--text-primary)]">not</strong> be affected.
+                      </p>
+                    </div>
 
-                  <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
-                    <button
-                      type="button"
-                      onClick={() => setIsDeleteModalOpen(false)}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteStep(2)}
-                      className="rounded-lg bg-rose-500 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-600 transition"
-                    >
-                      Yes, Proceed
-                    </button>
+                    <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
+                      <button
+                        type="button"
+                        onClick={() => setIsDeleteModalOpen(false)}
+                        className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteStep(2)}
+                        className="rounded-lg bg-rose-500 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-600 transition"
+                      >
+                        Yes, Proceed
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                /* Step 2: Passcode Verification Prompt */
-                <form onSubmit={handleConfirmDeleteWithPasscode} className="space-y-4">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
-                      Step 2 of 2 · Security Check
-                    </span>
-                    <h2 className="mt-1 text-lg font-bold tracking-tight text-[var(--text-primary)]">
-                      Enter App Passcode to Confirm
-                    </h2>
-                    <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
-                      Please enter your app login passcode to authorize deletion of Cloudflare D1 study tracker logs.
-                    </p>
-                  </div>
+                ) : (
+                  /* Step 2: Passcode Verification Prompt */
+                  <form onSubmit={handleConfirmDeleteWithPasscode} className="space-y-4">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500">
+                        Step 2 of 2 · Security Check
+                      </span>
+                      <h2 className="mt-1 text-lg font-bold tracking-tight text-[var(--text-primary)]">
+                        Enter App Passcode to Confirm
+                      </h2>
+                      <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                        Please enter your app login passcode to authorize deletion of Cloudflare D1 study tracker logs.
+                      </p>
+                    </div>
 
-                  <div>
-                    <input
-                      type="password"
-                      autoFocus
-                      value={passcode}
-                      onChange={(e) => setPasscode(e.target.value)}
-                      placeholder="Enter app login passcode"
-                      className="app-input w-full px-3.5 py-2.5 text-sm font-semibold"
-                    />
-                    {passcodeError ? (
-                      <p className="mt-2 text-xs font-semibold text-rose-500">{passcodeError}</p>
-                    ) : null}
-                  </div>
+                    <div>
+                      <input
+                        type="password"
+                        autoFocus
+                        value={passcode}
+                        onChange={(e) => setPasscode(e.target.value)}
+                        placeholder="Enter app login passcode"
+                        className="app-input w-full px-3.5 py-2.5 text-sm font-semibold"
+                      />
+                      {passcodeError ? (
+                        <p className="mt-2 text-xs font-semibold text-rose-500">{passcodeError}</p>
+                      ) : null}
+                    </div>
 
-                  <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
-                    <button
-                      type="button"
-                      onClick={() => setIsDeleteModalOpen(false)}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
-                    >
-                      Cancel
-                    </button>
-                    <MicroInteractionButton
-                      type="submit"
-                      loading={verifyingPasscode}
-                      className="rounded-lg bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition"
-                    >
-                      Delete Logs
-                    </MicroInteractionButton>
-                  </div>
-                </form>
-              )}
-            </motion.div>
-          </div>
-        ) : null}
-      </AnimatePresence>
+                    <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border)]">
+                      <button
+                        type="button"
+                        onClick={() => setIsDeleteModalOpen(false)}
+                        className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                      >
+                        Cancel
+                      </button>
+                      <MicroInteractionButton
+                        type="submit"
+                        loading={verifyingPasscode}
+                        className="rounded-lg bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition"
+                      >
+                        Delete Logs
+                      </MicroInteractionButton>
+                    </div>
+                  </form>
+                )}
+              </motion.div>
+            </div>
+          ) : null}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Full Session Logs History Modal — Crisp 1-Liner Rows & Chart Table */}
       {isMounted && typeof document !== "undefined"
@@ -2195,21 +2659,19 @@ function MetricCard({
   value,
   suffix,
   subtext,
-  iconType,
   decimals,
 }: {
   label: string;
   value: number;
   suffix: string;
   subtext: string;
-  iconType: "time" | "effort" | "avg" | "questions";
+  iconType?: "time" | "effort" | "avg" | "questions";
   decimals?: number;
 }) {
   return (
     <div className="surface p-4 flex flex-col justify-between">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-[var(--text-secondary)]">{label}</p>
-        <MetricIcon type={iconType} />
       </div>
       <div className="mt-3">
         <p className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
@@ -2232,13 +2694,22 @@ function GlassmorphicLiquidGoalPicker({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [localValue, setLocalValue] = useState<number>(value);
+  const debounceTimerRef = useRef<number | null>(null);
+
+  // Sync local value with prop when not dragging
+  useEffect(() => {
+    if (!isDragging) {
+      setLocalValue(value);
+    }
+  }, [value, isDragging]);
 
   const minVal = 0.5;
   const maxVal = 14.0;
-  const percent = Math.min(Math.max(((value - minVal) / (maxVal - minVal)) * 100, 0), 100);
+  const percent = Math.min(Math.max(((localValue - minVal) / (maxVal - minVal)) * 100, 0), 100);
 
   const updateFromClientX = useCallback(
-    (clientX: number) => {
+    (clientX: number, forceImmediate = false) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const relativeX = Math.max(0, Math.min(clientX - rect.left, rect.width));
@@ -2246,7 +2717,19 @@ function GlassmorphicLiquidGoalPicker({
       const rawVal = minVal + rawRatio * (maxVal - minVal);
       const snapped = Math.round(rawVal * 2) / 2;
       const clamped = Math.min(Math.max(snapped, minVal), maxVal);
-      onChange(clamped);
+
+      // Instant optimistic local update for 120fps butter-smooth slider
+      setLocalValue(clamped);
+
+      if (forceImmediate) {
+        if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+        onChange(clamped);
+      } else {
+        if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = window.setTimeout(() => {
+          onChange(clamped);
+        }, 40);
+      }
     },
     [minVal, maxVal, onChange]
   );
@@ -2258,8 +2741,9 @@ function GlassmorphicLiquidGoalPicker({
       updateFromClientX(e.clientX);
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (e: PointerEvent) => {
       setIsDragging(false);
+      updateFromClientX(e.clientX, true);
     };
 
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
@@ -2278,19 +2762,18 @@ function GlassmorphicLiquidGoalPicker({
     updateFromClientX(e.clientX);
   };
 
-
   return (
-    <div className="flex flex-col items-center space-y-5 py-1 select-none">
-      {/* High-Contrast Readout Visible in Light & Dark Mode */}
+    <div className="flex flex-col items-center space-y-4 py-1 select-none">
+      {/* High-Contrast Readout */}
       <div className="text-center">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[var(--accent)]">
-          Target Daily Hours
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-[var(--accent)]">
+          Set Goal
         </p>
-        <div className="mt-2 flex items-baseline justify-center gap-2">
+        <div className="mt-1.5 flex items-baseline justify-center gap-1.5">
           <span className="text-5xl sm:text-6xl font-black tracking-tight text-[var(--accent)] font-sans drop-shadow-xs">
-            {value.toFixed(1)}
+            {localValue.toFixed(1)}
           </span>
-          <span className="text-sm font-extrabold text-[var(--text-secondary)]">
+          <span className="text-xs font-extrabold text-[var(--text-secondary)]">
             hrs / day
           </span>
         </div>
@@ -2298,14 +2781,14 @@ function GlassmorphicLiquidGoalPicker({
 
       {/* Glassmorphic Liquid Bar with Scale Labels */}
       <div className="w-full space-y-2">
-        {/* Visible Scale Numbers */}
-        <div className="flex items-center justify-between px-2 text-[10px] font-extrabold text-[var(--text-secondary)] font-mono">
+        {/* Embedded Scale Numbers with Smooth Rounded Font & Brighter Contrast */}
+        <div className="flex items-center justify-between px-2 text-[11px] font-bold text-stone-300 dark:text-stone-200 font-sans tracking-wide">
           <span>0.5h</span>
-          <span>3.0h</span>
-          <span>6.0h</span>
-          <span>9.0h</span>
-          <span>12.0h</span>
-          <span>14.0h</span>
+          <span>3h</span>
+          <span>6h</span>
+          <span>9h</span>
+          <span>12h</span>
+          <span>14h</span>
         </div>
 
         <div
@@ -2337,11 +2820,11 @@ function GlassmorphicLiquidGoalPicker({
       </div>
 
       {/* Drag Guidance */}
-      <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-secondary)]">
-        <svg className="w-4 h-4 text-[var(--accent)] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+        <svg className="w-3.5 h-3.5 text-[var(--accent)] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M8 12h8M8 17h8" />
         </svg>
-        Click & Drag horizontally across the liquid bar
+        Drag horizontally across the slider to adjust
       </div>
     </div>
   );

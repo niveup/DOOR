@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { AiMarkdown } from "@/components/AiMarkdown";
 import { ModelSelector, type AiSelection } from "@/components/ModelSelector";
@@ -75,8 +76,12 @@ export function PlanChatModal({
 
   const totalMinutes = draftTasks.reduce((sum, t) => sum + t.durationMin, 0);
   const totalHours = (totalMinutes / 60).toFixed(1);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  return (
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-3 sm:p-4 backdrop-blur-xs animate-fade-in overscroll-contain"
       onMouseDown={onClose}
@@ -315,6 +320,7 @@ export function PlanChatModal({
         </div>
 
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }
