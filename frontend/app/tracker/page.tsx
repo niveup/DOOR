@@ -2133,7 +2133,7 @@ export default function TrackerPage() {
                             const isPomoDisplay = activeRunningTimerType === "pomodoro";
                             const dispSecs = isPomoDisplay ? Math.max(0, pomodoroMinutes * 60 - timerSeconds) : timerSeconds;
                             const t = formatTimerDisplay(dispSecs);
-                            return `${t.hrs > 0 ? t.hrs + "h " : ""}${t.mins}m ${t.secs}s`;
+                            return `${Number(t.hrs) > 0 ? t.hrs + "h " : ""}${t.mins}m ${t.secs}s`;
                           })()}
                         </span>
                       </div>
