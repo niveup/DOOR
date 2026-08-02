@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { motion } from "motion/react";
 import { AppShell, PageSection } from "@/components/AppShell";
 import { MicroInteractionButton } from "@/components/MotionComponents";
+import { getCache, setCache, updateCache } from "@/lib/sessionCache";
 
 type ProviderName = "openrouter" | "nvidia" | "cerebras";
 
@@ -83,12 +84,20 @@ export default function AiSettingsPage() {
   );
 
   const loadModels = useCallback(async (nextProvider: ProviderName) => {
+    const cacheKey = `ai_models_${nextProvider}`;
+    const cached = getCache<string[]>(cacheKey);
+    if (cached) {
+      setModels(cached);
+      return;
+    }
     try {
       const response = await fetch(`${backendUrl}/api/ai/models?provider=${nextProvider}`, {
         headers: {},
       });
       const result = await response.json();
-      setModels(Array.isArray(result.models) ? result.models : []);
+      const loadedModels = Array.isArray(result.models) ? result.models : [];
+      setModels(loadedModels);
+      setCache(cacheKey, loadedModels);
     } catch {
       setModels([]);
     }
@@ -96,6 +105,17 @@ export default function AiSettingsPage() {
 
   const loadConfiguration = useCallback(async () => {
     setLoading(true);
+    const cached = getCache<AiConfiguration>('ai_config_full');
+    if (cached) {
+      setConfiguration(cached);
+      const activeProvider = cached.activeProvider || "openrouter";
+      const providerConfig = cached.providers.find((item) => item.provider === activeProvider);
+      setProvider(activeProvider);
+      setModel(providerConfig?.model || (activeProvider === "openrouter" ? "openrouter/free" : activeProvider === "cerebras" ? "gemma-4-31b" : "meta/llama-3.1-8b-instruct"));
+      await loadModels(activeProvider);
+      setLoading(false);
+      return;
+    }
     try {
       const response = await fetch(`${backendUrl}/api/ai/config`, {
         headers: {},
@@ -104,8 +124,12 @@ export default function AiSettingsPage() {
       if (!response.ok) throw new Error(result.error || "AI settings could not be loaded.");
 
       const nextConfiguration = result as AiConfiguration;
+      setCache('ai_config_full', nextConfiguration);
+      
       const activeProvider = nextConfiguration.activeProvider || "openrouter";
       const providerConfig = nextConfiguration.providers.find((item) => item.provider === activeProvider);
+      setCache('ai_config', { provider: activeProvider, model: providerConfig?.model || nextConfiguration.activeModel });
+      
       setConfiguration(nextConfiguration);
       setProvider(activeProvider);
       setModel(providerConfig?.model || (activeProvider === "openrouter" ? "openrouter/free" : activeProvider === "cerebras" ? "gemma-4-31b" : "meta/llama-3.1-8b-instruct"));
@@ -147,7 +171,10 @@ export default function AiSettingsPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI settings could not be saved.");
 
-      setConfiguration(result as AiConfiguration);
+      const newConfig = result as AiConfiguration;
+      setConfiguration(newConfig);
+      setCache('ai_config_full', newConfig);
+      setCache('ai_config', { provider: newConfig.activeProvider, model: newConfig.activeModel });
       setApiKey("");
       toast.success(`${providerLabels[provider]} is now active`);
       await loadModels(provider);

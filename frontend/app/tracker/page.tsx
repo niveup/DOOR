@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
+import { getCache, setCache, clearCache, updateCache } from "@/lib/sessionCache";
 import { AppShell, PageSection } from "@/components/AppShell";
 import { AiMarkdown } from "@/components/AiMarkdown";
 import { AnimatedNumber, EmptyState, MicroInteractionButton, ProgressBar } from "@/components/MotionComponents";
@@ -59,9 +60,6 @@ const timeBlocks = [
   { id: "Evening", label: "Evening" },
   { id: "Night", label: "Night" },
 ];
-
-const cacheKey = "door_study_tracker_data_v2";
-const logsCacheKey = "door_study_logs_history_v1";
 
 function MetricIcon({ type }: { type: "time" | "effort" | "avg" | "questions" }) {
   const common = {
@@ -446,11 +444,15 @@ export default function TrackerPage() {
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      try {
-        localStorage.removeItem("door_study_tracker_data_v2");
-        localStorage.removeItem("door_study_logs_history_v1");
-        localStorage.removeItem("door_offline_logs_queue_v1");
-      } catch {}
+      if (!silent) {
+        const cached = getCache<{ data: TrackerData & { error?: string }; logs: any[] }>('tracker_full');
+        if (cached) {
+          setData(cached.data);
+          setSessionLogs(cached.logs);
+          setLoading(false);
+          return;
+        }
+      }
 
       const response = await fetch(`${backendUrl}/api/tracker/status?t=${Date.now()}`, {
         headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
@@ -482,7 +484,9 @@ export default function TrackerPage() {
           }));
       }
 
-      setSessionLogs(dedupeLogs(effectiveLogs));
+      const finalLogs = dedupeLogs(effectiveLogs);
+      setSessionLogs(finalLogs);
+      setCache('tracker_full', { data: result, logs: finalLogs });
       setError("");
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to connect to study tracker database.");
@@ -492,12 +496,6 @@ export default function TrackerPage() {
   }, [backendUrl]);
 
   useEffect(() => {
-    try {
-      localStorage.removeItem("door_study_tracker_data_v2");
-      localStorage.removeItem("door_study_logs_history_v1");
-      localStorage.removeItem("door_offline_logs_queue_v1");
-    } catch {}
-
     const savedGoal = localStorage.getItem("door_daily_goal_hours");
     if (savedGoal) {
       const parsed = parseFloat(savedGoal);
@@ -794,6 +792,16 @@ export default function TrackerPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dailyAvailableHours: parsed }),
       });
+      updateCache<{ data: TrackerData & { error?: string }; logs: any[] }>('tracker_full', (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            dailyAvailableHours: parsed
+          }
+        };
+      });
     } catch (err) {
       console.warn("Could not save daily goal to cloud database:", err);
     }
@@ -860,6 +868,20 @@ export default function TrackerPage() {
       if (!response.ok) throw new Error("Cloud database save failed.");
 
       toast.success(`Logged ${hoursNum}h of ${targetSubject.subjectName} to cloud!`);
+      updateCache<{ data: TrackerData & { error?: string }; logs: any[] }>('tracker_full', (prev) => {
+        if (!prev) return prev;
+        const newLog = {
+          id: `temp-${Date.now()}`,
+          logDate: cleanDate,
+          timeBlock: timeBlockLabel,
+          subjectId: targetSubject.subjectId,
+          subjectName: targetSubject.subjectName,
+          hoursStudied: hoursNum,
+          questionsSolved: qNum,
+          notes: notesStr,
+        };
+        return { ...prev, logs: [newLog, ...prev.logs] };
+      });
       await refresh(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Cloud database save failed.");
@@ -954,6 +976,7 @@ export default function TrackerPage() {
       setNewSubjectName("");
       setNewSubjectWeight("10");
       setNewSubjectTopics("");
+      clearCache('tracker_full');
       await refresh(true);
       toast.success(`Subject "${created.subjectName || newSubjectName}" added successfully!`);
     } catch (err) {
@@ -991,11 +1014,10 @@ export default function TrackerPage() {
       setData((prev) => {
         if (!prev) return prev;
         const updatedSubjects = prev.subjects.filter((s) => s.subjectId !== targetId);
-        const updatedData = { ...prev, subjects: updatedSubjects };
-        localStorage.setItem(cacheKey, JSON.stringify(updatedData));
-        return updatedData;
+        return { ...prev, subjects: updatedSubjects };
       });
 
+      clearCache('tracker_full');
       await refresh(true);
       toast.success(`Subject "${targetName}" deleted successfully!`);
     } catch (err) {
@@ -1044,7 +1066,7 @@ export default function TrackerPage() {
       const resetRes = await fetch(`${backendUrl}/api/tracker/reset`, { method: "POST" });
       if (!resetRes.ok) throw new Error("Could not reset tracker database.");
 
-      localStorage.removeItem(logsCacheKey);
+      clearCache('tracker_full');
       setSessionLogs([]);
       setIsDeleteModalOpen(false);
       await refresh(true);

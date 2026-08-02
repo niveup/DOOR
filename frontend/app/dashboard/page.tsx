@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { AiSelection, ModelSelector } from "@/components/ModelSelector";
 import { PlanChatModal, CustomTaskTypeDropdown, TASK_CARD_STYLES } from "@/components/PlanChatModal";
 import { Latex } from "@/components/Latex";
+import { getCache, setCache, clearCache, updateCache } from "@/lib/sessionCache";
 
 function formatPriorityText(text: string): string {
   let cleaned = text;
@@ -193,39 +194,14 @@ export default function Dashboard() {
     }
   };
 
-function getSessionCachedPlan(dateStr: string): { found: boolean; plan: RoutinePlan | null } {
-  if (typeof window === "undefined") return { found: false, plan: null };
-  try {
-    const raw = sessionStorage.getItem(`routine_plan_${dateStr}`);
-    if (raw === null) return { found: false, plan: null };
-    if (raw === "NO_PLAN") return { found: true, plan: null };
-    return { found: true, plan: JSON.parse(raw) as RoutinePlan };
-  } catch {
-    return { found: false, plan: null };
-  }
-}
-
-function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (plan) {
-      sessionStorage.setItem(`routine_plan_${dateStr}`, JSON.stringify(plan));
-    } else {
-      sessionStorage.setItem(`routine_plan_${dateStr}`, "NO_PLAN");
-    }
-  } catch {
-    // Ignore quota errors
-  }
-}
-
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
   const fetchTodayPlan = useCallback(async (dateStr?: string, forceRefresh = false) => {
     const queryDate = dateStr || selectedDate;
 
     if (!forceRefresh) {
-      const cached = getSessionCachedPlan(queryDate);
-      if (cached.found) {
+      const cached = getCache<{ plan: RoutinePlan | null }>(`routine_plan_${queryDate}`);
+      if (cached) {
         setPlan(cached.plan);
         setLoading(false);
         setError("");
@@ -241,11 +217,11 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
       if (res.ok) {
         const data = (await res.json()) as RoutinePlan | null;
         setPlan(data);
-        setSessionCachedPlan(queryDate, data);
+        setCache(`routine_plan_${queryDate}`, { plan: data });
         setError("");
       } else {
         setPlan(null);
-        setSessionCachedPlan(queryDate, null);
+        setCache(`routine_plan_${queryDate}`, { plan: null });
         setError("Plan could not be loaded.");
       }
     } catch {
@@ -262,6 +238,23 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
   };
 
   const fetchTrackerStatus = useCallback(async () => {
+    const cached = getCache<TrackerStatus>('tracker_status');
+    if (cached) {
+      const subjects = Array.isArray(cached.subjects) ? cached.subjects : [];
+      setReadiness(cached.overallReadiness || 0);
+
+      const weakSubject =
+        subjects.find((subject) => subject.hasAvoidanceWarning) ||
+        subjects.find((subject) => subject.isNeglected) ||
+        [...subjects].sort((a, b) => (a.latestRating || 5) - (b.latestRating || 5))[0];
+
+      if (weakSubject) {
+        setWeakArea(weakSubject.subjectName);
+        setHasAvoidance(Boolean(weakSubject.hasAvoidanceWarning || weakSubject.isNeglected));
+      }
+      return;
+    }
+
     try {
       const res = await fetch(`${backendUrl}/api/tracker/status`, {
         headers: {},
@@ -280,6 +273,7 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
         setWeakArea(weakSubject.subjectName);
         setHasAvoidance(Boolean(weakSubject.hasAvoidanceWarning || weakSubject.isNeglected));
       }
+      setCache('tracker_status', result);
     } catch {
       setWeakArea("Tracker appears after the backend starts");
     }
@@ -335,7 +329,7 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
         ...currentPlan,
         tasks: currentPlan.tasks.map((task) => task.taskId === taskId ? { ...task, status: nextStatus } : task),
       };
-      setSessionCachedPlan(selectedDate, updatedPlan);
+      setCache(`routine_plan_${selectedDate}`, { plan: updatedPlan });
       return updatedPlan;
     });
     setError("");
@@ -449,7 +443,7 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
 
       const resultPlan = result as RoutinePlan;
       setPlan(resultPlan);
-      setSessionCachedPlan(selectedDate, resultPlan);
+      setCache(`routine_plan_${selectedDate}`, { plan: resultPlan });
       setPlanChatOpen(false);
       toast.success("Your agreed plan is ready");
     } catch (chatSaveError) {
@@ -489,7 +483,7 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
 
       const resultPlan = result as RoutinePlan;
       setPlan(resultPlan);
-      setSessionCachedPlan(selectedDate, resultPlan);
+      setCache(`routine_plan_${selectedDate}`, { plan: resultPlan });
       setManualPlanOpen(false);
       toast.success("Manual plan saved");
     } catch (saveError) {
@@ -520,7 +514,7 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
       });
       if (res.ok) {
         setPlan(null);
-        setSessionCachedPlan(selectedDate, null);
+        setCache(`routine_plan_${selectedDate}`, { plan: null });
         toast.success("Today's plan deleted");
       } else {
         toast.error("Failed to delete today's plan.");

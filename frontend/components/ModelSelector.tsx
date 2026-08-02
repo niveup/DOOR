@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { getCache, setCache } from "@/lib/sessionCache";
 
 export type AiProviderName = "openrouter" | "nvidia" | "cerebras";
 
@@ -43,12 +44,18 @@ export function ModelSelector({
   const [loading, setLoading] = useState(true);
 
   const loadModels = useCallback(async (provider: AiProviderName, selectedModel: string) => {
+    const cached = getCache<string[]>(`ai_models_${provider}`);
+    if (cached) {
+      setModels([...new Set([selectedModel, ...cached].filter(Boolean))]);
+      return;
+    }
     try {
       const response = await fetch(`${backendUrl}/api/ai/models?provider=${provider}`, {
         headers: {},
       });
       const result = await response.json();
       const nextModels = Array.isArray(result.models) ? result.models : [];
+      setCache(`ai_models_${provider}`, nextModels);
       setModels([...new Set([selectedModel, ...nextModels].filter(Boolean))]);
     } catch {
       setModels([selectedModel]);
@@ -57,6 +64,20 @@ export function ModelSelector({
 
   const initialize = useCallback(async () => {
     setLoading(true);
+    const cached = getCache<{provider: string, model: string}>('ai_config');
+    if (cached) {
+      const nextSelection = {
+        provider: cached.provider as AiProviderName,
+        model: cached.model,
+      };
+      setProviders([
+        { provider: nextSelection.provider, configured: true, model: nextSelection.model, isActive: true },
+      ]);
+      onChange(nextSelection);
+      await loadModels(nextSelection.provider, nextSelection.model);
+      setLoading(false);
+      return;
+    }
     try {
       const response = await fetch(`${backendUrl}/api/ai/config`, {
         headers: {},
@@ -70,6 +91,7 @@ export function ModelSelector({
         provider: activeProvider,
         model: activeConfiguration?.model || result.activeModel || fallbackModels[activeProvider],
       };
+      setCache('ai_config', nextSelection);
       setProviders(result.providers.filter((item) => item.configured));
       onChange(nextSelection);
       await loadModels(nextSelection.provider, nextSelection.model);

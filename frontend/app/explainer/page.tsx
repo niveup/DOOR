@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { MicroInteractionButton } from "@/components/MotionComponents";
 import { AiMarkdown } from "@/components/AiMarkdown";
 import { ModelSelector, AiSelection } from "@/components/ModelSelector";
+import { getCache, setCache } from "@/lib/sessionCache";
 
 interface Section {
   id: string;
@@ -284,16 +285,23 @@ export default function ExplainerPage() {
   // Load active AI config on mount
   useEffect(() => {
     const fetchActiveConfig = async () => {
+      const cached = getCache<AiSelection>('ai_config');
+      if (cached) {
+        setAiSelection(cached);
+        return;
+      }
       try {
         const response = await fetch(`${backendUrl}/api/ai/config`);
         if (response.ok) {
           const result = await response.json();
           const activeProvider = result.activeProvider || "nvidia";
           const activeConfig = result.providers?.find((item: any) => item.provider === activeProvider);
-          setAiSelection({
+          const selection = {
             provider: activeProvider,
             model: activeConfig?.model || result.activeModel || "meta/llama-3.1-8b-instruct",
-          });
+          };
+          setAiSelection(selection);
+          setCache('ai_config', selection);
         }
       } catch {
         // Fallback to default
