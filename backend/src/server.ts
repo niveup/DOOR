@@ -858,17 +858,30 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
           + plan.tasks.map((task: Task) => `${task.title} ${task.durationMin}m ${task.status}`).join("; ")
         ).join("\n")
       : "No previous plans";
+    const rawDraftTasks = Array.isArray(req.body?.draftTasks)
+      ? req.body.draftTasks
+      : Array.isArray(req.body?.currentDraft)
+        ? req.body.currentDraft
+        : [];
+
+    const currentDraftText = rawDraftTasks.length > 0
+      ? rawDraftTasks.map((t: any, i: number) => `${i + 1}. ${t.title || "Task"} (${t.durationMin || 0}m, ${t.taskType || "study"})`).join(", ")
+      : "No tasks in live draft board yet";
+
     const explicitFacts = JSON.stringify({
       durationMentions: [...new Set(durationMentions)],
       latestUserMessage,
       confirmationDetected,
       currentPlanTaskCount: existingPlan?.tasks.length || 0,
+      userDraftTaskCount: rawDraftTasks.length,
     });
+
     const prompt = loadPrompt("plan_chat.md", {
       user_name: settings?.name || "Aspirant",
       available_hours: 24,
       weak_subjects: weakSubjects,
       existing_plan: existingPlanText,
+      current_draft_tasks: currentDraftText,
       student_profile: JSON.stringify({
         targetExam: settings?.targetExam || "GATE",
         targetYear: settings?.targetYear || 2027,
@@ -921,31 +934,34 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
           )
           .slice(0, 8)
       : [];
-    const suggestions = Array.isArray(parsed.suggestions)
+
+    // If AI returned no new draft tasks but user already had manual draft tasks, preserve user's manual draft
+    if (draftTasks.length === 0 && rawDraftTasks.length > 0) {
+      draftTasks = rawDraftTasks.map((task: any) => ({
+        title: String(task?.title || "").trim().slice(0, 180),
+        taskType: validTaskTypes.has(task?.taskType) ? task.taskType : "study",
+        durationMin: Math.round(Number(task?.durationMin)) || 30,
+      }));
+    }
+
+    let suggestions = Array.isArray(parsed.suggestions)
       ? parsed.suggestions.map((suggestion) => String(suggestion).trim().slice(0, 100)).filter(Boolean).slice(0, 4)
       : [];
 
     let reply = String(parsed.reply || "What would you like to adjust?").trim().slice(0, 1200);
-    let normalizedSuggestions = suggestions;
-    if (durationMentions.length === 0) {
-      const availableMinutes = 1440;
-      const timeOptions = availableMinutes < 60
-        ? [15, 30, Math.min(45, availableMinutes)]
-        : [30, 45, 60];
-      reply = "Got it. How much time do you want to give this today? Choose one of these, or type your own time.";
-      normalizedSuggestions = [...new Set(timeOptions)].map((minutes) => `${minutes} minutes`);
-      draftTasks = [];
-    } else if (draftTasks.length > 0 && /(how much time|kitna samay|time chahiye|how long)/i.test(reply)) {
-      const totalMinutes = draftTasks.reduce((total: number, task: { durationMin: number }) => total + task.durationMin, 0);
-      reply = `I have a ${totalMinutes}-minute draft from what you told me. Want to keep it, change the time, or add another task?`;
-      normalizedSuggestions = ["Looks good", "Change the time", "Add another task"];
-    } else if (draftTasks.length > 0 && normalizedSuggestions.length === 0) {
-      normalizedSuggestions = ["Looks good", "Change the time", "Add another task"];
+
+    // Fallback default suggestions only if AI generated none
+    if (suggestions.length === 0) {
+      if (draftTasks.length > 0) {
+        suggestions = ["Haan, looks good", "Change time", "Add another task"];
+      } else {
+        suggestions = ["45 minutes study", "30 minutes study", "60 minutes study"];
+      }
     }
 
     res.json({
       reply,
-      suggestions: normalizedSuggestions,
+      suggestions,
       ready: (Boolean(parsed.ready) || confirmationDetected) && draftTasks.length > 0,
       draftTasks,
     });
@@ -1056,6 +1072,8 @@ app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
       .join("\n");
 
     const prompt = loadPrompt("general_chat.md", {
+      TUTOR_NAME: "Jujum AI",
+      STUDENT_LEVEL: settings?.prepLevel || "Beginner",
       user_name: settings?.name || "Aspirant",
       target_exam: settings?.targetExam || "GATE",
       target_year: settings?.targetYear || 2027,
@@ -1078,7 +1096,7 @@ app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
       : undefined;
 
     const aiResponse = await aiChat(
-      "You are Jujum AI, a general study coach. Provide helpful tips and schedule guidance. Return JSON only.",
+      "You are Jujum AI, a friendly AI study partner and peer mentor. Answer the student's LATEST message directly using The 4-Beat Answer Structure. Do not repeat background stats unless asked. Return JSON only.",
       prompt,
       { provider: requestedProvider, model: requestedModel }
     );

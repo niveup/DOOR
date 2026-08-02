@@ -190,7 +190,7 @@ export default function AiSettingsPage() {
     <AppShell
       eyebrow="Settings"
       title="AI Control"
-      subtitle="Choose the provider and model used by plans, journal analysis, and explanations."
+      subtitle="Choose the provider used by plans, journal analysis, and explanations."
     >
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <PageSection title="Provider" eyebrow="Active connection">
@@ -234,20 +234,6 @@ export default function AiSettingsPage() {
                   autoComplete="off"
                   className="app-input px-3 py-2.5 text-sm"
                 />
-              </label>
-
-              <label className="block">
-                <span className="section-label mb-2 block">Model ID</span>
-                <input
-                  list={`models-${provider}`}
-                  value={model}
-                  onChange={(event) => setModel(event.target.value)}
-                  placeholder={provider === "openrouter" ? "openrouter/free" : provider === "cerebras" ? "gemma-4-31b" : "meta/llama-3.1-8b-instruct"}
-                  className="app-input px-3 py-2.5 text-sm"
-                />
-                <datalist id={`models-${provider}`}>
-                  {models.map((item) => <option key={item} value={item} />)}
-                </datalist>
               </label>
             </div>
 

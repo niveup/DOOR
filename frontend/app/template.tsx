@@ -1,9 +1,23 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 
 export default function Template({ children }: { children: React.ReactNode }) {
   const shouldReduceMotion = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="flex-1 flex flex-col w-full min-h-0">
+        {children}
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -20,3 +34,4 @@ export default function Template({ children }: { children: React.ReactNode }) {
     </motion.div>
   );
 }
+

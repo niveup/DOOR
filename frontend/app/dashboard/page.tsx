@@ -9,7 +9,7 @@ import { AiMarkdown } from "@/components/AiMarkdown";
 import { AnimatedNumber, EmptyState, MicroInteractionButton, MotionCard, ProgressBar, StatusBadge } from "@/components/MotionComponents";
 import { AnimatePresence, motion } from "motion/react";
 import { AiSelection, ModelSelector } from "@/components/ModelSelector";
-import { PlanChatModal } from "@/components/PlanChatModal";
+import { PlanChatModal, CustomTaskTypeDropdown, TASK_CARD_STYLES } from "@/components/PlanChatModal";
 import { Latex } from "@/components/Latex";
 
 function formatPriorityText(text: string): string {
@@ -193,13 +193,15 @@ export default function Dashboard() {
     }
   };
 
-function getSessionCachedPlan(dateStr: string): RoutinePlan | null {
-  if (typeof window === "undefined") return null;
+function getSessionCachedPlan(dateStr: string): { found: boolean; plan: RoutinePlan | null } {
+  if (typeof window === "undefined") return { found: false, plan: null };
   try {
     const raw = sessionStorage.getItem(`routine_plan_${dateStr}`);
-    return raw ? (JSON.parse(raw) as RoutinePlan) : null;
+    if (raw === null) return { found: false, plan: null };
+    if (raw === "NO_PLAN") return { found: true, plan: null };
+    return { found: true, plan: JSON.parse(raw) as RoutinePlan };
   } catch {
-    return null;
+    return { found: false, plan: null };
   }
 }
 
@@ -209,7 +211,7 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
     if (plan) {
       sessionStorage.setItem(`routine_plan_${dateStr}`, JSON.stringify(plan));
     } else {
-      sessionStorage.removeItem(`routine_plan_${dateStr}`);
+      sessionStorage.setItem(`routine_plan_${dateStr}`, "NO_PLAN");
     }
   } catch {
     // Ignore quota errors
@@ -223,8 +225,8 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
 
     if (!forceRefresh) {
       const cached = getSessionCachedPlan(queryDate);
-      if (cached) {
-        setPlan(cached);
+      if (cached.found) {
+        setPlan(cached.plan);
         setLoading(false);
         setError("");
         return;
@@ -393,6 +395,7 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
         },
         body: JSON.stringify({
           messages: nextMessages.map((message) => ({ role: message.role, content: message.content })),
+          draftTasks: planChatDraft,
           aiProvider: planChatAi.provider,
           aiModel: planChatAi.model,
         }),
@@ -692,6 +695,7 @@ function setSessionCachedPlan(dateStr: string, plan: RoutinePlan | null) {
           input={planChatInput}
           suggestions={planChatSuggestions}
           draftTasks={planChatDraft}
+          onUpdateDraftTasks={setPlanChatDraft}
           ready={planChatReady}
           loading={planChatLoading}
           saving={planChatSaving}
@@ -727,6 +731,11 @@ function ManualPlanModal({
 
   const addTask = () => {
     if (tasks.length >= 30) return;
+    const emptyIndex = tasks.findIndex((t) => !t.title.trim());
+    if (emptyIndex !== -1) {
+      toast.error(`Please enter a title for Task #${emptyIndex + 1} before adding a new task.`);
+      return;
+    }
     onChange([
       ...tasks,
       {
@@ -814,76 +823,116 @@ function ManualPlanModal({
         onMouseDown={(event) => event.stopPropagation()}
         className="surface flex flex-col h-[80vh] w-full max-w-2xl overflow-hidden p-4 sm:p-5 overscroll-contain"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4 shrink-0">
+        <div className="flex items-center justify-between border-b border-stone-200 pb-3 shrink-0">
           <div>
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Create plan manually</h2>
+            <h2 className="text-base font-extrabold text-stone-800 font-serif tracking-tight">Create Plan Manually</h2>
+            <p className="text-[10px] text-stone-500 font-mono">Custom Daily Study Ledger</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close manual plan"
-            title="Close"
-            className="focus-ring flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition cursor-pointer"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-stone-700 bg-stone-100 border border-stone-200 px-2.5 py-0.5 rounded-full tabular-nums">
+              {(totalMinutes / 60).toFixed(1)} hrs ({totalMinutes}m)
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close manual plan"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div className="relative flex-1 min-h-0 my-4 flex flex-col">
+        {/* Capacity Bar */}
+        <div className="mt-3 shrink-0">
+          <div className="flex items-center justify-between text-[9px] font-semibold text-stone-500 mb-1">
+            <span>TOTAL COMMITMENT</span>
+            <span className="tabular-nums">{Math.min(100, Math.round((totalMinutes / 480) * 100))}% Capacity</span>
+          </div>
+          <div className="h-2 w-full bg-stone-100 border border-stone-200 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-stone-700"
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(100, (totalMinutes / 480) * 100)}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </div>
+        </div>
+
+        <div className="relative flex-1 min-h-0 my-3 flex flex-col">
           <div
             ref={scrollRef}
             onScroll={checkScroll}
             className="flex-1 overflow-y-auto overscroll-contain no-scrollbar space-y-2.5 pr-1"
           >
           {tasks.map((task, index) => (
-            <div key={task.id} className="grid grid-cols-[24px_1fr] gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5 sm:grid-cols-[24px_minmax(0,1fr)_120px_88px_32px] sm:items-center">
-              <span className="text-center text-[11px] font-semibold text-[var(--text-secondary)]">{index + 1}</span>
-              <input
-                required
-                value={task.title}
-                onChange={(event) => updateTask(task.id, { title: event.target.value })}
-                placeholder="Task name"
-                className="app-input rounded-full bg-white px-4 py-1.5 text-xs border border-[var(--border)] focus:border-[var(--accent)] focus:outline-none transition"
-              />
-              <select
-                value={task.taskType}
-                onChange={(event) => updateTask(task.id, { taskType: event.target.value as TaskType })}
-                className="app-input rounded-full bg-white px-3 py-1.5 text-xs border border-[var(--border)] focus:border-[var(--accent)] focus:outline-none transition cursor-pointer"
-              >
-                <option value="study">Study</option>
-                <option value="exercise">Exercise</option>
-                <option value="reading">Reading</option>
-                <option value="routine">Routine</option>
-              </select>
-              <label className="relative block">
+            <motion.div
+              key={task.id}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="group relative flex items-center gap-3 bg-gradient-to-b from-white to-[#FDFCFB] border border-stone-200/90 rounded-2xl p-3.5 shadow-[0_3px_10px_rgba(0,0,0,0.05),0_1px_3px_rgba(0,0,0,0.03)] hover:border-stone-300 hover:shadow-[0_6px_18px_rgba(0,0,0,0.08)] transition-all duration-200"
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-stone-100 text-[10px] font-extrabold text-stone-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.04)]">
+                {index + 1}
+              </span>
+              
+              <div className="min-w-0 flex-1 flex flex-col gap-1">
                 <input
                   required
-                  type="number"
-                  min="5"
-                  max="480"
-                  value={task.durationMin}
-                  onChange={(event) => updateTask(task.id, { durationMin: event.target.value })}
-                  aria-label={`Minutes for task ${index + 1}`}
-                  className="app-input rounded-full bg-white px-4 py-1.5 pr-8 text-xs font-semibold border border-[var(--border)] focus:border-[var(--accent)] focus:outline-none transition"
+                  type="text"
+                  value={task.title}
+                  onChange={(event) => updateTask(task.id, { title: event.target.value })}
+                  placeholder="Task title..."
+                  className="w-full bg-transparent text-xs font-semibold text-stone-800 tracking-tight border-b border-transparent hover:border-stone-200 focus:border-stone-400 focus:bg-stone-50/50 focus:outline-none px-1 py-0.5 rounded-md transition"
                 />
-                <span className="pointer-events-none absolute right-3.5 top-1.5 text-[10px] font-semibold text-[var(--text-faint)]">m</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => removeTask(task.id)}
-                disabled={tasks.length === 1}
-                aria-label={`Remove task ${index + 1}`}
-                title="Remove task"
-                className="focus-ring flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:opacity-30 transition cursor-pointer"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+                <div className="flex items-center gap-2">
+                  <CustomTaskTypeDropdown
+                    value={task.taskType}
+                    onChange={(val) => updateTask(task.id, { taskType: val })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 bg-stone-100/90 border border-stone-200/90 rounded-full px-3 py-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05),0_1px_0_rgba(255,255,255,0.8)]">
+                  <input
+                    required
+                    type="number"
+                    min="5"
+                    max="480"
+                    step="5"
+                    value={task.durationMin}
+                    onChange={(event) => updateTask(task.id, { durationMin: event.target.value })}
+                    className="w-8 text-xs font-bold text-stone-800 text-center tabular-nums bg-transparent focus:outline-none transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-[10px] font-bold text-stone-500">m</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => removeTask(task.id)}
+                  disabled={tasks.length === 1}
+                  className="opacity-40 group-hover:opacity-100 hover:text-rose-600 hover:bg-rose-50 text-stone-400 p-1.5 rounded-full transition-all cursor-pointer disabled:opacity-20"
+                  title="Delete task"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </motion.div>
           ))}
+
+          <button
+            type="button"
+            onClick={addTask}
+            disabled={tasks.length >= 30}
+            className="w-full py-2.5 border border-dashed border-stone-300/90 hover:border-stone-400 bg-gradient-to-b from-white to-stone-50/70 hover:from-stone-50 hover:to-stone-100/80 text-xs font-bold text-stone-600 hover:text-stone-800 transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.9)] hover:shadow-xs mt-3 disabled:opacity-40"
+          >
+            + Add Custom Task
+          </button>
           </div>
 
           <AnimatePresence>
@@ -915,7 +964,7 @@ function ManualPlanModal({
           </AnimatePresence>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4 shrink-0">
+        <div className="flex items-center justify-end gap-3 border-t border-stone-200 pt-3 shrink-0">
           <button
             type="button"
             onClick={addTask}

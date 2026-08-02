@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type AiProviderName = "openrouter" | "nvidia" | "cerebras";
 
@@ -90,11 +90,6 @@ export function ModelSelector({
     return () => window.clearTimeout(timer);
   }, [initialize]);
 
-  const availableModels = useMemo(
-    () => [...new Set([value.model, ...models].filter(Boolean))],
-    [models, value.model]
-  );
-
   const changeProvider = (provider: AiProviderName) => {
     const providerConfiguration = providers.find((item) => item.provider === provider);
     const model = providerConfiguration?.model || fallbackModels[provider];
@@ -120,18 +115,6 @@ export function ModelSelector({
           <option key={item.provider} value={item.provider}>
             {item.provider === "openrouter" ? "OpenRouter" : item.provider === "cerebras" ? "Cerebras" : "NVIDIA"}
           </option>
-        ))}
-      </select>
-      <select
-        aria-label="AI model"
-        value={value.model}
-        onChange={(event) => onChange({ ...value, model: event.target.value })}
-        disabled={loading}
-        title={value.model}
-        className="focus-ring h-8 min-w-0 max-w-[220px] rounded-md border border-[var(--border)] bg-white px-2 text-[10px] font-medium text-[var(--text-secondary)] disabled:opacity-50"
-      >
-        {availableModels.map((model) => (
-          <option key={model} value={model}>{model}</option>
         ))}
       </select>
     </div>

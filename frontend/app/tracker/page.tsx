@@ -534,31 +534,124 @@ export default function TrackerPage() {
     return Number(thisWeekLogs.reduce((sum, l) => sum + l.hoursStudied, 0).toFixed(2));
   }, [sessionLogs]);
 
-  // Daily Chart Data Generator (Past N Days or All Time)
+  // Daily / Monthly / Yearly Chart Data Generator (Past N Days or All Time)
   const dailyChartData = useMemo<DailyLogEntry[]>(() => {
+    // 1. Handle "all" Time Range (Month-wise if <2 yrs, Year-wise if >=2 yrs)
+    if (timeRange === "all") {
+      let minDate = new Date();
+      let maxDate = new Date();
+
+      if (sessionLogs.length > 0) {
+        const timestamps = sessionLogs
+          .map((l) => new Date(`${formatDateKey(l.logDate)}T00:00:00`).getTime())
+          .filter((t) => !isNaN(t));
+        if (timestamps.length > 0) {
+          minDate = new Date(Math.min(...timestamps));
+          maxDate = new Date(Math.max(...timestamps, new Date().getTime()));
+        }
+      } else {
+        minDate = new Date();
+        minDate.setMonth(minDate.getMonth() - 5);
+      }
+
+      const diffMs = maxDate.getTime() - minDate.getTime();
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      const isMoreThanTwoYears = diffDays >= 730;
+
+      const logsByDate = new Map<string, { hours: number; questions: number }>();
+      for (const log of sessionLogs) {
+        const cleanDate = formatDateKey(log.logDate);
+        const existing = logsByDate.get(cleanDate) || { hours: 0, questions: 0 };
+        logsByDate.set(cleanDate, {
+          hours: existing.hours + log.hoursStudied,
+          questions: existing.questions + log.questionsSolved,
+        });
+      }
+
+      const list: DailyLogEntry[] = [];
+
+      if (!isMoreThanTwoYears) {
+        // Month-wise aggregation (Span < 2 years)
+        const start = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+        const end = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+
+        const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+        if (monthsDiff < 5) {
+          start.setMonth(end.getMonth() - 5);
+        }
+
+        const curr = new Date(start);
+        const today = new Date();
+
+        while (curr <= end) {
+          const year = curr.getFullYear();
+          const month = curr.getMonth();
+          const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+          const monthLabel = curr.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+          const isTodayMonth = today.getFullYear() === year && today.getMonth() === month;
+
+          let monthHours = 0;
+          let monthQuestions = 0;
+
+          for (const [dateStr, data] of logsByDate.entries()) {
+            if (dateStr.startsWith(monthKey)) {
+              monthHours += data.hours;
+              monthQuestions += data.questions;
+            }
+          }
+
+          list.push({
+            dateStr: monthKey,
+            dayLabel: monthLabel,
+            hours: Number(monthHours.toFixed(2)),
+            questions: monthQuestions,
+            isToday: isTodayMonth,
+          });
+
+          curr.setMonth(curr.getMonth() + 1);
+        }
+      } else {
+        // Year-wise aggregation (Span >= 2 years)
+        const startYear = minDate.getFullYear();
+        const endYear = maxDate.getFullYear();
+        const todayYear = new Date().getFullYear();
+
+        for (let y = startYear; y <= endYear; y++) {
+          const yearKey = `${y}`;
+          const yearLabel = `${y}`;
+          const isTodayYear = todayYear === y;
+
+          let yearHours = 0;
+          let yearQuestions = 0;
+
+          for (const [dateStr, data] of logsByDate.entries()) {
+            if (dateStr.startsWith(yearKey)) {
+              yearHours += data.hours;
+              yearQuestions += data.questions;
+            }
+          }
+
+          list.push({
+            dateStr: yearKey,
+            dayLabel: yearLabel,
+            hours: Number(yearHours.toFixed(2)),
+            questions: yearQuestions,
+            isToday: isTodayYear,
+          });
+        }
+      }
+
+      return list;
+    }
+
+    // 2. Handle 7d, 14d, 30d Time Ranges (Day-wise)
     let daysCount = 7;
     if (timeRange === "14d") daysCount = 14;
     else if (timeRange === "30d") daysCount = 30;
-    else if (timeRange === "all") {
-      if (sessionLogs.length > 0) {
-        const dates = sessionLogs.map((l) => new Date(`${l.logDate}T00:00:00`).getTime()).filter((t) => !isNaN(t));
-        if (dates.length > 0) {
-          const minTime = Math.min(...dates);
-          const nowTime = new Date().getTime();
-          const diffDays = Math.ceil((nowTime - minTime) / (1000 * 60 * 60 * 24)) + 1;
-          daysCount = Math.max(diffDays, 30);
-        } else {
-          daysCount = 30;
-        }
-      } else {
-        daysCount = 30;
-      }
-    }
 
     const list: DailyLogEntry[] = [];
     const today = new Date();
-    
-    // Group session logs by normalized date
+
     const logsByDate = new Map<string, { hours: number; questions: number }>();
     for (const log of sessionLogs) {
       const cleanDate = formatDateKey(log.logDate);
@@ -624,15 +717,64 @@ export default function TrackerPage() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [sessionLogs]);
 
-
-
-
-
-
   const maxChartHours = useMemo(() => {
-    const maxVal = Math.max(...dailyChartData.map((d) => d.hours), dailyGoal);
-    return Math.ceil(maxVal);
-  }, [dailyChartData, dailyGoal]);
+    const maxVal = Math.max(...dailyChartData.map((d) => d.hours), 0);
+    if (timeRange === "all") {
+      return Math.max(Math.ceil(maxVal), 1);
+    }
+    return Math.max(Math.ceil(Math.max(maxVal, dailyGoal)), 1);
+  }, [dailyChartData, dailyGoal, timeRange]);
+
+  const lineGraphPaths = useMemo(() => {
+    if (timeRange !== "all" || dailyChartData.length === 0) {
+      return { linePath: "", areaPath: "", points: [] };
+    }
+
+    const n = dailyChartData.length;
+    const maxVal = maxChartHours;
+
+    const points = dailyChartData.map((d, i) => {
+      const x = ((i + 0.5) / n) * 1000;
+      const yPct = maxVal > 0 ? d.hours / maxVal : 0;
+      const y = 180 - yPct * 150;
+      return { x, y, yPct };
+    });
+
+    let linePath = "";
+    let areaPath = "";
+
+    if (points.length === 1) {
+      const p = points[0];
+      linePath = `M 0,${p.y} L 1000,${p.y}`;
+      areaPath = `M 0,195 L 0,${p.y} L 1000,${p.y} L 1000,195 Z`;
+    } else {
+      linePath = `M ${points[0].x},${points[0].y}`;
+      areaPath = `M ${points[0].x},195 L ${points[0].x},${points[0].y}`;
+
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i];
+        const p1 = points[i + 1];
+        const dx = p1.x - p0.x;
+        const cp1x = p0.x + dx * 0.38;
+        const cp1y = p0.y;
+        const cp2x = p0.x + dx * 0.62;
+        const cp2y = p1.y;
+
+        const curve = ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
+        linePath += curve;
+        areaPath += curve;
+      }
+
+      areaPath += ` L ${points[points.length - 1].x},195 Z`;
+    }
+
+    return { linePath, areaPath, points };
+  }, [dailyChartData, maxChartHours, timeRange]);
+
+
+
+
+
 
   const handleSaveDailyGoal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1055,80 +1197,187 @@ export default function TrackerPage() {
             </div>
           </div>
 
-          {/* Bar Chart Container with hidden scrollbars */}
-          <div className="relative w-full pt-12 pb-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {/* Y-Axis Plot Area */}
-            <div
-              className="relative h-48 min-w-full"
-              style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
-            >
-              {/* Target Line */}
+          {/* Chart Container (Line Graph for 'all', Bar Chart for 7d/14d/30d) */}
+          {timeRange === "all" ? (
+            <div className="relative w-full pt-12 pb-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div
-                className="absolute left-0 right-0 z-0 border-b border-dashed border-[var(--accent)]/40 pointer-events-none"
-                style={{ bottom: `${Math.min((dailyGoal / maxChartHours) * 100, 100)}%` }}
-              />
+                className="relative h-48 min-w-full"
+                style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
+              >
+                {/* SVG Line Graph with Simple Rose-Gold Accent */}
+                <svg
+                  viewBox="0 0 1000 200"
+                  preserveAspectRatio="none"
+                  className="absolute inset-0 h-full w-full overflow-visible pointer-events-none"
+                >
+                  <defs>
+                    <linearGradient id="allTimeLineStroke" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#fb7185" />
+                      <stop offset="100%" stopColor="#f43f5e" />
+                    </linearGradient>
+                    <linearGradient id="allTimeAreaFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.18" />
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
 
-              {/* Bars flex row */}
-              <div className="relative z-10 flex h-full items-end justify-between gap-1 sm:gap-1.5 w-full">
-                {dailyChartData.map((d, idx) => {
-                  const heightPercent = Math.max((d.hours / maxChartHours) * 100, 3);
-                  const isLast = idx >= dailyChartData.length - 2;
-                  const isFirst = idx <= 1;
-                  const tooltipPos = isLast ? "right-0" : isFirst ? "left-0" : "left-1/2 -translate-x-1/2";
-                  const isHigh = heightPercent > 70;
-                  const tooltipY = isHigh ? "top-2" : "-top-11";
+                  {/* Horizontal Grid Guide Lines */}
+                  <line x1="0" y1="45" x2="1000" y2="45" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
+                  <line x1="0" y1="105" x2="1000" y2="105" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
+                  <line x1="0" y1="165" x2="1000" y2="165" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
 
-                  return (
-                    <div key={d.dateStr || idx} className="group relative flex flex-1 flex-col items-center h-full justify-end">
-                      {/* Hover Tooltip - Positioned safely inside container bounds */}
-                      <div className={`absolute ${tooltipY} z-40 hidden rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-center text-[10px] font-bold text-[var(--text-primary)] shadow-md group-hover:block whitespace-nowrap pointer-events-none ${tooltipPos}`}>
-                        <div>{d.dayLabel}</div>
-                        <div className="text-[var(--accent)]">{d.hours} hrs studied</div>
-                        {d.questions > 0 && <div className="text-[var(--text-secondary)]">{d.questions} Qs solved</div>}
+                  {/* Soft Gradient Area Fill */}
+                  <motion.path
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5 }}
+                    d={lineGraphPaths.areaPath}
+                    fill="url(#allTimeAreaFill)"
+                  />
+
+                  {/* Minimal Curved Line Path */}
+                  <motion.path
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 1 }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    d={lineGraphPaths.linePath}
+                    fill="none"
+                    stroke="url(#allTimeLineStroke)"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+
+                  {/* Clean Data Nodes */}
+                  {lineGraphPaths.points.map((pt, idx) => (
+                    <g key={idx}>
+                      <circle cx={pt.x} cy={pt.y} r="5" fill="none" stroke="#f43f5e" strokeOpacity="0.3" strokeWidth="1.5" />
+                      <circle cx={pt.x} cy={pt.y} r="3" className="fill-[#f43f5e] stroke-[var(--bg-card)] stroke-[2]" />
+                    </g>
+                  ))}
+                </svg>
+
+                {/* Interactive Columns & Hover Overlay */}
+                <div className="relative z-10 flex h-full items-end justify-between w-full">
+                  {dailyChartData.map((d, idx) => {
+                    const pt = lineGraphPaths.points[idx] || { x: 500, y: 100 };
+                    const isLast = idx >= dailyChartData.length - 2;
+                    const isFirst = idx <= 1;
+                    const tooltipPos = isLast ? "right-0" : isFirst ? "left-0" : "left-1/2 -translate-x-1/2";
+                    const isHigh = pt.y < 80;
+                    const tooltipY = isHigh ? "top-2" : "-top-11";
+
+                    return (
+                      <div key={d.dateStr || idx} className="group relative flex flex-1 flex-col items-center h-full justify-end cursor-pointer">
+                        {/* Vertical Hover Guideline */}
+                        <div className="absolute inset-y-0 w-px bg-rose-500/25 hidden group-hover:block pointer-events-none" />
+
+                        {/* Hover Node Dot */}
+                        <div
+                          className="absolute h-3.5 w-3.5 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shadow-md shadow-rose-500/30 hidden group-hover:block pointer-events-none -translate-x-1/2 -translate-y-1/2 z-20 border-2 border-[var(--bg-card)]"
+                          style={{ top: `${(pt.y / 200) * 100}%`, left: "50%" }}
+                        />
+
+                        {/* Sleek Minimal Hover Tooltip */}
+                        <div className={`absolute ${tooltipY} z-40 hidden rounded-xl border border-rose-500/30 bg-[var(--bg-elevated)]/95 backdrop-blur-md px-3 py-1.5 text-center text-[10.5px] font-bold text-[var(--text-primary)] shadow-xl group-hover:block whitespace-nowrap pointer-events-none ${tooltipPos}`}>
+                          <div className="text-[10px] tracking-wide text-[var(--text-secondary)] uppercase font-semibold">{d.dayLabel}</div>
+                          <div className="text-rose-400 font-extrabold">{d.hours} hrs studied</div>
+                          {d.questions > 0 && <div className="text-[var(--text-secondary)] text-[10px]">{d.questions} Qs solved</div>}
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-
-                      {/* Bar */}
-                      <motion.div
-                        layout
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: `${heightPercent}%`, opacity: 1 }}
-                        whileHover={{ scaleY: 1.06, scaleX: 1.08, originY: 1 }}
-                        transition={{
-                          height: { type: "spring", stiffness: 220, damping: 19, mass: 0.8 },
-                          opacity: { duration: 0.2 },
-                          scaleY: { type: "spring", stiffness: 400, damping: 25 },
-                        }}
-                        className={`w-full max-w-[28px] rounded-t-md cursor-pointer transition-colors ${
-                          d.isToday
-                            ? "bg-[var(--accent)] shadow-sm shadow-[var(--accent)]/30"
-                            : d.hours >= 4
-                            ? "bg-[var(--accent)]"
-                            : d.hours > 0
-                            ? "bg-[var(--accent)]/70"
-                            : "bg-[var(--track)] opacity-60"
-                        }`}
-                      />
-                    </div>
-                  );
-                })}
+              {/* X-Axis Labels Row */}
+              <div
+                className="flex items-center justify-between min-w-full pt-2.5 mt-1 border-t border-[var(--border)]/60"
+                style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
+              >
+                {dailyChartData.map((d, idx) => (
+                  <div key={d.dateStr || idx} className="flex-1 text-center">
+                    <span className={`text-[10px] font-semibold truncate block ${d.isToday ? "text-[var(--accent)] font-extrabold" : "text-[var(--text-secondary)]"}`}>
+                      {d.dayLabel}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
+          ) : (
+            <div className="relative w-full pt-12 pb-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {/* Y-Axis Plot Area */}
+              <div
+                className="relative h-48 min-w-full"
+                style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
+              >
+                {/* Target Line */}
+                <div
+                  className="absolute left-0 right-0 z-0 border-b border-dashed border-[var(--accent)]/40 pointer-events-none"
+                  style={{ bottom: `${Math.min((dailyGoal / maxChartHours) * 100, 100)}%` }}
+                />
 
-            {/* X-Axis Day Labels Row */}
-            <div
-              className="flex items-center justify-between gap-1 sm:gap-1.5 min-w-full pt-2.5 mt-1 border-t border-[var(--border)]/60"
-              style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
-            >
-              {dailyChartData.map((d, idx) => (
-                <div key={d.dateStr || idx} className="flex-1 text-center">
-                  <span className={`text-[10px] font-semibold truncate block ${d.isToday ? "text-[var(--accent)] font-extrabold" : "text-[var(--text-secondary)]"}`}>
-                    {d.dayLabel}
-                  </span>
+                {/* Bars flex row */}
+                <div className="relative z-10 flex h-full items-end justify-between gap-1 sm:gap-1.5 w-full">
+                  {dailyChartData.map((d, idx) => {
+                    const heightPercent = Math.max((d.hours / maxChartHours) * 100, 3);
+                    const isLast = idx >= dailyChartData.length - 2;
+                    const isFirst = idx <= 1;
+                    const tooltipPos = isLast ? "right-0" : isFirst ? "left-0" : "left-1/2 -translate-x-1/2";
+                    const isHigh = heightPercent > 70;
+                    const tooltipY = isHigh ? "top-2" : "-top-11";
+
+                    return (
+                      <div key={d.dateStr || idx} className="group relative flex flex-1 flex-col items-center h-full justify-end">
+                        {/* Hover Tooltip - Positioned safely inside container bounds */}
+                        <div className={`absolute ${tooltipY} z-40 hidden rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-center text-[10px] font-bold text-[var(--text-primary)] shadow-md group-hover:block whitespace-nowrap pointer-events-none ${tooltipPos}`}>
+                          <div>{d.dayLabel}</div>
+                          <div className="text-[var(--accent)]">{d.hours} hrs studied</div>
+                          {d.questions > 0 && <div className="text-[var(--text-secondary)]">{d.questions} Qs solved</div>}
+                        </div>
+
+                        {/* Bar */}
+                        <motion.div
+                          layout
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: `${heightPercent}%`, opacity: 1 }}
+                          whileHover={{ scaleY: 1.06, scaleX: 1.08, originY: 1 }}
+                          transition={{
+                            height: { type: "spring", stiffness: 220, damping: 19, mass: 0.8 },
+                            opacity: { duration: 0.2 },
+                            scaleY: { type: "spring", stiffness: 400, damping: 25 },
+                          }}
+                          className={`w-full max-w-[28px] rounded-t-md cursor-pointer transition-colors ${
+                            d.isToday
+                              ? "bg-[var(--accent)] shadow-sm shadow-[var(--accent)]/30"
+                              : d.hours >= 4
+                              ? "bg-[var(--accent)]"
+                              : d.hours > 0
+                              ? "bg-[var(--accent)]/70"
+                              : "bg-[var(--track)] opacity-60"
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+
+              {/* X-Axis Day Labels Row */}
+              <div
+                className="flex items-center justify-between gap-1 sm:gap-1.5 min-w-full pt-2.5 mt-1 border-t border-[var(--border)]/60"
+                style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
+              >
+                {dailyChartData.map((d, idx) => (
+                  <div key={d.dateStr || idx} className="flex-1 text-center">
+                    <span className={`text-[10px] font-semibold truncate block ${d.isToday ? "text-[var(--accent)] font-extrabold" : "text-[var(--text-secondary)]"}`}>
+                      {d.dayLabel}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </PageSection>
@@ -1582,7 +1831,7 @@ export default function TrackerPage() {
                                 initial={{ opacity: 0, y: -6, scale: 0.96 }}
                                 animate={{ opacity: 1, y: 2, scale: 1 }}
                                 exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                                transition={{ duration: 0.15, ease: "easeOut" }}
                                 className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 w-36 rounded-2xl border border-amber-500/30 bg-[var(--bg-card)]/95 p-1.5 shadow-2xl backdrop-blur-2xl space-y-1"
                               >
                                 {[25, 45, 60].map((m) => (
@@ -1590,7 +1839,7 @@ export default function TrackerPage() {
                                     key={m}
                                     type="button"
                                     whileTap={{ scale: 0.96 }}
-                                    transition={{ duration: 0.15 }}
+                                    transition={{ duration: 0.1 }}
                                     onClick={() => {
                                       setTimerType("pomodoro");
                                       setPomodoroMinutes(m);
@@ -1599,7 +1848,7 @@ export default function TrackerPage() {
                                       } else {
                                         setPomodoroTargetTimeMs(null);
                                       }
-                                      setTimeout(() => setIsPomodoroDropdownOpen(false), 380);
+                                      setTimeout(() => setIsPomodoroDropdownOpen(false), 80);
                                     }}
                                     className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
                                       timerType === "pomodoro" && pomodoroMinutes === m

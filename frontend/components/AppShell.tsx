@@ -119,13 +119,16 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
           <aside className="surface hidden w-[240px] lg:w-[250px] shrink-0 flex-col justify-between p-4 lg:flex sticky top-0 h-screen rounded-none border-t-0 border-b-0 border-l-0 border-r border-[var(--border)] z-30">
             <div>
               <div className="flex items-center justify-between gap-1">
-                <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="brand-mark brand-fixed focus-ring interactive-surface flex items-center gap-2.5 rounded-lg p-2.5 flex-1 min-w-0">
-                  <div className="h-8 w-8 rounded-md bg-stone-900 dark:bg-stone-950 flex items-center justify-center text-white shadow-sm shrink-0">
-                    <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 21V9a8 8 0 0116 0v12M2 21h20" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#1a1917" />
-                      <circle cx="12.5" cy="12.5" r="1.1" fill="#dfb15b" stroke="none" />
+                <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="brand-mark brand-fixed focus-ring flex items-center gap-2.5 rounded-lg p-2 flex-1 min-w-0 group hover:bg-[var(--bg-card)] transition-colors">
+                  <div className="h-8 w-8 flex items-center justify-center shrink-0">
+                    <svg className="h-[28px] w-[28px] text-stone-800 dark:text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M5 21V9a7 7 0 0114 0v12Z" fill="#FAF8F4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V9a7 7 0 0114 0v12M3 21h18" stroke="#292524" />
+                      <g className="transition-transform duration-500 ease-out origin-[6.5px_12px] group-hover:[transform:rotateY(-45deg)]">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 21V9.5a5.5 5.5 0 0111 0V21Z" fill="#EFECE6" stroke="#44403C" />
+                        <path d="M8.5 10a3.5 3.5 0 017 0v3h-7v-3zM8.5 14.5h7V19.5h-7v-5z" fill="#E7E4DC" stroke="#A8A29E" strokeWidth="0.8" />
+                        <circle cx="15.8" cy="14" r="0.75" fill="#78716C" stroke="none" />
+                      </g>
                     </svg>
                   </div>
                   <span className="text-[16px] font-black tracking-[0.22em] text-[#000000] dark:text-[#ffffff] uppercase font-sans">DOOR</span>
@@ -241,13 +244,16 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
             <div className="surface mb-3 flex flex-col gap-3 p-3 lg:hidden">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="brand-mark brand-fixed focus-ring flex items-center gap-2.5 rounded-lg">
-                    <div className="h-8 w-8 rounded-md bg-stone-900 dark:bg-stone-950 flex items-center justify-center text-white shadow-sm shrink-0">
-                      <svg className="h-5 w-5 text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                        <path d="M4 21V9a8 8 0 0116 0v12Z" fill="#ffffff" stroke="none" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 21V9a8 8 0 0116 0v12M2 21h20" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 21V9c0-1.8 1-3.2 2.5-4l7 2v12.5L6 21z" fill="#1a1917" />
-                        <circle cx="12.5" cy="12.5" r="1.1" fill="#dfb15b" stroke="none" />
+                  <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="brand-mark brand-fixed focus-ring flex items-center gap-2.5 rounded-lg group">
+                    <div className="h-8 w-8 flex items-center justify-center shrink-0">
+                      <svg className="h-[28px] w-[28px] text-stone-800 dark:text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M5 21V9a7 7 0 0114 0v12Z" fill="#FAF8F4" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V9a7 7 0 0114 0v12M3 21h18" stroke="#292524" />
+                        <g className="transition-transform duration-500 ease-out origin-[6.5px_12px] group-hover:[transform:rotateY(-45deg)]">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 21V9.5a5.5 5.5 0 0111 0V21Z" fill="#EFECE6" stroke="#44403C" />
+                          <path d="M8.5 10a3.5 3.5 0 017 0v3h-7v-3zM8.5 14.5h7V19.5h-7v-5z" fill="#E7E4DC" stroke="#A8A29E" strokeWidth="0.8" />
+                          <circle cx="15.8" cy="14" r="0.75" fill="#78716C" stroke="none" />
+                        </g>
                       </svg>
                     </div>
                     <span>

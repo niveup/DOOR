@@ -289,6 +289,45 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
     }
   }
 
+  // 7. GET /api/routine/today
+  if (safePath === "api/routine/today" && method === "GET") {
+    const dateQuery = reqUrl.searchParams.get("date");
+    const dateStr = dateQuery || getKolkataDateString();
+    const targetDate = new Date(`${dateStr}T00:00:00.000Z`);
+
+    const plan: any = await (prisma.routinePlan as any).findUnique({
+      where: { date: targetDate },
+      include: { Task: true },
+    });
+
+    if (plan) {
+      const formattedPlan = {
+        ...plan,
+        tasks: plan.tasks || plan.Task || [],
+      };
+      return NextResponse.json(formattedPlan, {
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      });
+    }
+
+    return NextResponse.json(null, {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
+
+  // 8. DELETE /api/routine/today
+  if (safePath === "api/routine/today" && method === "DELETE") {
+    const dateQuery = reqUrl.searchParams.get("date");
+    const dateStr = dateQuery || getKolkataDateString();
+    const targetDate = new Date(`${dateStr}T00:00:00.000Z`);
+
+    await prisma.routinePlan.deleteMany({
+      where: { date: targetDate },
+    });
+
+    return NextResponse.json({ success: true, message: "Plan has been cleared." });
+  }
+
   return null;
 }
 
