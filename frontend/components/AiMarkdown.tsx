@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -12,11 +12,22 @@ function preprocessMarkdown(content: string): string {
 
   let clean = content.replace(/\\(\$\$)/g, " $1");
   clean = clean.replace(/\\(\$)/g, " $1");
+  clean = clean
+    .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_, equation: string) => `$$${equation.trim()}$$`)
+    .replace(/\\\(([^\n]+?)\\\)/g, (_, equation: string) => `$${equation.trim()}$`);
 
   return clean
     .split("\n")
     .map((line) => {
       const trimmed = line.trim();
+
+      // Repair an AI-generated display equation that starts with `$$` but
+      // accidentally closes with one `$`; otherwise it renders as plain text.
+      if (trimmed.startsWith("$$") && trimmed.endsWith("$") && !trimmed.endsWith("$$")) {
+        const trailingWhitespace = line.match(/\s*$/)?.[0] || "";
+        return `${line.slice(0, line.length - trailingWhitespace.length)}$${trailingWhitespace}`;
+      }
+
       if (trimmed.startsWith("\\") && !trimmed.includes("$")) {
         return "$$" + trimmed + "$$";
       }
@@ -52,16 +63,11 @@ function parseYamlOrJson(text: string) {
 // --- PREMIUM COMPONENTS ---
 
 // 1. Premium Comparison Table
-function PremiumTable({ children }: any) {
+function PremiumTable({ children }: React.ComponentPropsWithoutRef<"table">) {
   return (
-    <div className="my-6 overflow-x-auto rounded-xl border border-[var(--border)]/60 bg-white/50 shadow-sm">
-      <table className="w-full border-collapse text-left text-xs leading-5">
-        <thead className="bg-[var(--bg-elevated)]/60 border-b border-[var(--border)]/60">
-          {children[0]}
-        </thead>
-        <tbody className="divide-y divide-[var(--border)]/40">
-          {children.slice(1)}
-        </tbody>
+    <div className="my-6 overflow-x-auto rounded-xl border border-[var(--border)]/60 bg-white/50 shadow-sm [&_thead]:border-b [&_thead]:border-[var(--border)]/60 [&_thead]:bg-[var(--bg-elevated)]/60 [&_tbody]:divide-y [&_tbody]:divide-[var(--border)]/40 [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_td]:px-4 [&_td]:py-3 [&_td]:align-top">
+      <table className="w-full border-collapse text-left text-sm leading-6">
+        {children}
       </table>
     </div>
   );
@@ -86,7 +92,7 @@ function PremiumBlockquote({ children }: any) {
     const cleanChildren = removePrefix(children, /\[!warning\]|warning:/i);
     return (
       <div className="my-5 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-soft)] p-4 text-xs font-semibold text-[var(--danger)] leading-6 flex gap-3 items-start">
-        <span className="text-base select-none">⚠️</span>
+        <span className="text-base select-none">âš ï¸</span>
         <div className="flex-1">{cleanChildren}</div>
       </div>
     );
@@ -96,7 +102,7 @@ function PremiumBlockquote({ children }: any) {
     const cleanChildren = removePrefix(children, /\[!tip\]|tip:|idea:/i);
     return (
       <div className="my-5 rounded-xl border border-emerald-500/20 bg-emerald-50/50 p-4 text-xs font-semibold text-emerald-700 leading-6 flex gap-3 items-start">
-        <span className="text-base select-none">💡</span>
+        <span className="text-base select-none">ðŸ’¡</span>
         <div className="flex-1">{cleanChildren}</div>
       </div>
     );
@@ -106,7 +112,7 @@ function PremiumBlockquote({ children }: any) {
     const cleanChildren = removePrefix(children, /\[!note\]|note:|info:/i);
     return (
       <div className="my-5 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] p-4 text-xs font-semibold text-[var(--accent)] leading-6 flex gap-3 items-start">
-        <span className="text-base select-none">ℹ️</span>
+        <span className="text-base select-none">â„¹ï¸</span>
         <div className="flex-1">{cleanChildren}</div>
       </div>
     );
@@ -312,8 +318,8 @@ function QuizComponent({ code }: { code: string }) {
                     className={`explainer-quiz-btn text-left text-xs p-2.5 rounded-lg border transition duration-150 cursor-pointer flex justify-between items-center ${btnStyle}`}
                   >
                     <span>{opt}</span>
-                    {isAnswered && isCorrect && <span className="text-emerald-600 font-bold">✓</span>}
-                    {isAnswered && isSelected && !isCorrect && <span className="text-red-600 font-bold">✗</span>}
+                    {isAnswered && isCorrect && <span className="text-emerald-600 font-bold">âœ“</span>}
+                    {isAnswered && isSelected && !isCorrect && <span className="text-red-600 font-bold">âœ—</span>}
                   </button>
                 );
               })}

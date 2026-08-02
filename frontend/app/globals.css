@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
  --bg-page: #f6f7f4;
@@ -468,6 +468,29 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); letter-spacing: 0; }
 .ai-markdown strong { color: var(--text-primary); }
 .ai-markdown code { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 5px; color: var(--accent); font-size: 0.76rem; padding: 0.08rem 0.28rem; }
 .ai-markdown .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.35rem 0; }
+
+/* Spacious answer treatment for the AI Coach only. */
+.coach-answer,
+.coach-answer .ai-markdown {
+  font-size: 1.08rem;
+  line-height: 1.86;
+  text-wrap: pretty;
+}
+.coach-answer p { margin: 0.8rem 0; }
+.coach-answer h1, .coach-answer h2, .coach-answer h3 {
+  margin-top: 1.7rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.coach-answer h1 { font-size: 1.45rem; }
+.coach-answer h2 { font-size: 1.22rem; }
+.coach-answer h3 { font-size: 1.06rem; }
+.coach-answer ul, .coach-answer ol { margin: 0.85rem 0; padding-left: 1.4rem; }
+.coach-answer li { margin: 0.42rem 0; }
+.coach-answer table { font-size: 0.875rem; }
+.coach-answer .katex { font-size: 1.15em; }
+.coach-answer .katex-display { margin: 1.25rem 0; padding: 0.65rem 0; }
 [data-sonner-toast] { border-radius: 8px !important; transition: transform 250ms var(--ease-out), opacity 250ms var(--ease-out), height 250ms var(--ease-out) !important; }
 [data-sonner-toast][data-state="closed"] { transition: transform 150ms var(--ease-standard), opacity 150ms var(--ease-standard), height 150ms var(--ease-standard) !important; }
 

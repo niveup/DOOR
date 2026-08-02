@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+﻿import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -1111,6 +1111,7 @@ app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
       reply?: unknown;
       suggestions?: unknown;
       action?: unknown;
+      layout?: unknown;
     };
 
     const suggestions = Array.isArray(parsed.suggestions)
@@ -1119,11 +1120,26 @@ app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
 
     const reply = String(parsed.reply || "I am listening. How can I help you today?").trim().slice(0, 2000);
     const action = parsed.action && typeof parsed.action === "object" ? parsed.action : null;
+    const validLayouts = new Set([
+      "quick_answer",
+      "concept_explainer",
+      "problem_solving",
+      "comparison",
+      "study_plan",
+      "revision",
+      "career_guidance",
+      "app_assistance",
+      "general",
+    ]);
+    const layout = typeof parsed.layout === "string" && validLayouts.has(parsed.layout)
+      ? parsed.layout
+      : "general";
 
     res.json({
       reply,
       suggestions,
-      action
+      action,
+      layout,
     });
   } catch (error: any) {
     res.status(502).json({ error: error.message });
@@ -1530,7 +1546,7 @@ function aggressiveSanitize(jsonStr: string): string {
  *  4. Aggressive sanitize (fix newlines, balance braces) + jsonrepair
  *  5. Extract a minimal valid object from the raw text
  *
- * Returns { data, error } — data is null only if ALL strategies fail.
+ * Returns { data, error } â€” data is null only if ALL strategies fail.
  */
 function robustJsonExtract(rawAiOutput: string): { data: any; error: string | null } {
   if (!rawAiOutput || rawAiOutput.trim().length === 0) {
@@ -1550,34 +1566,34 @@ function robustJsonExtract(rawAiOutput: string): { data: any; error: string | nu
 
   const extracted = cleaned.substring(start, end + 1);
 
-  // ── Strategy 1: Direct parse with LaTeX escape cleaning ──
+  // â”€â”€ Strategy 1: Direct parse with LaTeX escape cleaning â”€â”€
   try {
     const s1 = cleanLatexEscapes(extracted);
     return { data: JSON.parse(s1), error: null };
   } catch { /* continue */ }
 
-  // ── Strategy 2: jsonrepair on LaTeX-cleaned string ──
+  // â”€â”€ Strategy 2: jsonrepair on LaTeX-cleaned string â”€â”€
   try {
     const s2 = cleanLatexEscapes(extracted);
     const repaired = jsonrepair(s2);
     return { data: JSON.parse(repaired), error: null };
   } catch { /* continue */ }
 
-  // ── Strategy 3: Aggressive sanitize (fix newlines, balance braces) + jsonrepair ──
+  // â”€â”€ Strategy 3: Aggressive sanitize (fix newlines, balance braces) + jsonrepair â”€â”€
   try {
     const s3 = aggressiveSanitize(cleanLatexEscapes(extracted));
     const repaired = jsonrepair(s3);
     return { data: JSON.parse(repaired), error: null };
   } catch { /* continue */ }
 
-  // ── Strategy 4: Raw jsonrepair on original extracted text (no LaTeX cleaning) ──
+  // â”€â”€ Strategy 4: Raw jsonrepair on original extracted text (no LaTeX cleaning) â”€â”€
   try {
     const s4 = aggressiveSanitize(extracted);
     const repaired = jsonrepair(s4);
     return { data: JSON.parse(repaired), error: null };
   } catch { /* continue */ }
 
-  // ── Strategy 5: Build minimal fallback object from whatever we can extract ──
+  // â”€â”€ Strategy 5: Build minimal fallback object from whatever we can extract â”€â”€
   try {
     const topicMatch = extracted.match(/"(?:topic|concept)"\s*:\s*"([^"]+)"/);
     const overviewMatch = extracted.match(/"(?:overview|summary)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
@@ -1731,13 +1747,13 @@ app.post("/api/explainer/query", async (req: Request, res: Response) => {
       errorMessage = err.message;
     }
 
-    // Fallback attempt (stricter instructions) — only if first attempt completely failed
+    // Fallback attempt (stricter instructions) â€” only if first attempt completely failed
     if (!parseSuccessful) {
       console.log("[AI Fallback] First attempt failed JSON parsing. Retrying with stricter instructions.");
       success = true;
       errorMessage = null;
       try {
-        const fallbackPrompt = finalSystemPrompt + "\n\nCRITICAL WARNING: Your previous response was invalid JSON. You must return ONLY the raw minified JSON object matching the requested schema, starting with { and ending with }. No conversation, no markdown codeblocks, and no wrapping in ```json. Do not use literal newlines inside string values — use \\n instead.";
+        const fallbackPrompt = finalSystemPrompt + "\n\nCRITICAL WARNING: Your previous response was invalid JSON. You must return ONLY the raw minified JSON object matching the requested schema, starting with { and ending with }. No conversation, no markdown codeblocks, and no wrapping in ```json. Do not use literal newlines inside string values â€” use \\n instead.";
         aiResponse = await aiChat(
           "You are a strict JSON responder. You must return ONLY a valid, minified JSON object matching the requested schema. Do not output anything else.",
           fallbackPrompt,
