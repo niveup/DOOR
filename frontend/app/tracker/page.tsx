@@ -280,6 +280,7 @@ export default function TrackerPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [error, setError] = useState("");
+  const [showStudyAreas, setShowStudyAreas] = useState(false);
   
   // Log Session Modal State
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -708,6 +709,11 @@ export default function TrackerPage() {
     return Number((rangeTotal / activeDaysCount).toFixed(1));
   }, [dailyChartData, activeDaysCount]);
 
+  const weeklyGoalHours = dailyGoal * 7;
+  const weeklyGoalProgress = Math.min(100, Math.round((weeklyHours / weeklyGoalHours) * 100));
+  const todayGoalProgress = Math.min(100, Math.round((todayHours / dailyGoal) * 100));
+  const todayRemaining = Math.max(0, Number((dailyGoal - todayHours).toFixed(1)));
+
   const logsByDateGroups = useMemo(() => {
     const map = new Map<string, Array<typeof sessionLogs[0]>>();
     for (const log of sessionLogs) {
@@ -1090,19 +1096,23 @@ export default function TrackerPage() {
 
   return (
     <AppShell
-      eyebrow="Study Hours & Progress"
-      title="Study Tracker"
-      subtitle="Track your study hours, session timelines, and subject effort"
+      eyebrow="YOUR STUDY SYSTEM"
+      title="Focus Tracker"
+      subtitle="A simple home for your sessions, goals, momentum, and weekly progress."
       actions={
         <div className="flex items-center gap-2">
           <MicroInteractionButton
-            onClick={() => setIsAddSubjectModalOpen(true)}
+            onClick={() => {
+              setTempGoalInput(dailyGoal.toString());
+              setIsGoalModalOpen(true);
+            }}
             className="btn-secondary flex items-center gap-1.5 py-1.5 text-xs font-semibold"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              <circle cx="12" cy="12" r="8" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 1.5" />
             </svg>
-            Add Subject
+            Set goal
           </MicroInteractionButton>
           <MicroInteractionButton
             onClick={() => openLogModal()}
@@ -1129,44 +1139,34 @@ export default function TrackerPage() {
         </div>
       ) : null}
 
-      {/* Metric Cards Header */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MetricCard
-          label="Today's Study Time"
-          value={todayHours}
-          suffix="hrs"
-          subtext="Logged today"
-          iconType="time"
-        />
-        <MetricCard
-          label="This Week's Effort"
-          value={weeklyHours}
-          suffix="hrs"
-          subtext="Current week"
-          iconType="effort"
-        />
-        <MetricCard
-          label="Daily Average"
-          value={dailyAvg}
-          suffix="hrs/day"
-          subtext={
-            activeDaysCount > 0
-              ? `${activeDaysCount} active ${activeDaysCount === 1 ? "day" : "days"} (${timeRange === "all" ? "All Time" : "Past " + timeRange})`
-              : timeRange === "all" ? "All Time" : `Past ${timeRange}`
-          }
-          iconType="avg"
-          decimals={1}
-        />
-
-        <MetricCard
-          label="Today's Questions Solved"
-          value={todayQuestions}
-          suffix="problems"
-          subtext="Solved today"
-          iconType="questions"
-        />
-
-      </section>
+      <motion.section
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="mb-5 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--text-primary)] text-[var(--bg-card)] shadow-[var(--shadow-soft)]"
+      >
+        <div className="relative grid gap-5 px-5 py-5 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
+          <div className="absolute -right-12 -top-14 h-44 w-44 rounded-full border border-white/10" />
+          <div className="absolute right-14 top-10 h-20 w-20 rounded-full border border-white/10" />
+          <div className="relative">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/55">Today&apos;s focus</p>
+            <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-1">
+              <p className="text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">{todayHours.toFixed(1)}h</p>
+              <p className="mb-1 text-xs font-medium text-white/60">of {dailyGoal.toFixed(1)}h goal · {todayRemaining > 0 ? `${todayRemaining.toFixed(1)}h to go` : "goal complete"}</p>
+            </div>
+            <div className="mt-4 h-2 max-w-xl overflow-hidden rounded-full bg-white/15"><motion.div initial={{ width: 0 }} animate={{ width: `${todayGoalProgress}%` }} transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }} className="h-full rounded-full bg-[var(--accent)]" /></div>
+          </div>
+          <div className="relative flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => openLogModal()} className="focus-ring inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-xs font-bold text-stone-900 transition hover:bg-stone-100 cursor-pointer"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" /></svg> Log study</button>
+            <button type="button" onClick={() => openLogModal()} className="focus-ring inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/15 cursor-pointer"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" /><circle cx="12" cy="12" r="9" /></svg> Start timer</button>
+          </div>
+        </div>
+        <div className="grid divide-y divide-white/10 border-t border-white/10 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <FocusStat label="Weekly progress" value={`${weeklyGoalProgress}%`} note={`${weeklyHours.toFixed(1)}h of ${weeklyGoalHours.toFixed(1)}h`} />
+          <FocusStat label="Active days" value={`${activeDaysCount}`} note={`in the selected ${timeRange === "all" ? "history" : timeRange}`} />
+          <FocusStat label="Questions today" value={`${todayQuestions}`} note={todayQuestions ? "Good practice momentum" : "Add when you solve"} />
+        </div>
+      </motion.section>
 
       {/* Daily Study Graph Section */}
       <PageSection
@@ -1414,39 +1414,35 @@ export default function TrackerPage() {
         </div>
       </PageSection>
 
-      {/* Subject Effort Breakdown Section */}
+      {/* Optional study-area organisation stays out of the primary daily flow. */}
       <PageSection
-        title="Subject Effort Breakdown"
+        title="Study areas (optional)"
         titleClassName="text-lg font-semibold tracking-tight text-[var(--text-primary)]"
         className="mt-6"
         headerClassName="mb-4"
         action={
-          <div className="relative flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] p-1 z-0">
-            {filters.map((f) => {
-              const isSelected = filter === f.id;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setFilter(f.id)}
-                  className={`focus-ring relative z-10 rounded-full px-3.5 py-1 text-xs font-bold transition-colors duration-200 ${
-                    isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="activeFilterTab"
-                      className="absolute inset-0 rounded-full bg-[var(--bg-card)] border border-[var(--border)] shadow-xs -z-10"
-                      transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }}
-                    />
-                  )}
-                  {f.label}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-2">
+            {showStudyAreas ? (
+              <>
+                <div className="relative hidden items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] p-1 md:flex">
+                  {filters.map((f) => {
+                    const isSelected = filter === f.id;
+                    return <button key={f.id} onClick={() => setFilter(f.id)} className={`focus-ring relative z-10 rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors ${isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{isSelected && <motion.div layoutId="activeFilterTab" className="absolute inset-0 rounded-full border border-[var(--border)] bg-[var(--bg-card)] shadow-xs -z-10" transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }} />}{f.label.replace(" Subjects", "")}</button>;
+                  })}
+                </div>
+                <button type="button" onClick={() => setIsAddSubjectModalOpen(true)} className="focus-ring hidden rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] sm:inline-flex cursor-pointer">Add area</button>
+              </>
+            ) : null}
+            <button type="button" onClick={() => setShowStudyAreas((current) => !current)} className="focus-ring rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] cursor-pointer">{showStudyAreas ? "Hide" : "Organise areas"}</button>
           </div>
         }
       >
-        {loading && !data ? (
+        {!showStudyAreas ? (
+          <div className="surface flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center">
+            <div><p className="text-sm font-semibold text-[var(--text-primary)]">You don&apos;t need to manage subjects to use this tracker.</p><p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--text-secondary)]">Use the timer, log sessions, set your daily goal, and review your week. Study areas are only optional labels for students who want separate course reports.</p></div>
+            <button type="button" onClick={() => setShowStudyAreas(true)} className="focus-ring shrink-0 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--accent)] hover:border-[var(--accent)]/40 cursor-pointer">Show areas</button>
+          </div>
+        ) : loading && !data ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="surface h-36 animate-pulse bg-[var(--track)]" />
@@ -2964,6 +2960,16 @@ function MetricCard({
         </p>
         <p className="mt-1 text-[10px] text-[var(--text-secondary)]">{subtext}</p>
       </div>
+    </div>
+  );
+}
+
+function FocusStat({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="px-5 py-3.5 sm:px-6">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-white/45">{label}</p>
+      <p className="mt-1 text-base font-semibold tracking-tight text-white">{value}</p>
+      <p className="mt-0.5 text-[10px] font-medium text-white/55">{note}</p>
     </div>
   );
 }
