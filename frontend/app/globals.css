@@ -51,9 +51,9 @@
 }
 
 :root[data-theme="dark"] {
-  --bg-page: #1a1815;
+  --bg-page: #14120f;
   --bg-card: #221f1a;
-  --bg-elevated: #2a2620;
+  --bg-elevated: #2b2721;
   --text-primary: #f3f0ea;
   --text-secondary: #aba69c;
   --text-faint: #756f63;
@@ -68,9 +68,9 @@
   --sun-soft: #3a2a12;
   --lavender: #a98fe8;
   --lavender-soft: #2a2140;
-  --success: #4fc98a;
-  --success-soft: #163329;
-  --warning: #e0a855;
+  --success: #4fc9a9;
+  --success-soft: #163229;
+  --warning: #e3a855;
   --warning-soft: #3a2a12;
   --danger: #e8829b;
   --danger-soft: #3a1f26;
@@ -86,8 +86,8 @@
   --error-shadow: rgba(232, 130, 155, 0.16);
   --pill-blue-border: rgba(223, 177, 91, 0.25);
   --pill-teal-border: rgba(75, 195, 204, 0.25);
-  --pill-green-border: rgba(79, 201, 138, 0.25);
-  --pill-amber-border: rgba(224, 168, 85, 0.25);
+  --pill-green-border: rgba(79, 201, 169, 0.25);
+  --pill-amber-border: rgba(227, 168, 85, 0.25);
   --pill-rose-border: rgba(232, 130, 155, 0.25);
   --code-bg: rgba(223, 177, 91, 0.12);
   --code-border: rgba(223, 177, 91, 0.22);
