@@ -192,7 +192,42 @@ export default function FinancePage() {
   const visibleExpenses = useMemo(() => [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, showAll ? undefined : 5), [expenses, showAll]);
   const upcomingBills = useMemo(() => bills.filter((bill) => !bill.paid).sort((a, b) => a.date.localeCompare(b.date)), [bills]);
   const overBudgetCategories = groupedSpending.filter((item) => item.spent > item.budget).length;
-  const dailyBars = [38, 22, 46, 66, 31, 54, 82, 43, 61, 47, 72, 56];
+  const pulseData = useMemo(() => {
+    const baseDays = [
+      { date: "01 Aug", barVal: 38 },
+      { date: "03 Aug", barVal: 22 },
+      { date: "06 Aug", barVal: 46 },
+      { date: "09 Aug", barVal: 66 },
+      { date: "12 Aug", barVal: 31 },
+      { date: "15 Aug", barVal: 54 },
+      { date: "18 Aug", barVal: 82 },
+      { date: "21 Aug", barVal: 43 },
+      { date: "24 Aug", barVal: 61 },
+      { date: "27 Aug", barVal: 47 },
+      { date: "29 Aug", barVal: 72 },
+      { date: "31 Aug", barVal: 56 },
+    ];
+    const maxBar = Math.max(...baseDays.map((d) => d.barVal));
+
+    return baseDays.map((d) => {
+      const dayNum = parseInt(d.date.split(" ")[0]);
+      const matchedSpent = expenses
+        .filter((e) => {
+          const eDay = parseInt(e.date.split("-")[2] || "0");
+          return Math.abs(eDay - dayNum) <= 1;
+        })
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      const actualSpent = matchedSpent > 0 ? matchedSpent : Math.round((d.barVal / 100) * (monthlyAllowance / 4));
+      const heightPercent = Math.min(100, Math.max(8, Math.round((d.barVal / maxBar) * 100)));
+
+      return {
+        dateLabel: d.date,
+        heightPercent,
+        amount: actualSpent,
+      };
+    });
+  }, [expenses, monthlyAllowance]);
 
   const handleAddExpense = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -315,8 +350,35 @@ export default function FinancePage() {
         <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.35, ease: [0.16, 1, 0.3, 1] }} className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(380px,0.95fr)]">
           <div className="surface overflow-hidden p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4"><div><p className="section-label">SPENDING PULSE</p><h2 className="mt-1.5 text-base font-semibold tracking-tight text-[var(--text-primary)]">A calmer month, one day at a time</h2><p className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">See the pattern—not just the total.</p></div><span className="rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[10px] font-semibold text-[var(--text-secondary)]">This month</span></div>
-            <div className="mt-6 grid h-[146px] grid-cols-12 items-end gap-1.5 border-b border-[var(--border)] px-1 sm:gap-2">
-              {dailyBars.map((height, index) => <motion.div key={index} initial={{ height: 0 }} animate={{ height: `${height}%` }} transition={{ delay: 0.1 + index * 0.025, duration: 0.5, ease: [0.16, 1, 0.3, 1] }} className={`min-h-1 rounded-t-sm ${index === 6 ? "bg-[var(--accent)]" : index > 7 ? "bg-[var(--mint)]/55" : "bg-[var(--border-strong)]/70"}`} />)}
+            <div className="mt-6 grid h-[152px] grid-cols-12 items-end gap-1.5 border-b border-[var(--border)] px-1 sm:gap-2">
+              {pulseData.map((bar, index) => {
+                const isToday = index === 6;
+                return (
+                  <div key={index} className="group relative flex h-full flex-col justify-end items-center cursor-pointer">
+                    {/* Hover Floating Tooltip */}
+                    <div className="absolute -top-11 z-30 hidden rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)]/95 backdrop-blur-md px-2.5 py-1 text-center shadow-xl group-hover:block whitespace-nowrap pointer-events-none">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">{bar.dateLabel}</p>
+                      <p className="text-[11px] font-black text-[var(--accent)]">{formatINR(bar.amount)} spent</p>
+                    </div>
+
+                    {/* Vertical Guideline */}
+                    <div className="absolute inset-y-0 w-px bg-[var(--accent)]/25 hidden group-hover:block pointer-events-none" />
+
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: `${bar.heightPercent}%` }}
+                      transition={{ delay: 0.05 + index * 0.02, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                      className={`w-full min-h-1.5 rounded-t-sm transition-colors ${
+                        isToday
+                          ? "bg-[var(--accent)] shadow-xs shadow-[var(--accent)]/30"
+                          : index > 7
+                          ? "bg-[var(--mint)]/60 group-hover:bg-[var(--mint)]"
+                          : "bg-[var(--border-strong)]/70 group-hover:bg-[var(--accent)]/80"
+                      }`}
+                    />
+                  </div>
+                );
+              })}
             </div>
             <div className="mt-3 flex justify-between px-1 text-[10px] font-medium text-[var(--text-faint)]"><span>01 Aug</span><span>Week 2</span><span>Today</span></div>
             <div className="mt-5 flex flex-wrap gap-2"><span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2 py-1 text-[10px] font-semibold text-[var(--text-secondary)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" /> Hostel fee paid</span><span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-2 py-1 text-[10px] font-semibold text-[var(--text-secondary)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--mint)]" /> You&apos;re within budget</span></div>
@@ -335,11 +397,37 @@ export default function FinancePage() {
             <div className="flex items-center justify-between"><div><p className="section-label">YOUR ENVELOPES</p><h2 className="mt-1.5 text-base font-semibold tracking-tight text-[var(--text-primary)]">Every rupee has a job</h2></div><span className="text-[10px] font-semibold text-[var(--text-secondary)]">{formatINR(monthlyAllowance)} plan</span></div>
             <div className="mt-5 space-y-3.5">
               {groupedSpending.slice(0, 6).map(({ category, spent, budget, icon, color, soft }) => {
+                const isOverBudget = spent > budget;
                 const percentage = Math.min(100, Math.round((spent / budget) * 100));
-                return <div key={category}>
-                  <div className="mb-1.5 flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><span style={{ background: soft, color }} className="grid h-6 w-6 place-items-center rounded-md"><Icon name={icon} className="h-3 w-3" /></span><span className="truncate text-[11px] font-semibold text-[var(--text-primary)]">{category}</span></div><span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--text-secondary)]">{formatINR(spent)} <span className="text-[var(--text-faint)]">/ {formatINR(budget)}</span></span></div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-[var(--track)]"><div style={{ width: `${percentage}%`, background: color }} className="h-full rounded-full transition-[width] duration-500" /></div>
-                </div>;
+                return (
+                  <div key={category}>
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span style={{ background: soft, color }} className="grid h-6 w-6 place-items-center rounded-md shrink-0">
+                          <Icon name={icon} className="h-3 w-3" />
+                        </span>
+                        <span className="truncate text-[11px] font-semibold text-[var(--text-primary)]">{category}</span>
+                        {isOverBudget && (
+                          <span
+                            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[var(--danger,#f43f5e)] text-white text-[10px] font-black shadow-xs"
+                            title={`${category} is over budget by ${formatINR(spent - budget)}!`}
+                          >
+                            !
+                          </span>
+                        )}
+                      </div>
+                      <span className={`shrink-0 text-[10px] font-semibold tabular-nums ${isOverBudget ? "text-[var(--danger,#f43f5e)] font-extrabold" : "text-[var(--text-secondary)]"}`}>
+                        {formatINR(spent)} <span className="text-[var(--text-faint)]">/ {formatINR(budget)}</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--track)]">
+                      <div
+                        style={{ width: `${percentage}%`, background: isOverBudget ? "var(--danger,#f43f5e)" : color }}
+                        className="h-full rounded-full transition-[width] duration-500"
+                      />
+                    </div>
+                  </div>
+                );
               })}
             </div>
             <button type="button" onClick={() => setShowBudget(true)} className="focus-ring mt-5 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline cursor-pointer">Review monthly plan <Icon name="arrow" className="h-3.5 w-3.5" /></button>
