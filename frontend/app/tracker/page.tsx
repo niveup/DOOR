@@ -305,6 +305,7 @@ export default function TrackerPage() {
   const [floatingClockMode, setFloatingClockMode] = useState<"compact" | "medium">("compact");
   const [dragBounds, setDragBounds] = useState({ left: -300, right: 0, top: 0, bottom: 500 });
   const [nowDate, setNowDate] = useState(() => new Date());
+  const chartScrollRef = useRef<HTMLDivElement>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -450,8 +451,9 @@ export default function TrackerPage() {
       if (!silent) {
         const cached = getCache<{ data: TrackerData & { error?: string }; logs: any[] }>('tracker_full');
         if (cached) {
+          const cleanLogs = (cached.logs || []).filter((l: any) => !l.id?.startsWith("db-synced-"));
           setData(cached.data);
-          setSessionLogs(cached.logs);
+          setSessionLogs(cleanLogs);
           setLoading(false);
           return;
         }
@@ -469,22 +471,8 @@ export default function TrackerPage() {
       }
 
       let effectiveLogs: NonNullable<TrackerData["logs"]>[number][] = [];
-      if (Array.isArray(result.logs) && result.logs.length > 0) {
-        effectiveLogs = result.logs;
-      } else if (Array.isArray(result.subjects)) {
-        const todayStr = getLocalDateString();
-        effectiveLogs = result.subjects
-          .filter((s) => (s.cumulativeHours || s.hoursStudied || 0) > 0 || (s.cumulativeQuestions || s.questionsSolved || 0) > 0)
-          .map((s) => ({
-            id: `db-synced-${s.subjectId}`,
-            logDate: todayStr,
-            timeBlock: "Evening",
-            subjectId: s.subjectId,
-            subjectName: s.subjectName,
-            hoursStudied: s.cumulativeHours || s.hoursStudied || 0,
-            questionsSolved: s.cumulativeQuestions || s.questionsSolved || 0,
-            notes: "Cloud database session",
-          }));
+      if (Array.isArray(result.logs)) {
+        effectiveLogs = result.logs.filter((l: any) => !l.id?.startsWith("db-synced-"));
       }
 
       const finalLogs = dedupeLogs(effectiveLogs);
@@ -545,7 +533,7 @@ export default function TrackerPage() {
 
   // Daily / Monthly / Yearly Chart Data Generator (Past N Days or All Time)
   const dailyChartData = useMemo<DailyLogEntry[]>(() => {
-    // 1. Handle "all" Time Range (Month-wise if <2 yrs, Year-wise if >=2 yrs)
+    // 1. Handle "all" Time Range (Daily granularity so 0-study days dip down to 0 and study days spike up)
     if (timeRange === "all") {
       let minDate = new Date();
       let maxDate = new Date();
@@ -560,12 +548,15 @@ export default function TrackerPage() {
         }
       } else {
         minDate = new Date();
-        minDate.setMonth(minDate.getMonth() - 5);
+        minDate.setMonth(minDate.getMonth() - 2);
       }
 
-      const diffMs = maxDate.getTime() - minDate.getTime();
-      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      const isMoreThanTwoYears = diffDays >= 730;
+      // Ensure minimum 30-day window so graph has a clear timeline
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      if (minDate > thirtyDaysAgo) {
+        minDate = thirtyDaysAgo;
+      }
 
       const logsByDate = new Map<string, { hours: number; questions: number }>();
       for (const log of sessionLogs) {
@@ -578,76 +569,30 @@ export default function TrackerPage() {
       }
 
       const list: DailyLogEntry[] = [];
+      const curr = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
+      curr.setHours(0, 0, 0, 0);
 
-      if (!isMoreThanTwoYears) {
-        // Month-wise aggregation (Span < 2 years)
-        const start = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-        const end = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+      const todayStr = getLocalDateString();
 
-        const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-        if (monthsDiff < 5) {
-          start.setMonth(end.getMonth() - 5);
-        }
+      while (curr <= maxDate || list.length < 14) {
+        const dateStr = getLocalDateString(curr);
+        const data = logsByDate.get(dateStr) || { hours: 0, questions: 0 };
+        const isToday = dateStr === todayStr;
 
-        const curr = new Date(start);
-        const today = new Date();
+        const isFirstOfMonth = curr.getDate() === 1 || list.length === 0;
+        const monthLabel = curr.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+        const dayLabel = isFirstOfMonth ? monthLabel : "";
 
-        while (curr <= end) {
-          const year = curr.getFullYear();
-          const month = curr.getMonth();
-          const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
-          const monthLabel = curr.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-          const isTodayMonth = today.getFullYear() === year && today.getMonth() === month;
+        list.push({
+          dateStr,
+          dayLabel,
+          hours: Number(data.hours.toFixed(2)),
+          questions: data.questions,
+          isToday,
+        });
 
-          let monthHours = 0;
-          let monthQuestions = 0;
-
-          for (const [dateStr, data] of logsByDate.entries()) {
-            if (dateStr.startsWith(monthKey)) {
-              monthHours += data.hours;
-              monthQuestions += data.questions;
-            }
-          }
-
-          list.push({
-            dateStr: monthKey,
-            dayLabel: monthLabel,
-            hours: Number(monthHours.toFixed(2)),
-            questions: monthQuestions,
-            isToday: isTodayMonth,
-          });
-
-          curr.setMonth(curr.getMonth() + 1);
-        }
-      } else {
-        // Year-wise aggregation (Span >= 2 years)
-        const startYear = minDate.getFullYear();
-        const endYear = maxDate.getFullYear();
-        const todayYear = new Date().getFullYear();
-
-        for (let y = startYear; y <= endYear; y++) {
-          const yearKey = `${y}`;
-          const yearLabel = `${y}`;
-          const isTodayYear = todayYear === y;
-
-          let yearHours = 0;
-          let yearQuestions = 0;
-
-          for (const [dateStr, data] of logsByDate.entries()) {
-            if (dateStr.startsWith(yearKey)) {
-              yearHours += data.hours;
-              yearQuestions += data.questions;
-            }
-          }
-
-          list.push({
-            dateStr: yearKey,
-            dayLabel: yearLabel,
-            hours: Number(yearHours.toFixed(2)),
-            questions: yearQuestions,
-            isToday: isTodayYear,
-          });
-        }
+        curr.setDate(curr.getDate() + 1);
+        if (curr > maxDate && list.length >= 14) break;
       }
 
       return list;
@@ -688,6 +633,12 @@ export default function TrackerPage() {
     }
     return list;
   }, [timeRange, sessionLogs]);
+
+  useEffect(() => {
+    if (chartScrollRef.current) {
+      chartScrollRef.current.scrollLeft = chartScrollRef.current.scrollWidth;
+    }
+  }, [dailyChartData, timeRange]);
 
   const todayHours = useMemo(() => {
     const todayEntry = dailyChartData.find((d) => d.isToday);
@@ -834,7 +785,7 @@ export default function TrackerPage() {
   }, [subjects, filter]);
 
   // Handle Quick Session Logging
-  const openLogModal = (subject?: Subject) => {
+  const openLogModal = (subject?: Subject, mode: "manual" | "timer" = "manual") => {
     if (subject) {
       setSelectedSubject(subject);
     } else if (subjects.length > 0) {
@@ -845,7 +796,7 @@ export default function TrackerPage() {
     setLogHours("1.5");
     setLogQuestions("10");
     setLogNotes("");
-    setLogMode("timer");
+    setLogMode(mode);
     setIsLogModalOpen(true);
   };
 
@@ -1115,7 +1066,7 @@ export default function TrackerPage() {
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/55">Today&apos;s focus</p>
             <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-1">
               <p className="text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">{todayHours.toFixed(1)}h</p>
-              <p className="mb-1 text-xs font-medium text-white/60">of {dailyGoal.toFixed(1)}h goal · {todayRemaining > 0 ? `${todayRemaining.toFixed(1)}h to go` : "goal complete"}</p>
+              <p className="mb-1 text-xs font-medium text-white/60">of {dailyGoal.toFixed(1)}h goal</p>
             </div>
             <div className="mt-4 h-2 max-w-xl overflow-hidden rounded-full bg-white/15"><motion.div initial={{ width: 0 }} animate={{ width: `${todayGoalProgress}%` }} transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }} className="h-full rounded-full bg-[var(--accent)]" /></div>
           </div>
@@ -1134,8 +1085,8 @@ export default function TrackerPage() {
               </svg>
               Set goal
             </button>
-            <button type="button" onClick={() => openLogModal()} className="focus-ring inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-xs font-bold text-stone-900 transition hover:bg-stone-100 cursor-pointer"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" /></svg> Log study</button>
-            <button type="button" onClick={() => openLogModal()} className="focus-ring inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/15 cursor-pointer"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" /><circle cx="12" cy="12" r="9" /></svg> Start timer</button>
+            <button type="button" onClick={() => openLogModal(undefined, "manual")} className="focus-ring inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-xs font-bold text-stone-900 transition hover:bg-stone-100 cursor-pointer"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" /></svg> Log study</button>
+            <button type="button" onClick={() => openLogModal(undefined, "timer")} className="focus-ring inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/15 cursor-pointer"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" /><circle cx="12" cy="12" r="9" /></svg> Start timer</button>
           </div>
         </div>
         <div className="grid divide-y divide-white/10 border-t border-white/10 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
@@ -1208,7 +1159,7 @@ export default function TrackerPage() {
 
           {/* Chart Container (Line Graph for 'all', Bar Chart for 7d/14d/30d) */}
           {timeRange === "all" ? (
-            <div className="relative w-full pt-12 pb-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div ref={chartScrollRef} className="relative w-full pt-12 pb-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div
                 className="relative h-48 min-w-full"
                 style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
@@ -1289,7 +1240,7 @@ export default function TrackerPage() {
 
                         {/* Sleek Minimal Hover Tooltip */}
                         <div className={`absolute ${tooltipY} z-40 hidden rounded-xl border border-rose-500/30 bg-[var(--bg-elevated)]/95 backdrop-blur-md px-3 py-1.5 text-center text-[10.5px] font-bold text-[var(--text-primary)] shadow-xl group-hover:block whitespace-nowrap pointer-events-none ${tooltipPos}`}>
-                          <div className="text-[10px] tracking-wide text-[var(--text-secondary)] uppercase font-semibold">{d.dayLabel}</div>
+                          <div className="text-[10px] tracking-wide text-[var(--text-secondary)] uppercase font-semibold">{formatDisplayDate(d.dateStr) || d.dayLabel}</div>
                           <div className="text-rose-400 font-extrabold">{d.hours} hrs studied</div>
                           {d.questions > 0 && <div className="text-[var(--text-secondary)] text-[10px]">{d.questions} Qs solved</div>}
                         </div>
@@ -1416,7 +1367,7 @@ export default function TrackerPage() {
       >
         {!showStudyAreas ? (
           <div className="surface flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center">
-            <div><p className="text-sm font-semibold text-[var(--text-primary)]">You don&apos;t need to manage subjects to use this tracker.</p><p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--text-secondary)]">Use the timer, log sessions, set your daily goal, and review your week. Study areas are only optional labels for students who want separate course reports.</p></div>
+            <div><p className="text-sm font-semibold text-[var(--text-primary)]">You don&apos;t need to manage subjects to use this tracker.</p><p className="mt-1 text-xs text-[var(--text-secondary)]">Use the timer, log sessions, and set daily goals. Study areas are optional labels for course reports.</p></div>
             <button type="button" onClick={() => setShowStudyAreas(true)} className="focus-ring shrink-0 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--accent)] hover:border-[var(--accent)]/40 cursor-pointer">Show areas</button>
           </div>
         ) : loading && !data ? (
@@ -2612,7 +2563,7 @@ export default function TrackerPage() {
                 }}
                 onSubmit={handleSaveDailyGoal}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-md space-y-5 rounded-3xl border border-stone-200/80 dark:border-white/10 bg-white/95 dark:bg-stone-900/95 p-6 shadow-2xl backdrop-blur-xl text-[var(--text-primary)] relative z-10"
+                className="w-full max-w-md space-y-5 rounded-3xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-2xl backdrop-blur-xl text-[var(--text-primary)] relative z-10"
               >
                 {/* Glassmorphic Liquid Bar Picker */}
                 <GlassmorphicLiquidGoalPicker
@@ -2621,17 +2572,17 @@ export default function TrackerPage() {
                 />
 
                 {/* Action Buttons */}
-                <div className="flex justify-end gap-3 pt-3 border-t border-stone-200/60 dark:border-white/10">
+                <div className="flex justify-end gap-3 pt-3 border-t border-[var(--border)]">
                   <button
                     type="button"
                     onClick={() => setIsGoalModalOpen(false)}
-                    className="rounded-xl border border-stone-200 dark:border-white/15 bg-stone-100 dark:bg-stone-800/80 px-4 py-2 text-xs font-semibold text-stone-700 dark:text-stone-300 transition hover:bg-stone-200 dark:hover:bg-stone-700"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="rounded-xl bg-[var(--accent)] px-6 py-2 text-xs font-extrabold text-stone-950 shadow-md shadow-[var(--accent)]/30 hover:brightness-110 transition"
+                    className="rounded-xl bg-[var(--accent)] px-6 py-2 text-xs font-extrabold text-stone-950 shadow-md shadow-[var(--accent)]/30 hover:brightness-110 transition cursor-pointer"
                   >
                     Apply Goal
                   </button>
@@ -2962,12 +2913,14 @@ function GlassmorphicLiquidGoalPicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [localValue, setLocalValue] = useState<number>(value);
-  const debounceTimerRef = useRef<number | null>(null);
+  const rafIdRef = useRef<number | null>(null);
+  const latestValueRef = useRef<number>(value);
 
   // Sync local value with prop when not dragging
   useEffect(() => {
     if (!isDragging) {
       setLocalValue(value);
+      latestValueRef.current = value;
     }
   }, [value, isDragging]);
 
@@ -2976,30 +2929,37 @@ function GlassmorphicLiquidGoalPicker({
   const percent = Math.min(Math.max(((localValue - minVal) / (maxVal - minVal)) * 100, 0), 100);
 
   const updateFromClientX = useCallback(
-    (clientX: number, forceImmediate = false) => {
+    (clientX: number) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const relativeX = Math.max(0, Math.min(clientX - rect.left, rect.width));
       const rawRatio = relativeX / rect.width;
       const rawVal = minVal + rawRatio * (maxVal - minVal);
-      const snapped = Math.round(rawVal * 2) / 2;
+      const snapped = Math.round(rawVal * 10) / 10;
       const clamped = Math.min(Math.max(snapped, minVal), maxVal);
 
-      // Instant optimistic local update for 120fps butter-smooth slider
-      setLocalValue(clamped);
+      if (latestValueRef.current !== clamped) {
+        latestValueRef.current = clamped;
+        setLocalValue(clamped);
 
-      if (forceImmediate) {
-        if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
-        onChange(clamped);
-      } else {
-        if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = window.setTimeout(() => {
-          onChange(clamped);
-        }, 40);
+        if (rafIdRef.current === null) {
+          rafIdRef.current = requestAnimationFrame(() => {
+            rafIdRef.current = null;
+            onChange(latestValueRef.current);
+          });
+        }
       }
     },
     [minVal, maxVal, onChange]
   );
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -3010,7 +2970,12 @@ function GlassmorphicLiquidGoalPicker({
 
     const handlePointerUp = (e: PointerEvent) => {
       setIsDragging(false);
-      updateFromClientX(e.clientX, true);
+      updateFromClientX(e.clientX);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      onChange(latestValueRef.current);
     };
 
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
@@ -3019,7 +2984,7 @@ function GlassmorphicLiquidGoalPicker({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [isDragging, updateFromClientX]);
+  }, [isDragging, updateFromClientX, onChange]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     try {
@@ -3048,8 +3013,8 @@ function GlassmorphicLiquidGoalPicker({
 
       {/* Glassmorphic Liquid Bar with Scale Labels */}
       <div className="w-full space-y-2">
-        {/* Embedded Scale Numbers with Smooth Rounded Font & Brighter Contrast */}
-        <div className="flex items-center justify-between px-2 text-[11px] font-bold text-stone-300 dark:text-stone-200 font-sans tracking-wide">
+        {/* Embedded Scale Numbers with Smooth Rounded Font & Theme Contrast */}
+        <div className="flex items-center justify-between px-2 text-[11px] font-bold text-[var(--text-secondary)] font-sans tracking-wide">
           <span>0.5h</span>
           <span>3h</span>
           <span>6h</span>
@@ -3061,7 +3026,7 @@ function GlassmorphicLiquidGoalPicker({
         <div
           ref={containerRef}
           onPointerDown={handlePointerDown}
-          className="relative h-14 w-full cursor-ew-resize select-none overflow-hidden rounded-2xl border border-stone-300/60 dark:border-white/15 bg-stone-100/80 dark:bg-stone-900/80 backdrop-blur-md p-1.5 shadow-inner touch-none"
+          className="relative h-14 w-full cursor-ew-resize select-none overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] backdrop-blur-md p-1.5 shadow-inner touch-none"
         >
           {/* Tick Marks Grid */}
           <div className="absolute inset-0 flex items-center justify-between px-4 opacity-30 pointer-events-none z-10 text-[var(--text-secondary)]">
@@ -3078,7 +3043,7 @@ function GlassmorphicLiquidGoalPicker({
             style={{ width: `${percent}%` }}
           >
             {/* Wave Shimmer Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
             
             {/* Liquid Leading Edge Handle */}
             <div className="h-8 w-2.5 rounded-full bg-white shadow-lg z-20 shrink-0 border border-[var(--accent)]" />
@@ -3088,7 +3053,7 @@ function GlassmorphicLiquidGoalPicker({
 
       {/* Drag Guidance */}
       <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)]">
-        <svg className="w-3.5 h-3.5 text-[var(--accent)] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-3.5 h-3.5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M8 12h8M8 17h8" />
         </svg>
         Drag horizontally across the slider to adjust
