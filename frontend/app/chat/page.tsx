@@ -1,13 +1,14 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { AiMarkdown } from "@/components/AiMarkdown";
-import { ModelSelector, type AiSelection } from "@/components/ModelSelector";
+import { type AiSelection } from "@/components/ModelSelector";
 import { MicroInteractionButton } from "@/components/MotionComponents";
 import { toast, Toaster } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
+import { useDemoFetch } from "@/lib/DemoContext";
 
 type AnswerLayout =
   | "quick_answer"
@@ -39,11 +40,11 @@ const answerLayouts: Record<AnswerLayout, { label: string; description: string; 
   general: { label: "Coach response", description: "Clear, tailored guidance", icon: "?", tone: "text-[var(--accent)] bg-[var(--accent-soft)] border-[var(--accent)]/25" },
 };
 
-const starterPrompts: Array<{ label: string; prompt: string; layout: AnswerLayout; icon: string }> = [
-  { label: "Explain a concept", prompt: "Explain entropy from first principles with a simple example.", layout: "concept_explainer", icon: "?" },
-  { label: "Solve step by step", prompt: "Help me solve a GATE-level numerical step by step.", layout: "problem_solving", icon: "S" },
-  { label: "Make a revision plan", prompt: "Make me a focused 3-day revision plan for my weakest subject.", layout: "revision", icon: "?" },
-  { label: "Compare clearly", prompt: "Compare Rankine cycle and Brayton cycle in an exam-ready table.", layout: "comparison", icon: "?" },
+const starterPrompts: Array<{ label: string; prompt: string; layout: AnswerLayout }> = [
+  { label: "Explain a concept", prompt: "Explain entropy from first principles with a simple example.", layout: "concept_explainer" },
+  { label: "Solve step by step", prompt: "Help me solve a GATE-level numerical step by step.", layout: "problem_solving" },
+  { label: "Make a revision plan", prompt: "Make me a focused 3-day revision plan for my weakest subject.", layout: "revision" },
+  { label: "Compare clearly", prompt: "Compare Rankine cycle and Brayton cycle in an exam-ready table.", layout: "comparison" },
 ];
 
 function isAnswerLayout(value: unknown): value is AnswerLayout {
@@ -52,61 +53,29 @@ function isAnswerLayout(value: unknown): value is AnswerLayout {
 
 function AssistantResponse({ message, onUsePrompt }: { message: ChatMessage; onUsePrompt: (prompt: string) => void }) {
   const layout = message.layout || "general";
-  const meta = answerLayouts[layout];
-  const [copied, setCopied] = useState(false);
-
-  const copyAnswer = async () => {
-    try {
-      await navigator.clipboard.writeText(message.content);
-      setCopied(true);
-      toast.success("Answer copied");
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      toast.error("Could not copy that answer");
-    }
-  };
 
   return (
-    <article className="w-full max-w-5xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-[var(--shadow-tight)]">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--bg-page)]/50 px-5 py-3.5 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-base font-bold ${meta.tone}`} aria-hidden="true">{meta.icon}</span>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-bold uppercase tracking-[0.14em] text-[var(--text-primary)]">{meta.label}</p>
-            <p className="hidden truncate text-[11px] font-medium text-[var(--text-secondary)] sm:block">{meta.description}</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => void copyAnswer()}
-          className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
-          aria-label="Copy coach response"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
-      <div className="px-5 py-5 sm:px-7 sm:py-6">
-        <div className="coach-answer ai-markdown font-medium">
-          <AiMarkdown content={message.content} />
-        </div>
+    <div className="w-full">
+      <div className="coach-answer ai-markdown font-medium">
+        <AiMarkdown content={message.content} />
       </div>
       {layout === "revision" && (
         <button
           type="button"
           onClick={() => onUsePrompt("Test me with 5 questions from this topic, one at a time.")}
-          className="focus-ring mx-5 mb-5 inline-flex items-center gap-2 rounded-lg border border-[var(--sun)]/25 bg-[var(--sun-soft)] px-3 py-2 text-[11px] font-bold text-[var(--sun)] transition hover:brightness-95 sm:mx-5 sm:mb-5"
+          className="focus-ring mt-3 inline-flex items-center gap-2 rounded-lg border border-[var(--sun)]/25 bg-[var(--sun-soft)] px-3 py-2 text-[11px] font-bold text-[var(--sun)] transition hover:brightness-95"
         >
           <span aria-hidden="true">?</span> Test me on this
         </button>
       )}
-    </article>
+    </div>
   );
 }
 
 export default function ChatPage() {
   const router = useRouter();
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+  const appFetch = useDemoFetch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [input, setInput] = useState("");
@@ -119,6 +88,26 @@ export default function ChatPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, loading, suggestions]);
 
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = event.target.value;
+    setInput(val);
+    const el = event.target;
+    el.style.height = "auto";
+    const maxHeight = 140;
+    const newHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${newHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+  };
+
   const sendChatMessage = async (content: string) => {
     const trimmed = content.trim();
     if (!trimmed || loading) return;
@@ -130,8 +119,12 @@ export default function ChatPage() {
     setSuggestions([]);
     setLoading(true);
 
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
+
     try {
-      const response = await fetch(`${backendUrl}/api/routine/general-chat`, {
+      const response = await appFetch(`${backendUrl}/api/routine/general-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -171,7 +164,6 @@ export default function ChatPage() {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Connection error";
-      toast.error(errorMessage);
       setMessages((current) => [...current, {
         id: `error-${nextMessages.length + 1}`,
         role: "assistant",
@@ -199,78 +191,168 @@ export default function ChatPage() {
     setMessages([]);
     setSuggestions([]);
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
     window.setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   return (
     <AppShell>
       <Toaster position="top-right" richColors />
-      <section className="surface flex h-[calc(100vh-5rem)] w-full flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] shadow-[var(--shadow-soft)] sm:h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-3rem)]">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--bg-card)] px-5 py-4 sm:px-7">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] text-[var(--accent)] shadow-sm" aria-hidden="true">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5l-5 5v-5z" /></svg>
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="truncate text-base font-black tracking-tight text-[var(--text-primary)]">AI Coach</h1>
-                <span className="hidden rounded-full border border-[var(--success)]/20 bg-[var(--success-soft)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--success)] sm:inline">Adaptive</span>
-              </div>
-              <p className="truncate text-xs font-medium text-[var(--text-secondary)]">General answers, subject mastery, and focused next steps.</p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="hidden md:block"><ModelSelector value={aiSelection} onChange={setAiSelection} /></div>
-            <button type="button" onClick={startFresh} className="focus-ring rounded-lg border border-[var(--border)] px-3.5 py-2.5 text-[11px] font-bold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)]">New chat</button>
-          </div>
-        </header>
+      <section className="relative flex flex-1 h-[calc(100vh-4.5rem)] min-h-[calc(100vh-4.5rem)] max-h-[calc(100vh-4.5rem)] w-full flex-col overflow-hidden bg-transparent">
+        {messages.length === 0 ? (
+          <div className="m-auto flex w-full max-w-4xl flex-col items-center justify-center px-4 py-8 text-center sm:px-6 my-auto">
+            <motion.h2
+              initial={{ y: 8, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.35, delay: 0.05 }}
+              className="text-xl font-bold tracking-tight text-[var(--text-primary)] sm:text-2xl"
+            >
+              How can I help you today?
+            </motion.h2>
 
-        <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto bg-[var(--bg-page)]/40">
-          {messages.length === 0 ? (
-            <div className="m-auto w-full max-w-5xl px-5 py-10 sm:px-8">
-              <div className="mx-auto max-w-2xl text-center">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--accent)]">? Built around your question</span>
-                <h2 className="mt-5 text-3xl font-black tracking-tight text-[var(--text-primary)] sm:text-4xl">Ask it your way. Get the right shape of answer.</h2>
-                <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-[var(--text-secondary)]">Your coach switches from simple answers to worked solutions, comparison tables, revision sprints, and study plans—without forcing every question into the same template.</p>
+            <form
+              onSubmit={handleSend}
+              className="mt-6 w-full max-w-4xl px-2"
+            >
+              <div className="flex items-center gap-2.5 rounded-full border border-slate-200/90 bg-white dark:bg-[var(--bg-card)] dark:border-[var(--border)] pl-4 pr-2 py-2 shadow-xl shadow-slate-900/10 transition-all duration-200 focus-within:border-[var(--accent)]/70 focus-within:ring-4 focus-within:ring-[var(--accent)]/15">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask anything..."
+                  disabled={loading}
+                  rows={1}
+                  className="no-scrollbar flex-1 resize-none bg-transparent py-1 text-xs font-medium leading-5 text-slate-900 dark:text-[var(--text-primary)] outline-none placeholder:text-slate-400 dark:placeholder:text-[var(--text-secondary)] disabled:opacity-60 sm:text-sm"
+                  style={{ minHeight: "26px", maxHeight: "140px" }}
+                />
+                <motion.button
+                  type="submit"
+                  whileHover={input.trim() ? { scale: 1.08 } : {}}
+                  whileTap={input.trim() ? { scale: 0.92 } : {}}
+                  disabled={!input.trim() || loading}
+                  className={`flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
+                    input.trim()
+                      ? "bg-[var(--accent)] text-white shadow-md hover:brightness-110 cursor-pointer"
+                      : "bg-stone-200/90 text-stone-600 dark:bg-stone-800/80 dark:text-stone-300 cursor-not-allowed opacity-70"
+                  }`}
+                  aria-label="Send prompt"
+                >
+                  <svg className="h-4 w-4 text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3 21l18-9L3 3l3 9m0 0h8" />
+                  </svg>
+                </motion.button>
               </div>
-              <div className="mt-9 grid gap-4 sm:grid-cols-2">
-                {starterPrompts.map((starter) => {
-                  const meta = answerLayouts[starter.layout];
-                  return (
-                    <button key={starter.label} type="button" onClick={() => void sendChatMessage(starter.prompt)} className="focus-ring group flex min-h-32 items-start gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 text-left shadow-2xs transition hover:-translate-y-0.5 hover:border-[var(--accent)]/30 hover:shadow-[var(--shadow-tight)]">
-                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-base font-bold ${meta.tone}`} aria-hidden="true">{starter.icon}</span>
-                      <span className="min-w-0"><span className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">{starter.label}<span className="opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" aria-hidden="true">?</span></span><span className="mt-1.5 block text-xs leading-6 text-[var(--text-secondary)]">{meta.description}</span></span>
-                    </button>
-                  );
-                })}
+            </form>
+          </div>
+        ) : (
+          <>
+            <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto min-h-0 bg-transparent">
+              <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 pt-6 pb-6 sm:px-6 sm:pt-8 sm:pb-8">
+                <AnimatePresence initial={false}>
+                  {messages.map((message, index) => {
+                    const isUser = message.role === "user";
+                    const isLast = index === messages.length - 1;
+                    return (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.16 }}
+                        className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
+                      >
+                        {isUser ? (
+                          <div className="max-w-[76%] rounded-2xl rounded-tr-xs bg-slate-100 text-slate-900 border border-slate-200/90 dark:bg-slate-800/70 dark:text-slate-100 dark:border-slate-700/60 px-3.5 py-2.5 text-xs sm:text-sm font-medium leading-5 shadow-2xs sm:max-w-[56%]">
+                            {message.content}
+                          </div>
+                        ) : (
+                          <AssistantResponse message={message} onUsePrompt={(prompt) => void sendChatMessage(prompt)} />
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+                {loading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex justify-start pt-1"
+                  >
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)]/70 bg-[var(--bg-card)] px-3.5 py-1.5 shadow-2xs">
+                      <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse" />
+                      <span className="text-xs font-medium text-[var(--text-secondary)] tracking-wide select-none">
+                        Thinking...
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+                <div ref={chatEndRef} />
               </div>
-              <p className="mt-6 text-center text-xs font-medium text-[var(--text-faint)]">Try any subject question, a general question, or a request about your preparation.</p>
             </div>
-          ) : (
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-7 px-5 py-7 sm:px-9 sm:py-8">
-              <AnimatePresence initial={false}>
-                {messages.map((message) => {
-                  const isUser = message.role === "user";
-                  return (
-                    <motion.div key={message.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                      {isUser ? <div className="max-w-[88%] rounded-2xl rounded-tr-sm border border-[var(--accent)] bg-[var(--accent)] px-5 py-4 text-base font-semibold leading-7 text-white shadow-sm sm:max-w-[68%]">{message.content}</div> : <AssistantResponse message={message} onUsePrompt={(prompt) => void sendChatMessage(prompt)} />}
+
+            <form
+              onSubmit={handleSend}
+              className="mt-auto shrink-0 w-full py-3 px-4 bg-[var(--bg-main)]/90 backdrop-blur-md z-30 border-t border-[var(--border)]/40"
+            >
+              <div className="mx-auto max-w-4xl w-full flex flex-col gap-2.5">
+                <AnimatePresence>
+                  {suggestions.length > 0 && !loading && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 2 }}
+                      transition={{ duration: 0.18 }}
+                      className="flex flex-wrap items-center gap-1.5 px-0.5"
+                    >
+                      {suggestions.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => void sendChatMessage(suggestion)}
+                          className="focus-ring rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] shadow-2xs transition hover:border-[var(--accent)]/40 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] cursor-pointer"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
                     </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-              {loading && <div className="flex justify-start"><div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-3.5 py-2.5 shadow-2xs"><span className="flex gap-1" aria-hidden="true"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--accent)]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--accent)]" style={{ animationDelay: "150ms" }} /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--accent)]" style={{ animationDelay: "300ms" }} /></span><span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">Finding the best way to explain this</span></div></div>}
-              {suggestions.length > 0 && !loading && <div className="flex flex-wrap gap-2 sm:pl-1">{suggestions.map((suggestion) => <button key={suggestion} type="button" onClick={() => void sendChatMessage(suggestion)} className="focus-ring rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--accent)]/30 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]">{suggestion}</button>)}</div>}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-        </div>
-
-        <form onSubmit={handleSend} className="shrink-0 border-t border-[var(--border)] bg-[var(--bg-card)] p-4 sm:px-7 sm:py-5">
-          <div className="mx-auto max-w-6xl"><div className="rounded-xl border border-[var(--border-strong)] bg-[var(--bg-page)]/55 p-2 shadow-inner transition focus-within:border-[var(--accent)]/60 focus-within:ring-4 focus-within:ring-[var(--focus-shadow)]">
-            <textarea ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} placeholder="Ask anything—concepts, problems, plans, or everyday questions…" disabled={loading} rows={1} className="max-h-36 min-h-12 w-full resize-none bg-transparent px-3 py-3 text-base font-medium leading-6 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-faint)] disabled:opacity-60" />
-            <div className="flex items-center justify-between gap-3 px-1"><p className="hidden text-[10px] font-medium text-[var(--text-faint)] sm:block">Enter to send <span className="mx-1">·</span> Shift + Enter for a new line</p><div className="ml-auto flex items-center gap-2"><MicroInteractionButton type="submit" loading={loading} disabled={!input.trim()} className={`group inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-4 text-[11px] font-black uppercase tracking-[0.1em] transition ${input.trim() ? "border-[#c69437]/40 bg-gradient-to-r from-[#e8be6b] via-[#dfb15b] to-[#c69437] text-stone-900 shadow-[0_2px_10px_rgba(223,177,91,0.32)] hover:brightness-105" : "cursor-not-allowed border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-faint)]"}`}><span>Send</span><svg className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3 21l18-9L3 3l3 9m0 0h8" /></svg></MicroInteractionButton></div></div>
-          </div></div>
-        </form>
+                  )}
+                </AnimatePresence>
+                <div className="flex items-center gap-2.5 rounded-full border border-slate-200/90 bg-white dark:bg-[var(--bg-card)] dark:border-[var(--border)] pl-4 pr-2 py-2 shadow-xl shadow-slate-900/10 transition-all duration-200 focus-within:border-[var(--accent)]/70 focus-within:ring-4 focus-within:ring-[var(--accent)]/15">
+                  <textarea
+                    ref={inputRef}
+                    value={input}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Ask anything..."
+                    disabled={loading}
+                    rows={1}
+                    className="no-scrollbar flex-1 resize-none bg-transparent py-1 text-xs font-medium leading-5 text-slate-900 dark:text-[var(--text-primary)] outline-none placeholder:text-slate-400 dark:placeholder:text-[var(--text-secondary)] disabled:opacity-60 sm:text-sm"
+                    style={{ minHeight: "26px", maxHeight: "140px" }}
+                  />
+                  <motion.button
+                    type="submit"
+                    whileHover={input.trim() ? { scale: 1.08 } : {}}
+                    whileTap={input.trim() ? { scale: 0.92 } : {}}
+                    disabled={!input.trim() || loading}
+                    className={`flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
+                      input.trim()
+                        ? "bg-[var(--accent)] text-white shadow-md hover:brightness-110 cursor-pointer"
+                        : "bg-stone-200/90 text-stone-600 dark:bg-stone-800/80 dark:text-stone-300 cursor-not-allowed opacity-70"
+                    }`}
+                    aria-label="Send prompt"
+                  >
+                    <svg className="h-4 w-4 text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3 21l18-9L3 3l3 9m0 0h8" />
+                    </svg>
+                  </motion.button>
+                </div>
+              </div>
+            </form>
+          </>
+        )}
       </section>
     </AppShell>
   );

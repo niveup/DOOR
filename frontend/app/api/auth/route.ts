@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const payload = (await request.json()) as { passcode?: unknown };
     const passcode = typeof payload.passcode === "string" ? payload.passcode : "";
     if (!passcode || passcode.length > 256 || !safeEqual(passcode, appPasscode())) {
-      return NextResponse.json({ success: false, error: "Incorrect passcode." }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ success: false, error: "Incorrect passcode.", demo: true }, { status: 401, headers: { "Cache-Control": "no-store" } });
     }
     const session = await getSession();
     session.isLoggedIn = true;

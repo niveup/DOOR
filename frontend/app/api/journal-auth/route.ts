@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { journalPasscode, journalUnlockDurationMs } from "@/lib/env";
-import { getSession } from "@/lib/session";
+import { getSession, hasActiveJournalSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +25,12 @@ function safeEqual(left: string, right: string) {
   const leftHash = crypto.createHash("sha256").update(left).digest();
   const rightHash = crypto.createHash("sha256").update(right).digest();
   return crypto.timingSafeEqual(leftHash, rightHash);
+}
+
+export async function GET() {
+  const session = await getSession();
+  const isUnlocked = Boolean(session.isLoggedIn && hasActiveJournalSession(session));
+  return privateJson({ isUnlocked, expiresAt: session.journalUnlockedUntil });
 }
 
 export async function POST(request: NextRequest) {
@@ -55,7 +61,9 @@ export async function POST(request: NextRequest) {
     session.journalUnlockFailures = 0;
     session.journalUnlockBlockedUntil = undefined;
     await session.save();
-    return privateJson({ success: true, expiresAt: session.journalUnlockedUntil });
+    const res = privateJson({ success: true, expiresAt: session.journalUnlockedUntil });
+    res.cookies.set("jujum_journal_unlocked", "1", { path: "/", maxAge: Math.floor(journalUnlockDurationMs() / 1000) });
+    return res;
   } catch (error) {
     console.error("Journal unlock failed", error instanceof Error ? error.message : "unknown error");
     return privateJson({ error: "Journal unlock is unavailable." }, 503);
@@ -67,5 +75,7 @@ export async function DELETE() {
   if (!session.isLoggedIn) return privateJson({ error: "Unauthorized" }, 401);
   session.journalUnlockedUntil = undefined;
   await session.save();
-  return privateJson({ success: true });
+  const res = privateJson({ success: true });
+  res.cookies.set("jujum_journal_unlocked", "", { path: "/", maxAge: 0 });
+  return res;
 }

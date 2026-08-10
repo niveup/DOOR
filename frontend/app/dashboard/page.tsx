@@ -12,6 +12,7 @@ import { AiSelection, ModelSelector } from "@/components/ModelSelector";
 import { PlanChatModal, CustomTaskTypeDropdown, TASK_CARD_STYLES } from "@/components/PlanChatModal";
 import { Latex } from "@/components/Latex";
 import { getCache, setCache, clearCache, updateCache } from "@/lib/sessionCache";
+import { useDemoFetch } from "@/lib/DemoContext";
 
 function formatPriorityText(text: string): string {
   let cleaned = text;
@@ -149,6 +150,8 @@ export default function Dashboard() {
   const [hasAvoidance, setHasAvoidance] = useState(false);
   const [recentlyCompleted, setRecentlyCompleted] = useState<string[]>([]);
   const [manualPlanOpen, setManualPlanOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingPlan, setDeletingPlan] = useState(false);
   const [manualPlanSaving, setManualPlanSaving] = useState(false);
   const [manualTasks, setManualTasks] = useState<ManualTaskDraft[]>([
     { id: "task-1", title: "", taskType: "study", durationMin: "45" },
@@ -195,6 +198,7 @@ export default function Dashboard() {
   };
 
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+  const appFetch = useDemoFetch();
 
   const fetchTodayPlan = useCallback(async (dateStr?: string, forceRefresh = false) => {
     const queryDate = dateStr || selectedDate;
@@ -211,7 +215,7 @@ export default function Dashboard() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${backendUrl}/api/routine/today?date=${queryDate}`, {
+      const res = await appFetch(`${backendUrl}/api/routine/today?date=${queryDate}`, {
         headers: {},
       });
       if (res.ok) {
@@ -256,7 +260,7 @@ export default function Dashboard() {
     }
 
     try {
-      const res = await fetch(`${backendUrl}/api/tracker/status`, {
+      const res = await appFetch(`${backendUrl}/api/tracker/status`, {
         headers: {},
       });
       if (!res.ok) return;
@@ -304,7 +308,7 @@ export default function Dashboard() {
       while (pendingTaskStatuses.current.has(taskId)) {
         const status = pendingTaskStatuses.current.get(taskId);
         pendingTaskStatuses.current.delete(taskId);
-        const response = await fetch(`${backendUrl}/api/tasks/${taskId}/status`, {
+        const response = await appFetch(`${backendUrl}/api/tasks/${taskId}/status`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -382,7 +386,7 @@ export default function Dashboard() {
     setPlanChatLoading(true);
 
     try {
-      const response = await fetch(`${backendUrl}/api/routine/plan-chat`, {
+      const response = await appFetch(`${backendUrl}/api/routine/plan-chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -431,7 +435,7 @@ export default function Dashboard() {
     if (planChatDraft.length === 0) return;
     setPlanChatSaving(true);
     try {
-      const response = await fetch(`${backendUrl}/api/routine/manual?date=${selectedDate}`, {
+      const response = await appFetch(`${backendUrl}/api/routine/manual?date=${selectedDate}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -465,7 +469,7 @@ export default function Dashboard() {
     setManualPlanSaving(true);
     setError("");
     try {
-      const response = await fetch(`${backendUrl}/api/routine/manual?date=${selectedDate}`, {
+      const response = await appFetch(`${backendUrl}/api/routine/manual?date=${selectedDate}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -494,7 +498,7 @@ export default function Dashboard() {
   };
 
   const handleEditPlan = () => {
-    if (!plan) return;
+    if (!plan || !Array.isArray(plan.tasks)) return;
     const drafts: ManualTaskDraft[] = plan.tasks.map((task) => ({
       id: task.taskId,
       title: task.title,
@@ -505,37 +509,45 @@ export default function Dashboard() {
     setManualPlanOpen(true);
   };
 
-  const handleDeletePlan = async () => {
-    if (!confirm(`Are you sure you want to delete the plan for ${formatSelectedDate(selectedDate)}?`)) return;
+  const handleDeletePlan = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeletePlan = async () => {
+    setDeletingPlan(true);
     try {
-      const res = await fetch(`${backendUrl}/api/routine/today?date=${selectedDate}`, {
+      const res = await appFetch(`${backendUrl}/api/routine/today?date=${selectedDate}`, {
         method: "DELETE",
         headers: {},
       });
       if (res.ok) {
         setPlan(null);
         setCache(`routine_plan_${selectedDate}`, { plan: null });
-        toast.success("Today's plan deleted");
+        toast.success("Plan deleted successfully");
+        setDeleteConfirmOpen(false);
       } else {
-        toast.error("Failed to delete today's plan.");
+        toast.error("Failed to delete plan.");
       }
     } catch {
-      toast.error("Failed to delete today's plan.");
+      toast.error("Failed to delete plan.");
+    } finally {
+      setDeletingPlan(false);
     }
   };
 
   const score = useMemo(() => {
-    if (!plan || plan.tasks.length === 0) return 0;
+    const tasks = plan?.tasks;
+    if (!plan || !Array.isArray(tasks) || tasks.length === 0) return 0;
     const weights: Record<TaskType, number> = { study: 60, exercise: 15, reading: 10, routine: 15 };
     const groupScore = (taskType: TaskType) => {
-      const group = plan.tasks.filter((task) => task.taskType === taskType);
+      const group = tasks.filter((task) => task.taskType === taskType);
       if (group.length === 0) return 0;
       const completed = group.reduce((sum, task) => sum + taskCompletionRatio(task.status), 0);
       return (completed / group.length) * 100;
     };
 
     const activeTypes = (Object.keys(weights) as TaskType[]).filter((taskType) =>
-      plan.tasks.some((task) => task.taskType === taskType)
+      tasks.some((task) => task.taskType === taskType)
     );
     const activeWeight = activeTypes.reduce((total, taskType) => total + weights[taskType], 0);
     if (activeWeight === 0) return 0;
@@ -547,16 +559,16 @@ export default function Dashboard() {
     return Math.round(earnedScore / activeWeight);
   }, [plan]);
 
-  const visibleTasks = plan?.tasks || [];
-  const completedCount = plan?.tasks.filter((task) => task.status === "COMPLETED").length || 0;
+  const visibleTasks = Array.isArray(plan?.tasks) ? plan.tasks : [];
+  const completedCount = visibleTasks.filter((task) => task.status === "COMPLETED").length;
   const totalMinutes = visibleTasks.reduce((sum, task) => sum + task.durationMin, 0);
-  const completedMinutes = plan?.tasks.reduce(
+  const completedMinutes = visibleTasks.reduce(
     (sum, task) => sum + task.durationMin * taskCompletionRatio(task.status),
     0
-  ) || 0;
+  );
   const priority = plan?.mainPriority ? formatPriorityText(plan.mainPriority) : "Generate the AI plan to lock today's priority";
-  const taskProgress = plan?.tasks.length
-    ? (plan.tasks.reduce((sum, task) => sum + taskCompletionRatio(task.status), 0) / plan.tasks.length) * 100
+  const taskProgress = visibleTasks.length > 0
+    ? (visibleTasks.reduce((sum, task) => sum + taskCompletionRatio(task.status), 0) / visibleTasks.length) * 100
     : 0;
   const timeProgress = totalMinutes > 0 ? (completedMinutes / totalMinutes) * 100 : 0;
 
@@ -607,7 +619,7 @@ export default function Dashboard() {
           progress={plan ? score : 0}
           tone="blue"
         />
-        <MetricTile index={2} label="Tasks" value={completedCount} suffix={plan ? `/${plan.tasks.length}` : "/0"} note="Tap a task to update it" progress={taskProgress} tone="lavender" />
+        <MetricTile index={2} label="Tasks" value={completedCount} suffix={plan && Array.isArray(plan.tasks) ? `/${plan.tasks.length}` : "/0"} note="Tap a task to update it" progress={taskProgress} tone="lavender" />
         <MetricTile
           index={3}
           label="Time done"
@@ -679,6 +691,14 @@ export default function Dashboard() {
             onChange={setManualTasks}
             onClose={() => setManualPlanOpen(false)}
             onSubmit={saveManualPlan}
+          />
+        )}
+        {deleteConfirmOpen && (
+          <ConfirmDeleteModal
+            dateText={formatSelectedDate(selectedDate)}
+            deleting={deletingPlan}
+            onClose={() => setDeleteConfirmOpen(false)}
+            onConfirm={() => void confirmDeletePlan()}
           />
         )}
       </AnimatePresence>
@@ -1039,7 +1059,7 @@ const PlanPanel = memo(function PlanPanel({
       </div>
 
       <div className="max-h-[400px] space-y-2.5 overflow-y-auto pr-1">
-        {plan.tasks.map((task) => {
+        {(Array.isArray(plan.tasks) ? plan.tasks : []).map((task) => {
           const isDone = task.status === "COMPLETED";
           const isPartial = task.status === "PARTIAL";
           const flashed = recentlyCompleted.includes(task.taskId);
@@ -1118,3 +1138,94 @@ const MetricTile = memo(function MetricTile({
     </MotionCard>
   );
 });
+
+function ConfirmDeleteModal({
+  dateText,
+  deleting,
+  onClose,
+  onConfirm,
+}: {
+  dateText: string;
+  deleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const originalStyle = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+      animate={{ opacity: 1, backdropFilter: "blur(5px)" }}
+      exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+      transition={{ duration: 0.22, ease: "easeInOut" }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,18,24,0.35)] p-4 overscroll-contain"
+      onMouseDown={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="surface w-full max-w-md rounded-2xl border border-[var(--border)] p-6 shadow-2xl bg-[var(--bg-card)]"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20">
+            <svg className="h-5.5 w-5.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base font-bold tracking-tight text-[var(--text-primary)]">
+              Delete Routine Plan?
+            </h3>
+            <p className="mt-1.5 text-xs font-medium leading-relaxed text-[var(--text-secondary)]">
+              Are you sure you want to delete the plan for <span className="font-semibold text-[var(--text-primary)]">{dateText}</span>? All planned tasks for this day will be removed.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={deleting}
+            className="focus-ring interactive-surface rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition disabled:opacity-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={deleting}
+            className="focus-ring flex items-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] px-4 py-2 text-xs font-semibold text-white shadow-xs transition disabled:opacity-50 cursor-pointer"
+          >
+            {deleting ? (
+              <>
+                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span>Deleting...</span>
+              </>
+            ) : (
+              <span>Delete Plan</span>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+}

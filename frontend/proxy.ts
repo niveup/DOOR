@@ -19,6 +19,21 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!session.isLoggedIn) {
+    // Allow demo-mode users through (they have a client-side cookie).
+    // Demo users never hit real backend APIs — the frontend intercepts fetches.
+    const demoFlag = request.cookies.get("jujum_demo")?.value;
+    if (demoFlag === "1") {
+      // Block demo users from accessing the real backend proxy
+      if (pathname.startsWith("/api/backend")) {
+        return NextResponse.json({ error: "Demo mode" }, { status: 403 });
+      }
+      // Demo journal lock check: redirect to /journal/unlock if locked
+      const demoJournalUnlocked = request.cookies.get("jujum_demo_journal_unlocked")?.value === "1";
+      if ((pathname === "/journal" || pathname.startsWith("/journal/")) && pathname !== "/journal/unlock" && !demoJournalUnlocked) {
+        return NextResponse.redirect(new URL("/journal/unlock", request.url));
+      }
+      return response;
+    }
     return NextResponse.redirect(new URL("/passcode", request.url));
   }
 

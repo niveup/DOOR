@@ -8,6 +8,7 @@ import { MicroInteractionButton } from "@/components/MotionComponents";
 import { AiMarkdown } from "@/components/AiMarkdown";
 import { ModelSelector, AiSelection } from "@/components/ModelSelector";
 import { getCache, setCache } from "@/lib/sessionCache";
+import { useDemoFetch } from "@/lib/DemoContext";
 
 interface Section {
   id: string;
@@ -281,6 +282,7 @@ export default function ExplainerPage() {
 
   const shouldReduceMotion = useReducedMotion();
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+  const appFetch = useDemoFetch();
 
   // Load active AI config on mount
   useEffect(() => {
@@ -291,7 +293,7 @@ export default function ExplainerPage() {
         return;
       }
       try {
-        const response = await fetch(`${backendUrl}/api/ai/config`);
+        const response = await appFetch(`${backendUrl}/api/ai/config`);
         if (response.ok) {
           const result = await response.json();
           const activeProvider = result.activeProvider || "nvidia";
@@ -405,7 +407,7 @@ export default function ExplainerPage() {
         { role: "assistant", content: JSON.stringify(item.explanation) }
       ]) : [];
 
-      const res = await fetch(`${backendUrl}/api/explainer/query`, {
+      const res = await appFetch(`${backendUrl}/api/explainer/query`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

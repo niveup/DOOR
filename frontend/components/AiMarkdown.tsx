@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -10,7 +10,16 @@ import "katex/dist/katex.min.css";
 function preprocessMarkdown(content: string): string {
   if (!content) return "";
 
-  let clean = content.replace(/\\(\$\$)/g, " $1");
+  // Fix JSON-escaped control character corruptions of LaTeX commands (e.g. \f -> \x0C Form Feed, \t -> \x09 Tab)
+  let clean = content
+    .replace(/\x0C([a-zA-Z]+)/g, "\\f$1")
+    .replace(/\x09([a-zA-Z]+)/g, "\\t$1")
+    .replace(/\x0B([a-zA-Z]+)/g, "\\v$1")
+    .replace(/\x08([a-zA-Z]+)/g, "\\b$1")
+    .replace(/⬆rac/g, "\\frac")
+    .replace(/⬆/g, "\\")
+    .replace(/^\s*(?:HOOK|CORE|STICK|PASS\s+BACK)\s*:\s*/gim, "")
+    .replace(/\\(\$\$)/g, " $1");
   clean = clean.replace(/\\(\$)/g, " $1");
   clean = clean
     .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_, equation: string) => `$$${equation.trim()}$$`)

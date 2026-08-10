@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { Toaster } from "sonner";
 import { AppShellLayout } from "@/components/AppShell";
+import { DemoProvider } from "@/lib/DemoContext";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -30,7 +31,7 @@ export default function RootLayout({
               (function() {
                 var theme = localStorage.getItem('jujum-theme');
                 if (!theme) {
-                  theme = 'dark';
+                  theme = 'light';
                 }
                 document.documentElement.dataset.theme = theme;
               })();
@@ -53,7 +54,9 @@ export default function RootLayout({
             },
           }}
         />
-        <AppShellLayout>{children}</AppShellLayout>
+        <DemoProvider>
+          <AppShellLayout>{children}</AppShellLayout>
+        </DemoProvider>
       </body>
     </html>
   );

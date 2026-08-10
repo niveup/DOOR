@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { AppShell, PageSection } from "@/components/AppShell";
 import { MicroInteractionButton } from "@/components/MotionComponents";
 import { getCache, setCache, updateCache } from "@/lib/sessionCache";
+import { useDemoFetch } from "@/lib/DemoContext";
 
 type ProviderName = "openrouter" | "nvidia" | "cerebras";
 
@@ -32,6 +33,7 @@ const providerLabels: Record<ProviderName, string> = {
 
 export default function AiSettingsPage() {
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+  const appFetch = useDemoFetch();
   const [configuration, setConfiguration] = useState<AiConfiguration | null>(null);
   const [provider, setProvider] = useState<ProviderName>("openrouter");
   const [model, setModel] = useState("openrouter/free");
@@ -91,7 +93,7 @@ export default function AiSettingsPage() {
       return;
     }
     try {
-      const response = await fetch(`${backendUrl}/api/ai/models?provider=${nextProvider}`, {
+      const response = await appFetch(`${backendUrl}/api/ai/models?provider=${nextProvider}`, {
         headers: {},
       });
       const result = await response.json();
@@ -117,7 +119,7 @@ export default function AiSettingsPage() {
       return;
     }
     try {
-      const response = await fetch(`${backendUrl}/api/ai/config`, {
+      const response = await appFetch(`${backendUrl}/api/ai/config`, {
         headers: {},
       });
       const result = await response.json();
@@ -161,7 +163,7 @@ export default function AiSettingsPage() {
     setSaving(true);
     setTestResult(null);
     try {
-      const response = await fetch(`${backendUrl}/api/ai/config`, {
+      const response = await appFetch(`${backendUrl}/api/ai/config`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -189,7 +191,7 @@ export default function AiSettingsPage() {
     setTesting(true);
     setTestResult(null);
     try {
-      const response = await fetch(`${backendUrl}/api/ai/test`, {
+      const response = await appFetch(`${backendUrl}/api/ai/test`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

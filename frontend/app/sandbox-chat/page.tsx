@@ -8,6 +8,7 @@ import { ModelSelector, type AiSelection } from "@/components/ModelSelector";
 import { MicroInteractionButton } from "@/components/MotionComponents";
 import { toast, Toaster } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
+import { useDemoFetch } from "@/lib/DemoContext";
 
 interface PlanChatMessage {
   id: string;
@@ -54,6 +55,7 @@ const taskTypeLedger = {
 
 export default function SandboxChatPage() {
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+  const appFetch = useDemoFetch();
 
   // Modal open state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -163,7 +165,7 @@ export default function SandboxChatPage() {
 
     // Real API implementation
     try {
-      const response = await fetch(`${backendUrl}/api/routine/plan-chat`, {
+      const response = await appFetch(`${backendUrl}/api/routine/plan-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -187,7 +189,6 @@ export default function SandboxChatPage() {
       setDraftTasks(Array.isArray(result.draftTasks) ? result.draftTasks : []);
       setReady(Boolean(result.ready));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Network error");
       setMessages((curr) => [
         ...curr,
         {
@@ -225,7 +226,7 @@ export default function SandboxChatPage() {
     }
 
     try {
-      const res = await fetch(`${backendUrl}/api/routine/manual`, {
+      const res = await appFetch(`${backendUrl}/api/routine/manual`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tasks: draftTasks }),
@@ -259,7 +260,7 @@ export default function SandboxChatPage() {
       <Toaster position="top-right" richColors />
 
       {/* TOP CONTROL HUB */}
-      <section className="surface mb-4 bg-gradient-to-r from-stone-100 to-stone-200/50 p-4 border border-stone-300">
+      <section className="surface mb-4 bg-[#FAF9F5] p-4 border border-stone-300">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <span className="section-label text-stone-500 font-mono">WORKSPACE SETTINGS</span>

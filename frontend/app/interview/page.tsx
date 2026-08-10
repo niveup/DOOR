@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, PageSection } from "@/components/AppShell";
 import { AiMarkdown } from "@/components/AiMarkdown";
 import { EmptyState, MicroInteractionButton, ProgressBar } from "@/components/MotionComponents";
+import { useDemoFetch } from "@/lib/DemoContext";
 
 type Mode = "Technical" | "HR" | "Mixed" | "GD" | "Rapid Fire";
 type Dimension = { label: string; value: number };
@@ -39,6 +40,7 @@ export default function InterviewPage() {
  const [sessionId, setSessionId] = useState(newSessionId);
  const skipInFlight = useRef(false);
  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+ const appFetch = useDemoFetch();
  const questions = questionBank[mode];
  const currentQuestion = questions[questionIndex % questions.length];
  const sessionLength = mode === "Rapid Fire" ? 10 : 5;
@@ -55,7 +57,7 @@ export default function InterviewPage() {
   skipInFlight.current = true;
   setRunning(false);
   try {
-   const response = await fetch(`${backendUrl}/api/interview/skip`, {
+   const response = await appFetch(`${backendUrl}/api/interview/skip`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sessionId, questionIndex, sessionLength, company, mode, question: currentQuestion }),
@@ -87,7 +89,7 @@ export default function InterviewPage() {
   if (answer.trim().length < 20) { setError("Write at least 20 characters before scoring the answer."); return; }
   setEvaluating(true); setRunning(false); setError("");
   try {
-   const response = await fetch(`${backendUrl}/api/interview/evaluate`, {
+   const response = await appFetch(`${backendUrl}/api/interview/evaluate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sessionId, questionIndex, sessionLength, company, mode, question: currentQuestion, answer }),

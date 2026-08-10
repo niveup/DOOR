@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { MicroInteractionButton } from "@/components/MotionComponents";
 import { motion, AnimatePresence } from "motion/react";
+import { useDemoFetch, useDemoMode } from "@/lib/DemoContext";
 
 interface JournalEntry {
   journalId: string;
@@ -168,6 +169,8 @@ export default function JournalPage() {
   const dateInputRef = useRef<HTMLInputElement>(null);
   const writingTimer = useRef<number | null>(null);
   const router = useRouter();
+  const { isDemoMode } = useDemoMode();
+  const appFetch = useDemoFetch();
   const [isLocking, setIsLocking] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [isStickyToViewport, setIsStickyToViewport] = useState(true);
@@ -213,7 +216,7 @@ export default function JournalPage() {
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const response = await fetch("/api/journal?limit=30", { cache: "no-store" });
+      const response = await appFetch("/api/journal?limit=30", { cache: "no-store" });
       const result = await response.json() as { entries?: JournalEntry[]; error?: string };
       if (!response.ok) throw new Error(result.error || "Journal history could not be loaded.");
       const loadedEntries = Array.isArray(result.entries) ? result.entries : [];
@@ -242,6 +245,12 @@ export default function JournalPage() {
   }, []);
 
   useEffect(() => { void loadHistory(); }, [loadHistory]);
+
+  useEffect(() => {
+    if (isDemoMode && typeof window !== "undefined" && localStorage.getItem("jujum-demo-journal-unlocked") !== "true") {
+      router.push("/journal/unlock");
+    }
+  }, [isDemoMode, router]);
 
   useEffect(() => {
     router.prefetch("/journal/unlock");
@@ -295,7 +304,7 @@ export default function JournalPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/journal", {
+      const response = await appFetch("/api/journal", {
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
@@ -324,7 +333,15 @@ export default function JournalPage() {
     setIsLocking(true);
     await new Promise((resolve) => setTimeout(resolve, 1400));
     try {
-      await fetch("/api/journal-auth", { method: "DELETE", cache: "no-store" });
+      if (isDemoMode) {
+        document.cookie = "jujum_demo_journal_unlocked=; path=/; max-age=0";
+        localStorage.removeItem("jujum-demo-journal-unlocked");
+      } else {
+        await appFetch("/api/journal-auth", { method: "DELETE", cache: "no-store" });
+        document.cookie = "jujum_journal_unlocked=; path=/; max-age=0";
+        localStorage.removeItem("jujum-journal-unlocked");
+      }
+      window.dispatchEvent(new CustomEvent("journal-lock-change", { detail: { locked: true } }));
     } finally {
       router.replace("/journal/unlock");
       router.refresh();
@@ -654,8 +671,15 @@ export default function JournalPage() {
 
         <aside className="journal-sidebar" aria-label="Journal tools and history">
           <section className="journal-drawer">
-            <div className="journal-drawer-heading">
+            <div className="journal-drawer-heading flex items-center justify-between">
               <p className="journal-panel-kicker" style={{ margin: 0 }}>Prompt sheets</p>
+              <button type="button" onClick={lockJournal} className="journal-lock-button focus-ring" title="Lock Journal" aria-label="Lock Journal">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path className="lock-shackle" d="M8 10V6.5a4 4 0 0 1 8 0V10" />
+                  <rect x="5" y="10" width="14" height="10" rx="2" strokeWidth="1.5" />
+                </svg>
+                <span>Lock</span>
+              </button>
             </div>
             <div className="journal-prompt-list">
               {promptSheets.map((sheet) => <button type="button" key={sheet.title} onClick={() => insertPrompt(sheet.copy)} className="journal-prompt-card focus-ring"><span>{sheet.note}</span><strong>{sheet.title}</strong><i aria-hidden="true">Add +</i></button>)}

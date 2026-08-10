@@ -150,6 +150,7 @@ export function MotionCard({
       whileTap={isClickable && !shouldReduceMotion ? { scale: 0.995 } : {}}
       className={`premium-card premium-card-hover ${isClickable ? "cursor-pointer select-none" : ""} ${className}`}
       style={style}
+      suppressHydrationWarning
       {...props}
     >
       {children}
@@ -184,6 +185,7 @@ export function EmptyState({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: shouldReduceMotion ? 0.01 : 0.2, ease: [0, 0, 0.2, 1] }}
       className={`surface-flat flex flex-col items-center justify-center p-6 text-center ${className}`}
+      suppressHydrationWarning
     >
       {mark ? (
         <span className="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)]">

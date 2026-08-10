@@ -8,6 +8,7 @@ import { getCache, setCache, clearCache, updateCache } from "@/lib/sessionCache"
 import { AppShell, PageSection } from "@/components/AppShell";
 import { AiMarkdown } from "@/components/AiMarkdown";
 import { AnimatedNumber, EmptyState, MicroInteractionButton, ProgressBar } from "@/components/MotionComponents";
+import { useDemoFetch } from "@/lib/DemoContext";
 
 interface Subject {
   subjectId: number;
@@ -212,13 +213,13 @@ function enqueueOfflineLog(log: Record<string, any>) {
   saveOfflineQueue(queue);
 }
 
-async function flushOfflineQueue(backendUrl: string) {
+async function flushOfflineQueue(backendUrl: string, fetchFn: typeof fetch = fetch) {
   const queue = getOfflineQueue();
   if (queue.length === 0) return;
   const remaining: Array<Record<string, any>> = [];
   for (const log of queue) {
     try {
-      const res = await fetch(`${backendUrl}/api/tracker/log`, {
+      const res = await fetchFn(`${backendUrl}/api/tracker/log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(log),
@@ -440,6 +441,7 @@ export default function TrackerPage() {
 
 
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+  const appFetch = useDemoFetch();
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -454,7 +456,7 @@ export default function TrackerPage() {
         }
       }
 
-      const response = await fetch(`${backendUrl}/api/tracker/status?t=${Date.now()}`, {
+      const response = await appFetch(`${backendUrl}/api/tracker/status?t=${Date.now()}`, {
         headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
       });
       const result = (await response.json()) as TrackerData & { error?: string };
@@ -506,6 +508,14 @@ export default function TrackerPage() {
   }, [refresh]);
 
   const subjects = useMemo(() => data?.subjects || [], [data]);
+
+  useEffect(() => {
+    if (subjects.length > 0) {
+      if (!selectedSubject || !subjects.some((s) => s.subjectId === selectedSubject.subjectId)) {
+        setSelectedSubject(subjects[0]);
+      }
+    }
+  }, [subjects, selectedSubject]);
 
   // Aggregate Metrics (Derived cleanly from sessionLogs stored in Prisma Postgres)
   const totalHours = useMemo(() => {
@@ -787,7 +797,7 @@ export default function TrackerPage() {
     toast.success(`Daily goal updated to ${parsed.toFixed(1)} hours / day!`);
 
     try {
-      await fetch(`${backendUrl}/api/tracker/goal`, {
+      await appFetch(`${backendUrl}/api/tracker/goal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dailyAvailableHours: parsed }),
@@ -851,7 +861,7 @@ export default function TrackerPage() {
     setIsLogModalOpen(false);
 
     try {
-      const response = await fetch(`${backendUrl}/api/tracker/log`, {
+      const response = await appFetch(`${backendUrl}/api/tracker/log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -957,7 +967,7 @@ export default function TrackerPage() {
         .map((t) => t.trim())
         .filter(Boolean);
 
-      const response = await fetch(`${backendUrl}/api/subjects`, {
+      const response = await appFetch(`${backendUrl}/api/subjects`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -998,7 +1008,7 @@ export default function TrackerPage() {
     const targetName = subjectToDelete.subjectName;
 
     try {
-      const response = await fetch(`${backendUrl}/api/subjects/${targetId}`, {
+      const response = await appFetch(`${backendUrl}/api/subjects/${targetId}`, {
         method: "DELETE",
       });
 
@@ -1063,7 +1073,7 @@ export default function TrackerPage() {
       }
 
       // 2. Execute D1 database reset
-      const resetRes = await fetch(`${backendUrl}/api/tracker/reset`, { method: "POST" });
+      const resetRes = await appFetch(`${backendUrl}/api/tracker/reset`, { method: "POST" });
       if (!resetRes.ok) throw new Error("Could not reset tracker database.");
 
       clearCache('tracker_full');
@@ -1637,15 +1647,18 @@ export default function TrackerPage() {
                       Subject
                     </label>
                     <select
-                      value={selectedSubject?.subjectId || ""}
+                      value={selectedSubject?.subjectId || (subjects[0]?.subjectId ?? "")}
                       onChange={(e) => {
                         const sub = subjects.find((s) => s.subjectId === Number(e.target.value));
                         if (sub) setSelectedSubject(sub);
                       }}
-                      className="app-input w-full px-3.5 py-2.5 text-sm font-semibold"
+                      className="app-input w-full px-3.5 py-2.5 text-sm font-semibold bg-[var(--bg-card)] text-[var(--text-primary)] cursor-pointer"
                     >
+                      {subjects.length === 0 && (
+                        <option value="" disabled>No subjects available</option>
+                      )}
                       {subjects.map((s) => (
-                        <option key={s.subjectId} value={s.subjectId}>
+                        <option key={s.subjectId} value={s.subjectId} className="text-stone-900 bg-white dark:bg-stone-900 dark:text-stone-100">
                           {s.subjectName}
                         </option>
                       ))}

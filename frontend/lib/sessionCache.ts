@@ -22,6 +22,9 @@ interface CacheEnvelope<T> {
 export function getCache<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
   try {
+    if (localStorage.getItem("jujum-demo-mode") === "true") {
+      return null;
+    }
     const raw = sessionStorage.getItem(PREFIX + key);
     if (!raw) return null;
     const envelope = JSON.parse(raw) as CacheEnvelope<T>;

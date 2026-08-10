@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MicroInteractionButton } from "@/components/MotionComponents";
+import { clearAllCache } from "@/lib/sessionCache";
 
 export default function PasscodePage() {
   const [passcode, setPasscode] = useState("");
@@ -11,6 +12,15 @@ export default function PasscodePage() {
   const [loading, setLoading] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const router = useRouter();
+
+  const enterDemoMode = () => {
+    clearAllCache();
+    localStorage.setItem("jujum-demo-mode", "true");
+    // Set a simple cookie so the middleware allows navigation
+    document.cookie = "jujum_demo=1; path=/; max-age=" + 60 * 60 * 24 * 7;
+    toast("Entering demo mode — data is local only", { icon: "👁️" });
+    router.push("/dashboard");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +42,14 @@ export default function PasscodePage() {
         toast.success("Access granted");
         router.push("/dashboard");
       } else {
-        toast.error("Incorrect passcode");
-        setError("Incorrect password");
+        const data = await res.json().catch(() => ({}));
+        if (data.demo) {
+          // Wrong password — offer demo mode
+          setError("demo");
+        } else {
+          toast.error("Authentication failed");
+          setError("Incorrect password");
+        }
       }
     } catch {
       toast.error("Authentication failed");
@@ -135,7 +151,7 @@ export default function PasscodePage() {
                   </g>
                 </svg>
               </div>
-              <h2 className="text-2xl font-sans font-extrabold text-stone-800 tracking-[0.15em] uppercase">DOOR</h2>
+              <h2 className="text-2xl font-sans font-extrabold text-stone-900 tracking-[0.15em] uppercase">DOOR</h2>
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -154,12 +170,33 @@ export default function PasscodePage() {
                       : "border-stone-300 focus:border-stone-800 focus:ring-1 focus:ring-stone-800"
                   }`}
                 />
-                {error && (
+                {error && error !== "demo" && (
                   <div className="flex items-center justify-center gap-1.5 text-xs text-rose-500 font-sans font-medium mt-2 animate-fadeIn">
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                     </svg>
                     <span>{error}</span>
+                  </div>
+                )}
+                {error === "demo" && (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 animate-fadeIn">
+                    <p className="text-xs font-semibold text-amber-800 text-center">
+                      Incorrect password
+                    </p>
+                    <p className="text-[11px] text-amber-600 text-center mt-1 leading-relaxed">
+                      Want to explore? Take a quick tour with sample data — nothing is saved to the real account.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={enterDemoMode}
+                      className="mt-2.5 w-full rounded-md bg-amber-600 hover:bg-amber-700 text-white py-2 text-xs font-semibold tracking-wider uppercase transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Explore Demo
+                    </button>
                   </div>
                 )}
               </div>
@@ -169,7 +206,7 @@ export default function PasscodePage() {
                 loading={loading}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className="w-full relative overflow-hidden bg-stone-900 hover:bg-stone-800 text-stone-100 hover:text-white py-3.5 text-xs font-sans font-semibold tracking-wider rounded-lg border border-stone-800 hover:border-stone-700 shadow-sm hover:shadow transition-all duration-200 cursor-pointer uppercase group"
+                className="w-full relative overflow-hidden bg-stone-900 hover:bg-stone-800 text-stone-100 hover:text-white py-3.5 text-xs font-sans font-semibold tracking-wider rounded-lg border border-stone-800 shadow-sm hover:shadow transition-all duration-200 cursor-pointer uppercase group"
               >
                 <span className="relative z-10 transition-all duration-200 tracking-wider group-hover:tracking-[0.2em] flex items-center justify-center gap-2">
                   ENTER

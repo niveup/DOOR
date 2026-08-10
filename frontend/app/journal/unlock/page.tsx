@@ -4,16 +4,27 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
+import { useDemoMode } from "@/lib/DemoContext";
 
 export default function JournalUnlockPage() {
   const [passcode, setPasscode] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { isDemoMode } = useDemoMode();
 
   const unlock = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!passcode || loading) return;
     setLoading(true);
+
+    if (isDemoMode) {
+      document.cookie = "jujum_demo_journal_unlocked=1; path=/; max-age=" + 60 * 60 * 24;
+      localStorage.setItem("jujum-demo-journal-unlocked", "true");
+      window.dispatchEvent(new CustomEvent("journal-lock-change", { detail: { locked: false } }));
+      toast.success("Demo journal unlocked");
+      window.location.replace("/journal");
+      return;
+    }
     try {
       const response = await fetch("/api/journal-auth", {
         method: "POST",
@@ -22,6 +33,9 @@ export default function JournalUnlockPage() {
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Journal unlock failed.");
+      document.cookie = "jujum_journal_unlocked=1; path=/; max-age=" + 60 * 60 * 24;
+      localStorage.setItem("jujum-journal-unlocked", "true");
+      window.dispatchEvent(new CustomEvent("journal-lock-change", { detail: { locked: false } }));
       setPasscode("");
       toast.success("Private journal unlocked");
       window.location.replace("/journal");

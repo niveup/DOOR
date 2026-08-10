@@ -1,4 +1,4 @@
-﻿import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -1096,7 +1096,7 @@ app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
       : undefined;
 
     const aiResponse = await aiChat(
-      "You are Jujum AI, a friendly AI study partner and peer mentor. Answer the student's LATEST message directly using The 4-Beat Answer Structure. Do not repeat background stats unless asked. Return JSON only.",
+      "You are Jujum AI, a flexible, intelligent AI partner. Answer the student's LATEST message directly and naturally. Do NOT force background subjects (like Thermodynamics), exam tags, or study stats into greetings or unrelated prompts. Return valid JSON only.",
       prompt,
       { provider: requestedProvider, model: requestedModel }
     );

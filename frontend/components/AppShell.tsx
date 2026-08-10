@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
+import { type ReactNode, createContext, useContext, useEffect, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { useDemoMode } from "@/lib/DemoContext";
 
 const AppShellContext = createContext<{ isInsideLayout: boolean }>({ isInsideLayout: false });
 
 const primaryNavItems = [
   { href: "/dashboard", label: "Dashboard", mobileLabel: "Today", helper: "Today", mark: "D", icon: "home" },
-  { href: "/journal", label: "Journal", mobileLabel: "Journal", helper: "Evening", mark: "J", icon: "journal" },
   { href: "/tracker", label: "Tracker", mobileLabel: "Progress", helper: "Weekly", mark: "T", icon: "progress" },
+  { href: "/finance", label: "Finance", mobileLabel: "Money", helper: "Ledger", mark: "F", icon: "finance" },
+  { href: "/journal", label: "Journal", mobileLabel: "Journal", helper: "Evening", mark: "J", icon: "journal" },
   { href: "/chat", label: "AI Coach", mobileLabel: "Coach", helper: "General", mark: "C", icon: "chat" },
 ];
 
@@ -32,11 +34,6 @@ function todayLabel() {
   }).format(new Date());
 }
 
-function isActive(pathname: string, href: string) {
-  if (href === "/dashboard") return pathname === href || pathname === "/";
-  return pathname.startsWith(href);
-}
-
 function TabIcon({ name }: { name: string }) {
   const common = {
     width: 17,
@@ -52,6 +49,7 @@ function TabIcon({ name }: { name: string }) {
   if (name === "home") return <svg {...common}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
   if (name === "journal") return <svg {...common}><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>;
   if (name === "progress") return <svg {...common}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
+  if (name === "finance") return <svg {...common}><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>;
   if (name === "interview") return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>;
   if (name === "chat") return <svg {...common}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v6M9 10h6"/></svg>;
   if (name === "explain") return <svg {...common}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
@@ -64,6 +62,51 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
   const [optimisticPathname, setOptimisticPathname] = useState(pathname);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mounted, setMounted] = useState(false);
+  const [isJournalLocked, setIsJournalLocked] = useState(true);
+  const { isDemoMode, exitDemoMode } = useDemoMode();
+
+  const checkLockStatus = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    if (isDemoMode) {
+      const isUnlocked = localStorage.getItem("jujum-demo-journal-unlocked") === "true" || document.cookie.includes("jujum_demo_journal_unlocked=1");
+      setIsJournalLocked(!isUnlocked);
+      return;
+    }
+    const hasLocalUnlocked = document.cookie.includes("jujum_journal_unlocked=1") || localStorage.getItem("jujum-journal-unlocked") === "true";
+    setIsJournalLocked(!hasLocalUnlocked);
+
+    try {
+      const res = await fetch("/api/journal-auth", { cache: "no-store" });
+      if (res.ok) {
+        const data = (await res.json()) as { isUnlocked?: boolean };
+        const unlocked = Boolean(data.isUnlocked);
+        setIsJournalLocked(!unlocked);
+        if (unlocked) {
+          localStorage.setItem("jujum-journal-unlocked", "true");
+        } else {
+          localStorage.removeItem("jujum-journal-unlocked");
+        }
+      }
+    } catch {
+      // Keep local state fallback
+    }
+  }, [isDemoMode]);
+
+  useEffect(() => {
+    checkLockStatus();
+    const handleLockChange = (e: Event) => {
+      const customEv = e as CustomEvent<{ locked?: boolean }>;
+      if (typeof customEv.detail?.locked === "boolean") {
+        setIsJournalLocked(customEv.detail.locked);
+      } else {
+        checkLockStatus();
+      }
+    };
+    window.addEventListener("journal-lock-change", handleLockChange);
+    return () => {
+      window.removeEventListener("journal-lock-change", handleLockChange);
+    };
+  }, [checkLockStatus, pathname]);
 
   useEffect(() => {
     setOptimisticPathname(pathname);
@@ -76,7 +119,7 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const currentTheme = (document.documentElement.dataset.theme as "light" | "dark") || "dark";
+    const currentTheme = (document.documentElement.dataset.theme as "light" | "dark") || "light";
     setTheme(currentTheme);
     setMounted(true);
   }, []);
@@ -115,6 +158,25 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
   return (
     <AppShellContext.Provider value={{ isInsideLayout: true }}>
       <div className="app-background min-h-screen text-[var(--text-primary)]">
+        {/* Demo Mode Banner */}
+        {isDemoMode && (
+          <div className="sticky top-0 z-50 flex items-center justify-center gap-3 bg-amber-50 border-b border-amber-200 px-4 py-1.5">
+            <div className="flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="text-[11px] font-bold text-amber-700 tracking-wide uppercase">Demo Mode</span>
+              <span className="text-[11px] text-amber-600">— data is local only</span>
+            </div>
+            <button
+              onClick={exitDemoMode}
+              className="rounded-md bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase transition-colors cursor-pointer"
+            >
+              Exit
+            </button>
+          </div>
+        )}
         <div className="flex min-h-screen w-full max-w-full">
           <aside className="surface hidden w-[240px] lg:w-[250px] shrink-0 flex-col justify-between p-4 lg:flex sticky top-0 h-screen rounded-none border-t-0 border-b-0 border-l-0 border-r border-[var(--border)] z-30">
             <div>
@@ -180,7 +242,14 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                       <span className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-150 ${active ? "bg-[var(--bg-card)] text-[#000000] dark:text-[var(--accent)] shadow-xs" : "bg-[var(--bg-elevated)] text-[#000000] dark:text-[var(--text-secondary)] group-hover:bg-[var(--bg-card)]"}`}>
                         <TabIcon name={item.icon} />
                       </span>
-                      <span className={`relative z-10 truncate text-[13px] font-semibold ${active ? "text-[#000000] dark:text-[var(--accent)]" : "text-[#000000] dark:text-[var(--text-primary)]"}`}>{item.label}</span>
+                      <span className={`relative z-10 truncate text-[13px] font-semibold flex-1 ${active ? "text-[#000000] dark:text-[var(--accent)]" : "text-[#000000] dark:text-[var(--text-primary)]"}`}>{item.label}</span>
+                      {item.href === "/journal" && isJournalLocked && mounted ? (
+                        <span className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center text-stone-400 dark:text-stone-500 group-hover:text-stone-600 dark:group-hover:text-stone-300 transition-colors" title="Journal is locked" aria-label="Journal is locked">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6.75a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5v-6.75a2.25 2.25 0 012.25-2.25z" />
+                          </svg>
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })}
@@ -234,7 +303,15 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                 <span suppressHydrationWarning className="text-[12px] font-semibold text-zinc-950 dark:text-[var(--text-secondary)]">{mounted ? todayLabel() : ""}</span>
               </div>
               <div className="mt-2.5 grid gap-1.5">
-                <Link href="/journal" onClick={() => setOptimisticPathname("/journal")} className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Write today&apos;s entry</Link>
+                <Link href="/journal" onClick={() => setOptimisticPathname("/journal")} className="interactive-surface flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">
+                  <span>Write today&apos;s entry</span>
+                  {isJournalLocked && mounted ? (
+                    <svg className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                      <title>Journal is locked</title>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6.75a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5v-6.75a2.25 2.25 0 012.25-2.25z" />
+                    </svg>
+                  ) : null}
+                </Link>
                 <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="interactive-surface rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs font-semibold text-zinc-950 dark:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]">Make today&apos;s plan</Link>
               </div>
             </div>
@@ -295,7 +372,15 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                       ) : active ? (
                         <div className="absolute inset-0 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-soft)] -z-0 pointer-events-none" />
                       ) : null}
-                      <span className="relative z-10">{item.label}</span>
+                      <span className="relative z-10 flex items-center gap-1.5">
+                        {item.label}
+                        {item.href === "/journal" && isJournalLocked && mounted ? (
+                          <svg className="w-3 h-3 text-stone-400 dark:text-stone-500 inline-block shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                            <title>Journal is locked</title>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6.75a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5v-6.75a2.25 2.25 0 012.25-2.25z" />
+                          </svg>
+                        ) : null}
+                      </span>
                     </Link>
                   );
                 })}
@@ -341,7 +426,16 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                   <div className="absolute inset-0 rounded-lg bg-[var(--accent-soft)] -z-0 pointer-events-none" />
                 ) : null}
                 <span className="relative z-10 flex flex-col items-center justify-center gap-0.5">
-                  <TabIcon name={item.icon} />
+                  <div className="relative">
+                    <TabIcon name={item.icon} />
+                    {item.href === "/journal" && isJournalLocked && mounted ? (
+                      <span className="absolute -top-1 -right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] text-stone-500 dark:text-stone-400 shadow-xs" title="Journal is locked">
+                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6.75a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5v-6.75a2.25 2.25 0 012.25-2.25z" />
+                        </svg>
+                      </span>
+                    ) : null}
+                  </div>
                   <span>{item.mobileLabel}</span>
                 </span>
               </Link>
