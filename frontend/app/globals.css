@@ -754,20 +754,20 @@ main:has(.journal-workspace) { padding-bottom: 4px !important; }
 
 /* Poppins-Based Visual Hierarchy for Journal Text */
 .journal-sec-header { font-family: var(--font-sans), Poppins, sans-serif; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; line-height: 34px; display: block; }
-.journal-sec-routine { color: #a24b2a !important; }
-.journal-sec-study { color: #1e7a4d !important; }
-.journal-sec-health { color: #724f80 !important; }
-.journal-sec-distraction { color: #b86f18 !important; }
-.journal-sec-night { color: #2d5584 !important; }
+.journal-sec-routine { color: #8b5238 !important; }
+.journal-sec-study { color: #3d664f !important; }
+.journal-sec-health { color: #6e4f3a !important; }
+.journal-sec-distraction { color: #8a5e2f !important; }
+.journal-sec-night { color: #4f4b48 !important; }
 
-:root[data-theme="dark"] .journal-sec-routine { color: #f29f79 !important; }
-:root[data-theme="dark"] .journal-sec-study { color: #5ec995 !important; }
-:root[data-theme="dark"] .journal-sec-health { color: #d69de6 !important; }
-:root[data-theme="dark"] .journal-sec-distraction { color: #ecc36b !important; }
-:root[data-theme="dark"] .journal-sec-night { color: #7fadcf !important; }
+:root[data-theme="dark"] .journal-sec-routine { color: #dca58a !important; }
+:root[data-theme="dark"] .journal-sec-study { color: #82b596 !important; }
+:root[data-theme="dark"] .journal-sec-health { color: #c7a48d !important; }
+:root[data-theme="dark"] .journal-sec-distraction { color: #cf9e67 !important; }
+:root[data-theme="dark"] .journal-sec-night { color: #a8a39e !important; }
 
-.journal-prompt-question { font-family: var(--font-sans), Poppins, sans-serif; font-size: 0.76rem; font-weight: 500; color: #766453 !important; line-height: 34px; letter-spacing: 0.01em; display: inline; }
-:root[data-theme="dark"] .journal-prompt-question { color: #b8a898 !important; }
+.journal-prompt-question { font-family: var(--font-sans), Poppins, sans-serif; font-size: 0.77rem; font-weight: 500; color: #6b5645 !important; line-height: 34px; letter-spacing: 0.01em; display: inline; }
+:root[data-theme="dark"] .journal-prompt-question { color: #b5a292 !important; }
 
 .journal-user-ink { font-family: Georgia, Cambria, "Times New Roman", serif; font-size: 1.05rem; font-weight: 400; color: #241a14 !important; line-height: 34px; display: inline; }
 :root[data-theme="dark"] .journal-user-ink { color: #f3f0ea !important; }

@@ -198,33 +198,7 @@ function formatJournalTextToHTML(rawText: string): string {
     const trimmed = line.trim();
     if (!trimmed) return "<br/>";
     
-    // Routine Section Header
-    if (trimmed === "Daily Routine & Schedule" || trimmed.toUpperCase().includes("DAILY ROUTINE")) {
-      return `<div class="journal-sec-header journal-sec-routine">${escapeHtml(trimmed)}</div>`;
-    }
-    // Study Section Header
-    if (trimmed === "Study & Prep Log" || trimmed.toUpperCase().includes("STUDY & PREP")) {
-      return `<div class="journal-sec-header journal-sec-study">${escapeHtml(trimmed)}</div>`;
-    }
-    // Health & Hostel Header
-    if (trimmed === "Hostel, Health & Expenses" || trimmed.toUpperCase().includes("HEALTH & EXPENSES") || trimmed.toUpperCase().includes("HOSTEL")) {
-      return `<div class="journal-sec-header journal-sec-health">${escapeHtml(trimmed)}</div>`;
-    }
-    // Distractions Header
-    if (trimmed === "Distractions & Friction" || trimmed.toUpperCase().includes("DISTRACTION")) {
-      return `<div class="journal-sec-header journal-sec-distraction">${escapeHtml(trimmed)}</div>`;
-    }
-    // Night Priority Header
-    if (trimmed === "Night Review & Tomorrow's Priority" || trimmed.toUpperCase().includes("NIGHT REVIEW") || trimmed.toUpperCase().includes("TOMORROW")) {
-      return `<div class="journal-sec-header journal-sec-night">${escapeHtml(trimmed)}</div>`;
-    }
-    
-    // Custom Section Titles (e.g. A quiet check-in, Gratitude without gloss)
-    if (!trimmed.startsWith("•") && !trimmed.startsWith("-") && !/^\d+\./.test(trimmed) && trimmed.length > 3 && trimmed.length < 50 && !trimmed.includes(":") && !trimmed.endsWith(".")) {
-      return `<div class="journal-sec-header journal-sec-routine">${escapeHtml(trimmed)}</div>`;
-    }
-    
-    // Bullet Prompts with colored prompt labels (e.g. • Wake-up time, sleep hours:)
+    // Bullet Prompts with subtle warm prompt labels (e.g. • Wake-up time, sleep hours:)
     if (trimmed.startsWith("•") || trimmed.startsWith("-") || /^\d+\./.test(trimmed)) {
       const colonIdx = trimmed.indexOf(":");
       if (colonIdx !== -1) {
@@ -233,6 +207,30 @@ function formatJournalTextToHTML(rawText: string): string {
         return `<div><span class="journal-prompt-question">${escapeHtml(promptLabel)}</span><span class="journal-user-ink">${escapeHtml(userContent)}</span></div>`;
       }
       return `<div><span class="journal-prompt-question">${escapeHtml(trimmed)}</span></div>`;
+    }
+
+    const upper = trimmed.toUpperCase();
+
+    // Section Headers (Only non-bullet lines)
+    if (upper.includes("DAILY ROUTINE") || trimmed === "Daily Routine & Schedule") {
+      return `<div class="journal-sec-header journal-sec-routine">${escapeHtml(trimmed)}</div>`;
+    }
+    if (upper.includes("STUDY & PREP") || upper.includes("STUDY LOG") || trimmed === "Study & Prep Log") {
+      return `<div class="journal-sec-header journal-sec-study">${escapeHtml(trimmed)}</div>`;
+    }
+    if (upper.includes("HEALTH & EXPENSES") || upper.includes("HOSTEL, HEALTH") || trimmed === "Hostel, Health & Expenses") {
+      return `<div class="journal-sec-header journal-sec-health">${escapeHtml(trimmed)}</div>`;
+    }
+    if (upper.includes("DISTRACTION") || upper.includes("FRICTION") || trimmed === "Distractions & Friction") {
+      return `<div class="journal-sec-header journal-sec-distraction">${escapeHtml(trimmed)}</div>`;
+    }
+    if (upper.includes("NIGHT REVIEW") || upper.includes("TOMORROW'S PRIORITY") || trimmed === "Night Review & Tomorrow's Priority") {
+      return `<div class="journal-sec-header journal-sec-night">${escapeHtml(trimmed)}</div>`;
+    }
+    
+    // Custom Section Titles (e.g. A quiet check-in, Gratitude without gloss)
+    if (trimmed.length > 3 && trimmed.length < 50 && !trimmed.includes(":") && !trimmed.endsWith(".")) {
+      return `<div class="journal-sec-header journal-sec-routine">${escapeHtml(trimmed)}</div>`;
     }
 
     return `<div class="journal-user-ink">${escapeHtml(line)}</div>`;
