@@ -29,12 +29,6 @@ interface PersonalTodo {
   createdAt: number;
 }
 
-const DEFAULT_TODOS: PersonalTodo[] = [
-  { id: "def-1", text: "Revise 1 weak topic formula sheet", completed: false, tag: "GATE", createdAt: Date.now() - 3000 },
-  { id: "def-2", text: "Complete 15 practice PYQs", completed: false, tag: "GATE", createdAt: Date.now() - 2000 },
-  { id: "def-3", text: "Log today's cashflow expenses", completed: false, tag: "Quick", createdAt: Date.now() - 1000 },
-];
-
 let cheerSoundObject: Audio.Sound | null = null;
 
 async function setupAudio() {
@@ -150,18 +144,18 @@ export default function TodayScreen() {
       });
       setTodos(serverTasks);
     } else if (!routineQuery.isLoading && !routineQuery.data) {
-      // Fallback to local cache if no plan created yet today
+      // Fallback to local cache if no plan exists
       AsyncStorage.getItem(`door_todos_${date}`).then((stored) => {
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed)) {
               setTodos(parsed);
               return;
             }
           } catch {}
         }
-        setTodos(DEFAULT_TODOS);
+        setTodos([]);
       });
     }
   }, [routineQuery.data, routineQuery.isLoading, date, tagMap]);
@@ -577,6 +571,30 @@ export default function TodayScreen() {
 
         {/* List of Tasks */}
         <View style={styles.todoList}>
+          {todos.length === 0 && !routineQuery.isLoading && (
+            <View
+              style={[
+                styles.emptyTasksCard,
+                {
+                  backgroundColor: isDark ? "#121215" : "#ffffff",
+                  borderColor: isDark ? "#27272a" : "#e2e8f0",
+                },
+              ]}
+            >
+              <Ionicons
+                name="checkmark-done-circle-outline"
+                size={34}
+                color={isDark ? "#3f3f46" : "#94a3b8"}
+              />
+              <Text style={[styles.emptyTasksTitle, { color: theme.text }]}>
+                No tasks scheduled for today
+              </Text>
+              <Text style={[styles.emptyTasksSub, { color: theme.textFaint }]}>
+                Tap "+ Add task" above to start your daily focus.
+              </Text>
+            </View>
+          )}
+
           {todos.map((item) => {
             const tagCfg = TAG_CONFIG[item.tag] || TAG_CONFIG.GATE;
             const isJustAdded = item.id === recentlyAddedId;
@@ -923,5 +941,22 @@ const styles = StyleSheet.create({
   toastText: {
     fontSize: 13,
     fontWeight: "700",
+  },
+  emptyTasksCard: {
+    padding: 24,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  emptyTasksTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  emptyTasksSub: {
+    fontSize: 12,
+    fontWeight: "500",
+    textAlign: "center",
   },
 });
