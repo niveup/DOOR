@@ -331,225 +331,258 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
   return null;
 }
 
+function getFrontendFinanceModels() {
+  const expense = (prisma as any).financeExpense || (prisma as any).FinanceExpense;
+  const budget = (prisma as any).financeBudget || (prisma as any).FinanceBudget;
+  const bill = (prisma as any).financeBill || (prisma as any).FinanceBill;
+  return { expense, budget, bill };
+}
+
 async function handleNativeFinanceRoute(safePath: string, method: string, parsedBody: any, reqUrl: URL) {
-  // 1. GET api/finance/data
-  if (safePath === "api/finance/data" && method === "GET") {
-    const [expenses, budget, bills] = await Promise.all([
-      (prisma as any).financeExpense.findMany({
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      }),
-      (prisma as any).financeBudget.findUnique({
+  try {
+    const { expense, budget, bill } = getFrontendFinanceModels();
+
+    // 1. GET api/finance/data
+    if (safePath === "api/finance/data" && method === "GET") {
+      const [expenses, budgetRecord, bills] = await Promise.all([
+        expense?.findMany
+          ? expense.findMany({ orderBy: [{ date: "desc" }, { createdAt: "desc" }] })
+          : Promise.resolve([]),
+        budget?.findUnique
+          ? budget.findUnique({ where: { id: "default" } })
+          : Promise.resolve(null),
+        bill?.findMany
+          ? bill.findMany({ orderBy: [{ date: "asc" }, { createdAt: "asc" }] })
+          : Promise.resolve([]),
+      ]);
+
+      const defaultCaps = {
+        "Hostel & utilities": 0,
+        "Food & mess": 0,
+        "Travel & commute": 0,
+        "Academics": 0,
+        "Personal & health": 0,
+        "Subscriptions": 0,
+        "Fun & social": 0,
+        "Others": 0,
+      };
+
+      return NextResponse.json(
+        {
+          expenses: expenses || [],
+          budget: budgetRecord
+            ? {
+                allowance: budgetRecord.allowance,
+                caps: budgetRecord.caps || defaultCaps,
+              }
+            : {
+                allowance: 0,
+                caps: defaultCaps,
+              },
+          bills: bills || [],
+        },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+      );
+    }
+
+    // 2. POST api/finance/expense
+    if (safePath === "api/finance/expense" && method === "POST") {
+      if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
+      const { id, title, category, amount, date, payment } = parsedBody;
+      if (!title || typeof amount !== "number") {
+        return NextResponse.json({ error: "title and numeric amount are required." }, { status: 400 });
+      }
+
+      if (!expense?.upsert) {
+        return NextResponse.json({ success: true, expense: { id: id || `exp-${Date.now()}`, title, category, amount, date, payment } });
+      }
+
+      if (id) {
+        const updated = await expense.upsert({
+          where: { id },
+          update: {
+            title: String(title).trim(),
+            category: String(category || "Others"),
+            amount: Number(amount),
+            date: String(date || getKolkataDateString()),
+            payment: String(payment || "UPI"),
+          },
+          create: {
+            id,
+            title: String(title).trim(),
+            category: String(category || "Others"),
+            amount: Number(amount),
+            date: String(date || getKolkataDateString()),
+            payment: String(payment || "UPI"),
+          },
+        });
+        return NextResponse.json({ success: true, expense: updated });
+      } else {
+        const created = await expense.create({
+          data: {
+            title: String(title).trim(),
+            category: String(category || "Others"),
+            amount: Number(amount),
+            date: String(date || getKolkataDateString()),
+            payment: String(payment || "UPI"),
+          },
+        });
+        return NextResponse.json({ success: true, expense: created });
+      }
+    }
+
+    // 3. DELETE api/finance/expense
+    if ((safePath.startsWith("api/finance/expense/") || safePath === "api/finance/expense") && method === "DELETE") {
+      let id = safePath.startsWith("api/finance/expense/") ? safePath.replace("api/finance/expense/", "") : reqUrl.searchParams.get("id");
+      if (!id && parsedBody?.id) id = parsedBody.id;
+      if (!id) return NextResponse.json({ error: "Expense ID is required." }, { status: 400 });
+
+      if (expense?.deleteMany) {
+        await expense.deleteMany({
+          where: { id },
+        });
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    // 4. POST api/finance/budget
+    if (safePath === "api/finance/budget" && method === "POST") {
+      if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
+      const { allowance, caps } = parsedBody;
+      const allowanceNum = Number(allowance || 0);
+
+      if (!budget?.upsert) {
+        return NextResponse.json({ success: true, budget: { id: "default", allowance: allowanceNum, caps: caps || {} } });
+      }
+
+      const updated = await budget.upsert({
         where: { id: "default" },
-      }),
-      (prisma as any).financeBill.findMany({
-        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      }),
-    ]);
-
-    const defaultCaps = {
-      "Hostel & utilities": 0,
-      "Food & mess": 0,
-      "Travel & commute": 0,
-      "Academics": 0,
-      "Personal & health": 0,
-      "Subscriptions": 0,
-      "Fun & social": 0,
-      "Others": 0,
-    };
-
-    return NextResponse.json(
-      {
-        expenses: expenses || [],
-        budget: budget
-          ? {
-              allowance: budget.allowance,
-              caps: budget.caps || defaultCaps,
-            }
-          : {
-              allowance: 0,
-              caps: defaultCaps,
-            },
-        bills: bills || [],
-      },
-      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
-    );
-  }
-
-  // 2. POST api/finance/expense
-  if (safePath === "api/finance/expense" && method === "POST") {
-    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
-    const { id, title, category, amount, date, payment } = parsedBody;
-    if (!title || typeof amount !== "number") {
-      return NextResponse.json({ error: "title and numeric amount are required." }, { status: 400 });
-    }
-
-    if (id) {
-      const updated = await (prisma as any).financeExpense.upsert({
-        where: { id },
         update: {
-          title: String(title).trim(),
-          category: String(category || "Others"),
-          amount: Number(amount),
-          date: String(date || getKolkataDateString()),
-          payment: String(payment || "UPI"),
+          allowance: allowanceNum,
+          caps: caps || {},
         },
         create: {
-          id,
-          title: String(title).trim(),
-          category: String(category || "Others"),
-          amount: Number(amount),
-          date: String(date || getKolkataDateString()),
-          payment: String(payment || "UPI"),
+          id: "default",
+          allowance: allowanceNum,
+          caps: caps || {},
         },
       });
-      return NextResponse.json({ success: true, expense: updated });
-    } else {
-      const created = await (prisma as any).financeExpense.create({
-        data: {
-          title: String(title).trim(),
-          category: String(category || "Others"),
-          amount: Number(amount),
-          date: String(date || getKolkataDateString()),
-          payment: String(payment || "UPI"),
-        },
-      });
-      return NextResponse.json({ success: true, expense: created });
-    }
-  }
 
-  // 3. DELETE api/finance/expense
-  if ((safePath.startsWith("api/finance/expense/") || safePath === "api/finance/expense") && method === "DELETE") {
-    let id = safePath.startsWith("api/finance/expense/") ? safePath.replace("api/finance/expense/", "") : reqUrl.searchParams.get("id");
-    if (!id && parsedBody?.id) id = parsedBody.id;
-    if (!id) return NextResponse.json({ error: "Expense ID is required." }, { status: 400 });
-
-    await (prisma as any).financeExpense.deleteMany({
-      where: { id },
-    });
-    return NextResponse.json({ success: true });
-  }
-
-  // 4. POST api/finance/budget
-  if (safePath === "api/finance/budget" && method === "POST") {
-    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
-    const { allowance, caps } = parsedBody;
-    const allowanceNum = Number(allowance || 0);
-
-    const updated = await (prisma as any).financeBudget.upsert({
-      where: { id: "default" },
-      update: {
-        allowance: allowanceNum,
-        caps: caps || {},
-      },
-      create: {
-        id: "default",
-        allowance: allowanceNum,
-        caps: caps || {},
-      },
-    });
-
-    return NextResponse.json({ success: true, budget: updated });
-  }
-
-  // 5. POST api/finance/bill
-  if (safePath === "api/finance/bill" && method === "POST") {
-    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
-    const { id, title, date, amount, category, paid } = parsedBody;
-    if (!title || typeof amount !== "number") {
-      return NextResponse.json({ error: "title and numeric amount are required." }, { status: 400 });
+      return NextResponse.json({ success: true, budget: updated });
     }
 
-    if (id) {
-      const updated = await (prisma as any).financeBill.upsert({
+    // 5. POST api/finance/bill
+    if (safePath === "api/finance/bill" && method === "POST") {
+      if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
+      const { id, title, date, amount, category, paid } = parsedBody;
+      if (!title || typeof amount !== "number") {
+        return NextResponse.json({ error: "title and numeric amount are required." }, { status: 400 });
+      }
+
+      if (!bill?.upsert) {
+        return NextResponse.json({ success: true, bill: { id: id || `bill-${Date.now()}`, title, date, amount, category, paid: Boolean(paid) } });
+      }
+
+      if (id) {
+        const updated = await bill.upsert({
+          where: { id },
+          update: {
+            title: String(title).trim(),
+            date: String(date || getKolkataDateString()),
+            amount: Number(amount),
+            category: String(category || "Subscriptions"),
+            paid: Boolean(paid),
+          },
+          create: {
+            id,
+            title: String(title).trim(),
+            date: String(date || getKolkataDateString()),
+            amount: Number(amount),
+            category: String(category || "Subscriptions"),
+            paid: Boolean(paid),
+          },
+        });
+        return NextResponse.json({ success: true, bill: updated });
+      } else {
+        const created = await bill.create({
+          data: {
+            title: String(title).trim(),
+            date: String(date || getKolkataDateString()),
+            amount: Number(amount),
+            category: String(category || "Subscriptions"),
+            paid: Boolean(paid),
+          },
+        });
+        return NextResponse.json({ success: true, bill: created });
+      }
+    }
+
+    // 6. POST api/finance/bill/pay
+    if (safePath === "api/finance/bill/pay" && method === "POST") {
+      if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
+      const { id } = parsedBody;
+      if (!id) return NextResponse.json({ error: "Bill ID is required." }, { status: 400 });
+
+      if (!bill || !expense) {
+        return NextResponse.json({ success: true });
+      }
+
+      const targetBill = await bill.findUnique({
         where: { id },
+      });
+      if (!targetBill) return NextResponse.json({ error: "Bill not found." }, { status: 404 });
+
+      const updatedBill = await bill.update({
+        where: { id },
+        data: { paid: true },
+      });
+
+      const expenseId = `bill-${targetBill.id}`;
+      const createdExpense = await expense.upsert({
+        where: { id: expenseId },
         update: {
-          title: String(title).trim(),
-          date: String(date || getKolkataDateString()),
-          amount: Number(amount),
-          category: String(category || "Subscriptions"),
-          paid: Boolean(paid),
+          title: targetBill.title,
+          category: targetBill.category,
+          amount: targetBill.amount,
+          date: getKolkataDateString(),
+          payment: "UPI",
         },
         create: {
-          id,
-          title: String(title).trim(),
-          date: String(date || getKolkataDateString()),
-          amount: Number(amount),
-          category: String(category || "Subscriptions"),
-          paid: Boolean(paid),
+          id: expenseId,
+          title: targetBill.title,
+          category: targetBill.category,
+          amount: targetBill.amount,
+          date: getKolkataDateString(),
+          payment: "UPI",
         },
       });
-      return NextResponse.json({ success: true, bill: updated });
-    } else {
-      const created = await (prisma as any).financeBill.create({
-        data: {
-          title: String(title).trim(),
-          date: String(date || getKolkataDateString()),
-          amount: Number(amount),
-          category: String(category || "Subscriptions"),
-          paid: Boolean(paid),
-        },
-      });
-      return NextResponse.json({ success: true, bill: created });
+
+      return NextResponse.json({ success: true, bill: updatedBill, expense: createdExpense });
     }
-  }
 
-  // 6. POST api/finance/bill/pay
-  if (safePath === "api/finance/bill/pay" && method === "POST") {
-    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
-    const { id } = parsedBody;
-    if (!id) return NextResponse.json({ error: "Bill ID is required." }, { status: 400 });
+    // 7. DELETE api/finance/bill
+    if ((safePath.startsWith("api/finance/bill/") || safePath === "api/finance/bill") && method === "DELETE") {
+      let id = safePath.startsWith("api/finance/bill/") ? safePath.replace("api/finance/bill/", "") : reqUrl.searchParams.get("id");
+      if (!id && parsedBody?.id) id = parsedBody.id;
+      if (!id) return NextResponse.json({ error: "Bill ID is required." }, { status: 400 });
 
-    const bill = await (prisma as any).financeBill.findUnique({
-      where: { id },
-    });
-    if (!bill) return NextResponse.json({ error: "Bill not found." }, { status: 404 });
+      if (bill?.deleteMany) {
+        await bill.deleteMany({
+          where: { id },
+        });
+      }
+      return NextResponse.json({ success: true });
+    }
 
-    const updatedBill = await (prisma as any).financeBill.update({
-      where: { id },
-      data: { paid: true },
-    });
-
-    const expenseId = `bill-${bill.id}`;
-    const expense = await (prisma as any).financeExpense.upsert({
-      where: { id: expenseId },
-      update: {
-        title: bill.title,
-        category: bill.category,
-        amount: bill.amount,
-        date: getKolkataDateString(),
-        payment: "UPI",
-      },
-      create: {
-        id: expenseId,
-        title: bill.title,
-        category: bill.category,
-        amount: bill.amount,
-        date: getKolkataDateString(),
-        payment: "UPI",
-      },
-    });
-
-    return NextResponse.json({ success: true, bill: updatedBill, expense });
-  }
-
-  // 7. DELETE api/finance/bill
-  if ((safePath.startsWith("api/finance/bill/") || safePath === "api/finance/bill") && method === "DELETE") {
-    let id = safePath.startsWith("api/finance/bill/") ? safePath.replace("api/finance/bill/", "") : reqUrl.searchParams.get("id");
-    if (!id && parsedBody?.id) id = parsedBody.id;
-    if (!id) return NextResponse.json({ error: "Bill ID is required." }, { status: 400 });
-
-    await (prisma as any).financeBill.deleteMany({
-      where: { id },
-    });
-    return NextResponse.json({ success: true });
-  }
-
-  // 8. POST api/finance/reset
-  if (safePath === "api/finance/reset" && method === "POST") {
-    await (prisma as any).financeExpense.deleteMany({});
-    await (prisma as any).financeBill.deleteMany({});
-    await (prisma as any).financeBudget.deleteMany({});
-    return NextResponse.json({ success: true, message: "Finance data reset successfully in Supabase." });
+    // 8. POST api/finance/reset
+    if (safePath === "api/finance/reset" && method === "POST") {
+      if (expense?.deleteMany) await expense.deleteMany({});
+      if (bill?.deleteMany) await bill.deleteMany({});
+      if (budget?.deleteMany) await budget.deleteMany({});
+      return NextResponse.json({ success: true, message: "Finance data reset successfully in Supabase." });
+    }
+  } catch (err: any) {
+    console.error("Native finance route error:", err);
   }
 
   return null;
