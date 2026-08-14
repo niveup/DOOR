@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppScreen } from "@/src/components/screen";
 import { Card, Metric, ProgressBar, SectionTitle, ui } from "@/src/components/ui";
 import { todayInKolkata } from "@/src/lib/format";
-import { colors } from "@/src/theme/tokens";
+import { useTheme } from "@/src/providers/theme-provider";
 
 type TodoTag = "GATE" | "Quick" | "College" | "Personal";
 
@@ -18,13 +18,6 @@ interface PersonalTodo {
   createdAt: number;
 }
 
-const TAG_CONFIG: Record<TodoTag, { label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  GATE: { label: "GATE", color: colors.cyan, icon: "school-outline" },
-  Quick: { label: "Quick", color: colors.amber, icon: "flash-outline" },
-  College: { label: "College", color: colors.violet, icon: "book-outline" },
-  Personal: { label: "Personal", color: colors.emerald, icon: "leaf-outline" },
-};
-
 const DEFAULT_TODOS: PersonalTodo[] = [
   { id: "def-1", text: "Revise 1 weak topic formula sheet", completed: false, tag: "GATE", createdAt: Date.now() - 3000 },
   { id: "def-2", text: "Complete 15 practice PYQs", completed: false, tag: "GATE", createdAt: Date.now() - 2000 },
@@ -34,6 +27,17 @@ const DEFAULT_TODOS: PersonalTodo[] = [
 
 export default function TodayScreen() {
   const date = todayInKolkata();
+  const { theme, isDark, toggleTheme } = useTheme();
+
+  const TAG_CONFIG: Record<TodoTag, { label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = useMemo(
+    () => ({
+      GATE: { label: "GATE", color: theme.emerald, icon: "school-outline" },
+      Quick: { label: "Quick", color: theme.amber, icon: "flash-outline" },
+      College: { label: "College", color: theme.violet, icon: "book-outline" },
+      Personal: { label: "Personal", color: theme.cyan, icon: "leaf-outline" },
+    }),
+    [theme]
+  );
 
   // --- Personal To-Do State ---
   const [todos, setTodos] = useState<PersonalTodo[]>([]);
@@ -105,19 +109,6 @@ export default function TodayScreen() {
     setTodos((current) => current.filter((t) => !t.completed));
   };
 
-  const resetAllTodos = () => {
-    Alert.alert("Reset Checklist?", "This will reset today's checklist to default starter tasks.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Reset",
-        style: "destructive",
-        onPress: () => {
-          setTodos(DEFAULT_TODOS);
-        },
-      },
-    ]);
-  };
-
   // Calculations
   const completedCount = todos.filter((t) => t.completed).length;
   const totalCount = todos.length;
@@ -138,48 +129,92 @@ export default function TodayScreen() {
         month: "short",
       }).format(new Date())}
       action={
-        <Pressable
-          onPress={resetAllTodos}
-          hitSlop={10}
-          style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-        >
-          <Ionicons name="refresh-outline" size={20} color={colors.textFaint} />
-        </Pressable>
+        <View style={styles.topActions}>
+          {/* Apple Style Dark / Light Mode Switcher */}
+          <Pressable
+            onPress={toggleTheme}
+            style={({ pressed }) => [
+              styles.themeSwitchButton,
+              {
+                backgroundColor: isDark ? "#1a1a1f" : "#f1f5f9",
+                borderColor: isDark ? "#27272a" : "#e2e8f0",
+              },
+              pressed && { opacity: 0.7, transform: [{ scale: 0.96 }] },
+            ]}
+          >
+            <Ionicons
+              name={isDark ? "sunny-outline" : "moon-outline"}
+              size={18}
+              color={isDark ? theme.amber : theme.text}
+            />
+            <Text style={[styles.themeSwitchText, { color: theme.text }]}>
+              {isDark ? "Light" : "Dark"}
+            </Text>
+          </Pressable>
+        </View>
       }
     >
-      {/* Daily Progress Hero Card */}
-      <Card style={styles.hero}>
+      {/* Daily Progress Hero Card (Neutral Obsidian in Dark, Clean White in Light) */}
+      <Card
+        style={[
+          styles.hero,
+          {
+            backgroundColor: isDark ? "#121215" : "#ffffff",
+            borderColor: isDark ? "#27272a" : "#e2e8f0",
+          },
+        ]}
+      >
         <View style={ui.spread}>
           <View>
-            <Text style={styles.heroLabel}>TODAY'S COMPLETION</Text>
-            <Text style={styles.heroValue}>{progressPercent}%</Text>
+            <Text style={[styles.heroLabel, { color: theme.textFaint }]}>TODAY'S COMPLETION</Text>
+            <Text style={[styles.heroValue, { color: theme.text }]}>{progressPercent}%</Text>
           </View>
-          <View style={styles.priority}>
-            <Ionicons name="sparkles" color={colors.emerald} size={18} />
-            <Text style={styles.priorityText}>
+          <View
+            style={[
+              styles.priority,
+              {
+                backgroundColor: isDark ? "#1a1a1f" : "#f8fafc",
+                borderColor: isDark ? "#27272a" : "#e2e8f0",
+              },
+            ]}
+          >
+            <Ionicons
+              name={progressPercent === 100 ? "sparkles" : "checkmark-circle-outline"}
+              color={theme.emerald}
+              size={18}
+            />
+            <Text style={[styles.priorityText, { color: theme.text }]}>
               {progressPercent === 100
-                ? "All actions finished! Superb work today."
+                ? "All finished! Superb work."
                 : `${pendingCount} focus ${pendingCount === 1 ? "task" : "tasks"} remaining`}
             </Text>
           </View>
         </View>
         <ProgressBar
           value={progressPercent}
-          tone={progressPercent >= 75 ? colors.emerald : progressPercent >= 40 ? colors.cyan : colors.amber}
+          tone={progressPercent >= 75 ? theme.emerald : progressPercent >= 40 ? theme.cyan : theme.amber}
         />
-        <Text style={styles.heroNote}>
+        <Text style={[styles.heroNote, { color: theme.textMuted }]}>
           Small, honest daily actions compound into huge breakthroughs.
         </Text>
       </Card>
 
       {/* Quick Metrics */}
-      <Card style={styles.metrics}>
-        <Metric label="Completed" value={`${completedCount}/${totalCount}`} accent={colors.emerald} />
-        <Metric label="Remaining" value={pendingCount} accent={colors.amber} />
+      <Card
+        style={[
+          styles.metrics,
+          {
+            backgroundColor: isDark ? "#121215" : "#ffffff",
+            borderColor: isDark ? "#27272a" : "#e2e8f0",
+          },
+        ]}
+      >
+        <Metric label="Completed" value={`${completedCount}/${totalCount}`} accent={theme.emerald} />
+        <Metric label="Remaining" value={pendingCount} accent={theme.amber} />
         <Metric
           label="Status"
           value={progressPercent >= 80 ? "On fire" : progressPercent > 0 ? "In flow" : "Ready"}
-          accent={colors.cyan}
+          accent={theme.cyan}
         />
       </Card>
 
@@ -201,10 +236,23 @@ export default function TodayScreen() {
               }}
               style={[
                 styles.filterChip,
-                active && styles.filterChipActive,
+                {
+                  backgroundColor: isDark ? "#121215" : "#ffffff",
+                  borderColor: isDark ? "#27272a" : "#e2e8f0",
+                },
+                active && {
+                  backgroundColor: isDark ? "rgba(16, 185, 129, 0.16)" : "rgba(5, 150, 105, 0.12)",
+                  borderColor: theme.emerald,
+                },
               ]}
             >
-              <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  { color: theme.textFaint },
+                  active && { color: theme.emerald, fontWeight: "800" },
+                ]}
+              >
                 {tag} {count > 0 ? `(${count})` : ""}
               </Text>
             </Pressable>
@@ -222,23 +270,47 @@ export default function TodayScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setShowAddBox((prev) => !prev);
               }}
-              style={({ pressed }) => [styles.addPillButton, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [
+                styles.addPillButton,
+                {
+                  backgroundColor: isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(5, 150, 105, 0.12)",
+                  borderColor: theme.emerald,
+                },
+                pressed && { opacity: 0.7 },
+              ]}
             >
-              <Ionicons name={showAddBox ? "close" : "add"} size={16} color={colors.cyan} />
-              <Text style={styles.addPillText}>{showAddBox ? "Cancel" : "Add to-do"}</Text>
+              <Ionicons name={showAddBox ? "close" : "add"} size={16} color={theme.emerald} />
+              <Text style={[styles.addPillText, { color: theme.emerald }]}>
+                {showAddBox ? "Cancel" : "Add to-do"}
+              </Text>
             </Pressable>
           }
         />
 
         {/* Quick Add Form */}
         {showAddBox && (
-          <Card style={styles.addCard}>
+          <Card
+            style={[
+              styles.addCard,
+              {
+                backgroundColor: isDark ? "#141418" : "#ffffff",
+                borderColor: theme.emerald,
+              },
+            ]}
+          >
             <TextInput
-              style={styles.addInput}
+              style={[
+                styles.addInput,
+                {
+                  backgroundColor: isDark ? "#09090b" : "#f8fafc",
+                  borderColor: isDark ? "#27272a" : "#cbd5e1",
+                  color: theme.text,
+                },
+              ]}
               value={newTodoText}
               onChangeText={setNewTodoText}
               placeholder="What do you want to accomplish?"
-              placeholderTextColor={colors.textFaint}
+              placeholderTextColor={theme.textFaint}
               autoFocus
               autoCapitalize="sentences"
               onSubmitEditing={addTodo}
@@ -258,18 +330,23 @@ export default function TodayScreen() {
                       }}
                       style={[
                         styles.tagChip,
+                        {
+                          backgroundColor: isDark ? "#1a1a1f" : "#f8fafc",
+                          borderColor: isDark ? "#27272a" : "#e2e8f0",
+                        },
                         active && { backgroundColor: `${cfg.color}22`, borderColor: cfg.color },
                       ]}
                     >
                       <Ionicons
                         name={cfg.icon}
                         size={12}
-                        color={active ? cfg.color : colors.textFaint}
+                        color={active ? cfg.color : theme.textFaint}
                       />
                       <Text
                         style={[
                           styles.tagChipText,
-                          active && { color: cfg.color, fontWeight: "700" },
+                          { color: theme.textFaint },
+                          active && { color: cfg.color, fontWeight: "800" },
                         ]}
                       >
                         {cfg.label}
@@ -283,6 +360,7 @@ export default function TodayScreen() {
                 disabled={!newTodoText.trim()}
                 style={({ pressed }) => [
                   styles.saveTodoButton,
+                  { backgroundColor: theme.emerald },
                   !newTodoText.trim() && styles.saveTodoDisabled,
                   pressed && { opacity: 0.8 },
                 ]}
@@ -303,7 +381,15 @@ export default function TodayScreen() {
                 onPress={() => toggleTodo(item.id)}
                 style={({ pressed }) => [
                   styles.todoRow,
-                  item.completed && styles.todoRowCompleted,
+                  {
+                    backgroundColor: isDark ? "#121215" : "#ffffff",
+                    borderColor: isDark ? "#27272a" : "#e2e8f0",
+                  },
+                  item.completed && {
+                    backgroundColor: isDark ? "#0d0d0f" : "#f8fafc",
+                    borderColor: isDark ? "#1f1f23" : "#f1f5f9",
+                    opacity: 0.65,
+                  },
                   pressed && { opacity: 0.85 },
                 ]}
               >
@@ -311,12 +397,16 @@ export default function TodayScreen() {
                 <View
                   style={[
                     styles.checkCircle,
-                    item.completed && styles.checkCircleActive,
+                    {
+                      borderColor: isDark ? "#3f3f46" : "#cbd5e1",
+                    },
+                    item.completed && {
+                      borderColor: theme.emerald,
+                      backgroundColor: theme.emerald,
+                    },
                   ]}
                 >
-                  {item.completed && (
-                    <Ionicons name="checkmark" size={14} color="#ffffff" />
-                  )}
+                  {item.completed && <Ionicons name="checkmark" size={14} color="#ffffff" />}
                 </View>
 
                 {/* To-Do Content */}
@@ -324,7 +414,8 @@ export default function TodayScreen() {
                   <Text
                     style={[
                       styles.todoTitle,
-                      item.completed && styles.todoTitleCompleted,
+                      { color: theme.text },
+                      item.completed && [styles.todoTitleCompleted, { color: theme.textFaint }],
                     ]}
                   >
                     {item.text}
@@ -333,7 +424,10 @@ export default function TodayScreen() {
                     <View
                       style={[
                         styles.metaTagBadge,
-                        { backgroundColor: `${tagCfg.color}18`, borderColor: `${tagCfg.color}40` },
+                        {
+                          backgroundColor: `${tagCfg.color}15`,
+                          borderColor: `${tagCfg.color}35`,
+                        },
                       ]}
                     >
                       <Ionicons name={tagCfg.icon} size={10} color={tagCfg.color} />
@@ -353,7 +447,7 @@ export default function TodayScreen() {
                   }}
                   style={styles.deleteIconButton}
                 >
-                  <Ionicons name="close-circle-outline" size={18} color={colors.textFaint} />
+                  <Ionicons name="close-circle-outline" size={18} color={theme.textFaint} />
                 </Pressable>
               </Pressable>
             );
@@ -366,7 +460,7 @@ export default function TodayScreen() {
               onPress={clearCompletedTodos}
               style={({ pressed }) => [styles.clearButton, pressed && { opacity: 0.7 }]}
             >
-              <Text style={styles.clearButtonText}>
+              <Text style={[styles.clearButtonText, { color: theme.textFaint }]}>
                 Clear {completedCount} completed {completedCount === 1 ? "task" : "tasks"}
               </Text>
             </Pressable>
@@ -378,21 +472,61 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { borderColor: "#155e75", backgroundColor: "#0c2330", gap: 12 },
-  heroLabel: { color: colors.textMuted, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
-  heroValue: { color: colors.cyan, fontSize: 42, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  topActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  themeSwitchButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  themeSwitchText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  hero: {
+    gap: 12,
+  },
+  heroLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  heroValue: {
+    fontSize: 42,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+  },
   priority: {
     maxWidth: "58%",
     flexDirection: "row",
     gap: 8,
-    alignItems: "flex-start",
-    backgroundColor: "#172238",
+    alignItems: "center",
     borderRadius: 12,
-    padding: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  priorityText: { color: colors.text, fontSize: 12, lineHeight: 17, fontWeight: "700", flex: 1 },
-  heroNote: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
-  metrics: { flexDirection: "row", gap: 8 },
+  priorityText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+    flex: 1,
+  },
+  heroNote: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  metrics: {
+    flexDirection: "row",
+    gap: 8,
+  },
 
   filterScroll: {
     flexDirection: "row",
@@ -400,63 +534,45 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.borderMuted,
-  },
-  filterChipActive: {
-    backgroundColor: "rgba(6, 182, 212, 0.15)",
-    borderColor: colors.cyan,
   },
   filterChipText: {
-    color: colors.textFaint,
     fontSize: 12,
     fontWeight: "700",
-  },
-  filterChipTextActive: {
-    color: colors.cyan,
   },
 
   // --- To-Do Section ---
   todoSection: {
     gap: 10,
-    marginTop: 6,
+    marginTop: 4,
   },
   addPillButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(6, 182, 212, 0.12)",
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(6, 182, 212, 0.35)",
   },
   addPillText: {
-    color: colors.cyan,
     fontSize: 11,
     fontWeight: "800",
   },
   addCard: {
-    backgroundColor: "#0d1424",
-    borderColor: "rgba(6, 182, 212, 0.4)",
     padding: 12,
     gap: 10,
   },
   addInput: {
-    color: colors.text,
     fontSize: 14,
-    minHeight: 38,
-    paddingHorizontal: 10,
+    minHeight: 40,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: colors.canvas,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   addActionsRow: {
     flexDirection: "row",
@@ -472,15 +588,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.borderMuted,
-    backgroundColor: colors.surface,
   },
   tagChipText: {
-    color: colors.textFaint,
     fontSize: 11,
     fontWeight: "600",
   },
@@ -488,7 +601,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: colors.cyan,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -501,46 +613,32 @@ const styles = StyleSheet.create({
   todoRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#0f172a",
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: "#1e293b",
     gap: 12,
-  },
-  todoRowCompleted: {
-    backgroundColor: "#0b1220",
-    borderColor: "#141e30",
-    opacity: 0.65,
   },
   checkCircle: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
-  },
-  checkCircleActive: {
-    borderColor: colors.emerald,
-    backgroundColor: colors.emerald,
   },
   todoCopy: {
     flex: 1,
     gap: 4,
   },
   todoTitle: {
-    color: colors.text,
     fontSize: 14,
     fontWeight: "700",
     lineHeight: 19,
   },
   todoTitleCompleted: {
     textDecorationLine: "line-through",
-    color: colors.textFaint,
   },
   todoMetaRow: {
     flexDirection: "row",
@@ -573,7 +671,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   clearButtonText: {
-    color: colors.textFaint,
     fontSize: 11,
     fontWeight: "700",
   },
