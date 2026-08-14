@@ -28,6 +28,16 @@ export default function TodayScreen() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["routine", date] }),
   });
   const clearMutation = useMutation({ mutationFn: () => api.routine.clear(date), onSuccess: () => queryClient.setQueryData(["routine", date], null) });
+  const generateMutation = useMutation({
+    mutationFn: () => api.routine.generate(),
+    onSuccess: async (newPlan) => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.setQueryData(["routine", date], newPlan);
+    },
+    onError: (error: any) => {
+      Alert.alert("Could not generate plan", error?.message || "Check your internet connection.");
+    },
+  });
   const plan = routineQuery.data;
   const tasks = plan?.tasks || [];
   const weightedCompletion = tasks.length ? Math.round(tasks.reduce((sum, task) => sum + (task.status === "COMPLETED" ? 1 : task.status === "PARTIAL" ? 0.5 : 0), 0) / tasks.length * 100) : 0;
@@ -39,7 +49,7 @@ export default function TodayScreen() {
   return <AppScreen title="Daily Coach" subtitle={new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "short" }).format(new Date())} refreshing={routineQuery.isRefetching} onRefresh={routineQuery.refetch} action={plan ? <IconButton icon="trash-outline" label="Clear today’s plan" onPress={clearPlan} tone={colors.rose} /> : undefined}>
     {routineQuery.isLoading ? <LoadingCard /> : null}
     {routineQuery.error ? <EmptyState icon="cloud-offline-outline" title="Couldn’t load today" description="Your last synced data stays available offline. Pull down when you’re connected again." action={<ActionButton label="Try again" compact onPress={() => routineQuery.refetch()} />} /> : null}
-    {!routineQuery.isLoading && !routineQuery.error && !plan ? <EmptyState icon="calendar-outline" title="No plan for today" description="Create today’s plan from the web dashboard, then it will appear here for focused mobile check-offs." /> : null}
+    {!routineQuery.isLoading && !routineQuery.error && !plan ? <EmptyState icon="calendar-outline" title="No plan for today" description="Generate your personalized schedule based on your available capacity and weak topics." action={<ActionButton label={generateMutation.isPending ? "Generating plan…" : "Generate today’s plan"} tone="emerald" disabled={generateMutation.isPending} onPress={() => generateMutation.mutate()} />} /> : null}
     {plan ? <>
       <Card style={styles.hero}><View style={ui.spread}><View><Text style={styles.heroLabel}>TODAY’S READINESS</Text><Text style={styles.heroValue}>{weightedCompletion}%</Text></View><View style={styles.priority}><Ionicons name="flash" color={colors.amber} size={18} /><Text style={styles.priorityText}>{plan.mainPriority || "Start with your priority task"}</Text></View></View><ProgressBar value={weightedCompletion} tone={weightedCompletion >= 70 ? colors.emerald : colors.cyan} /><Text style={styles.heroNote}>{plan.greeting || "Small, honest progress compounds."}</Text></Card>
       <Card style={styles.metrics}><Metric label="Done" value={`${completed}/${tasks.length}`} accent={colors.emerald} /><Metric label="Focus" value={`${totalMinutes}m`} accent={colors.blue} /><Metric label="Streak" value={weightedCompletion >= 80 ? "On" : "Build"} accent={colors.amber} /></Card>

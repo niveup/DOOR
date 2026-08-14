@@ -56,6 +56,7 @@ export const api = {
   verifyPasscode: (passcode: string) => request<{ success: true }>("/api/auth/verify", {}, passcode),
   routine: {
     today: (date: string) => request<RoutinePlan>(`/api/routine/today?date=${encodeURIComponent(date)}`),
+    generate: () => request<RoutinePlan>("/api/routine/generate", { method: "POST" }),
     updateTask: (taskId: string, status: RoutineStatus) => request<{ task: unknown }>(`/api/routine/tasks/${taskId}`, {
       method: "PATCH",
       body: JSON.stringify({ status: status === "COMPLETED" ? "completed" : status === "PARTIAL" ? "partial" : "not_completed" }),
