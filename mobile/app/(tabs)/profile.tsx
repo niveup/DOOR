@@ -27,4 +27,19 @@ export default function ProfileScreen() {
     <View style={[ui.row, styles.footer]}><Text style={styles.footerText}>DOOR Android · Expo SDK 52</Text><Text style={styles.footerText}>v1.0.0</Text></View>
   </AppScreen>;
 }
-const styles = StyleSheet.create({ security: { flexDirection: "row", gap: 12, backgroundColor: "#062c26", borderColor: "#065f46", alignItems: "flex-start" }, securityIcon: { width: 43, height: 43, borderRadius: 14, backgroundColor: "#064e3b", alignItems: "center", justifyContent: "center" }, securityCopy: { flex: 1, gap: 4 }, securityTitle: { color: colors.text, fontSize: 15, fontWeight: "900" }, securityText: { color: colors.textMuted, fontSize: 12, lineHeight: 18 }, connectionLabel: { color: colors.cyan, fontSize: 10, fontWeight: "900", letterSpacing: 1 }, connectionUrl: { color: colors.text, fontSize: 13, lineHeight: 20, fontFamily: "monospace" }, connectionNote: { color: colors.textMuted, fontSize: 12, lineHeight: 18 }, item: { flexDirection: "row", gap: 11, alignItems: "flex-start" }, itemCopy: { flex: 1, gap: 3 }, itemTitle: { color: colors.text, fontSize: 14, fontWeight: "800" }, itemText: { color: colors.textMuted, fontSize: 12, lineHeight: 18 }, footer: { justifyContent: "space-between", padding: 8 }, footerText: { color: colors.textFaint, fontSize: 10, fontWeight: "700" } });
+const styles = StyleSheet.create({
+  security: { flexDirection: "row", gap: 12, backgroundColor: colors.surface, borderColor: colors.border, alignItems: "flex-start" },
+  securityIcon: { width: 43, height: 43, borderRadius: 14, backgroundColor: colors.raised, borderColor: colors.border, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  securityCopy: { flex: 1, gap: 4 },
+  securityTitle: { color: colors.text, fontSize: 15, fontWeight: "900" },
+  securityText: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  connectionLabel: { color: colors.cyan, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  connectionUrl: { color: colors.text, fontSize: 13, lineHeight: 20, fontFamily: "monospace" },
+  connectionNote: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  item: { flexDirection: "row", gap: 11, alignItems: "flex-start" },
+  itemCopy: { flex: 1, gap: 3 },
+  itemTitle: { color: colors.text, fontSize: 14, fontWeight: "800" },
+  itemText: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  footer: { justifyContent: "space-between", padding: 8 },
+  footerText: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
+});

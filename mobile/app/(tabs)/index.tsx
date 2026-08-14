@@ -1,5 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,7 +40,7 @@ export default function TodayScreen() {
   const TAG_CONFIG: Record<TodoTag, { label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = useMemo(
     () => ({
       GATE: { label: "GATE", color: theme.emerald, icon: "school-outline" },
-      Quick: { label: "Quick", color: theme.amber, icon: "flash-outline" },
+      Quick: { label: "Quick", color: theme.amber, icon: "cafe-outline" },
       College: { label: "College", color: theme.violet, icon: "book-outline" },
       Personal: { label: "Personal", color: theme.cyan, icon: "leaf-outline" },
     }),
@@ -41,9 +50,9 @@ export default function TodayScreen() {
   // --- State ---
   const [todos, setTodos] = useState<PersonalTodo[]>([]);
   const [isTodosLoaded, setIsTodosLoaded] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
   const [newTodoText, setNewTodoText] = useState("");
   const [selectedTag, setSelectedTag] = useState<TodoTag>("GATE");
-  const [showAddBox, setShowAddBox] = useState(false);
 
   // Load To-Dos from AsyncStorage
   useEffect(() => {
@@ -75,14 +84,26 @@ export default function TodayScreen() {
     }
   }, [todos, isTodosLoaded, date]);
 
-  const toggleTodo = async (id: string) => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setTodos((current) =>
-      current.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    );
+  // Handle Android Back Button to close add box
+  useEffect(() => {
+    if (!showAddCard) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setShowAddCard(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [showAddCard]);
+
+  const toggleAddCard = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!showAddCard) {
+      setNewTodoText("");
+      setSelectedTag("GATE");
+    }
+    setShowAddCard((prev) => !prev);
   };
 
-  const addTodo = async () => {
+  const handleSaveNewTodo = async () => {
     if (!newTodoText.trim()) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const newEntry: PersonalTodo = {
@@ -94,7 +115,14 @@ export default function TodayScreen() {
     };
     setTodos((current) => [newEntry, ...current]);
     setNewTodoText("");
-    setShowAddBox(false);
+    setShowAddCard(false);
+  };
+
+  const toggleTodo = async (id: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTodos((current) =>
+      current.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+    );
   };
 
   const deleteTodo = async (id: string) => {
@@ -145,7 +173,7 @@ export default function TodayScreen() {
         </Pressable>
       }
     >
-      {/* 1. Spacious & Non-Overlapping Hero Progress Card */}
+      {/* 1. Spacious Hero Progress Card */}
       <Card
         style={[
           styles.heroCard,
@@ -210,7 +238,7 @@ export default function TodayScreen() {
 
         <Text style={[styles.heroMessage, { color: theme.textMuted }]}>
           {progressPercent === 100
-            ? "✨ Superb discipline today! Every action completed."
+            ? "All tasks completed for today."
             : nextPendingTask
             ? `Next focus: "${nextPendingTask.text}"`
             : "Small, honest daily actions compound into huge breakthroughs."}
@@ -223,10 +251,7 @@ export default function TodayScreen() {
           title="Today's Tasks"
           trailing={
             <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowAddBox((prev) => !prev);
-              }}
+              onPress={toggleAddCard}
               style={({ pressed }) => [
                 styles.addPillButton,
                 {
@@ -236,31 +261,31 @@ export default function TodayScreen() {
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <Ionicons name={showAddBox ? "close" : "add"} size={16} color={theme.emerald} />
+              <Ionicons name={showAddCard ? "close" : "add"} size={16} color={theme.emerald} />
               <Text style={[styles.addPillText, { color: theme.emerald }]}>
-                {showAddBox ? "Cancel" : "Add task"}
+                {showAddCard ? "Cancel" : "Add task"}
               </Text>
             </Pressable>
           }
         />
 
-        {/* Quick Add Form */}
-        {showAddBox && (
+        {/* Ultra-Fast Instant Inline Quick Add (Zero Delay, 0ms Keyboard Lag) */}
+        {showAddCard && (
           <Card
             style={[
-              styles.addCard,
+              styles.inlineAddCard,
               {
-                backgroundColor: isDark ? "#16161b" : "#ffffff",
+                backgroundColor: isDark ? "#141418" : "#ffffff",
                 borderColor: theme.emerald,
               },
             ]}
           >
             <TextInput
               style={[
-                styles.addInput,
+                styles.inlineAddInput,
                 {
                   backgroundColor: isDark ? "#09090b" : "#f8fafc",
-                  borderColor: isDark ? "#27272a" : "#cbd5e1",
+                  borderColor: isDark ? "#27272a" : "#e2e8f0",
                   color: theme.text,
                 },
               ]}
@@ -268,30 +293,34 @@ export default function TodayScreen() {
               onChangeText={setNewTodoText}
               placeholder="What do you need to focus on?"
               placeholderTextColor={theme.textFaint}
-              autoFocus
+              autoFocus={true}
               autoCapitalize="sentences"
-              onSubmitEditing={addTodo}
               returnKeyType="done"
+              onSubmitEditing={handleSaveNewTodo}
             />
-            <View style={styles.addActionsRow}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagPicker}>
-                {(["GATE", "Quick", "College", "Personal"] as const).map((tag) => {
-                  const active = selectedTag === tag;
-                  const cfg = TAG_CONFIG[tag];
+
+            <View style={styles.inlineBottomRow}>
+              <View style={styles.inlineTagRow}>
+                {(["GATE", "Quick", "College", "Personal"] as const).map((t) => {
+                  const active = selectedTag === t;
+                  const cfg = TAG_CONFIG[t];
                   return (
                     <Pressable
-                      key={tag}
+                      key={t}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedTag(tag);
+                        setSelectedTag(t);
                       }}
                       style={[
-                        styles.tagChip,
+                        styles.inlineTagChip,
                         {
                           backgroundColor: isDark ? "#1a1a20" : "#f8fafc",
                           borderColor: isDark ? "#27272a" : "#e2e8f0",
                         },
-                        active && { backgroundColor: `${cfg.color}22`, borderColor: cfg.color },
+                        active && {
+                          backgroundColor: isDark ? `${cfg.color}25` : `${cfg.color}15`,
+                          borderColor: cfg.color,
+                        },
                       ]}
                     >
                       <Ionicons
@@ -301,28 +330,30 @@ export default function TodayScreen() {
                       />
                       <Text
                         style={[
-                          styles.tagChipText,
-                          { color: theme.textFaint },
-                          active && { color: cfg.color, fontWeight: "800" },
+                          styles.inlineTagText,
+                          { color: active ? cfg.color : theme.textFaint },
+                          active && { fontWeight: "800" },
                         ]}
+                        numberOfLines={1}
                       >
                         {cfg.label}
                       </Text>
                     </Pressable>
                   );
                 })}
-              </ScrollView>
+              </View>
+
               <Pressable
-                onPress={addTodo}
+                onPress={handleSaveNewTodo}
                 disabled={!newTodoText.trim()}
                 style={({ pressed }) => [
-                  styles.saveTodoButton,
+                  styles.inlineAddButton,
                   { backgroundColor: theme.emerald },
-                  !newTodoText.trim() && styles.saveTodoDisabled,
+                  !newTodoText.trim() && { opacity: 0.35 },
                   pressed && { opacity: 0.8 },
                 ]}
               >
-                <Ionicons name="arrow-up" size={17} color="#ffffff" />
+                <Ionicons name="arrow-up" size={18} color="#ffffff" />
               </Pressable>
             </View>
           </Card>
@@ -514,53 +545,55 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
   },
-  addCard: {
+
+  // Instant Inline Quick Add
+  inlineAddCard: {
     padding: 12,
     gap: 10,
     borderRadius: 14,
     borderWidth: 1,
   },
-  addInput: {
-    fontSize: 14,
-    minHeight: 40,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+  inlineAddInput: {
     borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 46,
+    paddingHorizontal: 12,
+    fontSize: 14,
   },
-  addActionsRow: {
+  inlineBottomRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
   },
-  tagPicker: {
+  inlineTagRow: {
+    flex: 1,
     flexDirection: "row",
-    gap: 6,
+    gap: 5,
   },
-  tagChip: {
+  inlineTagChip: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    justifyContent: "center",
+    gap: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
   },
-  tagChipText: {
-    fontSize: 11,
-    fontWeight: "600",
+  inlineTagText: {
+    fontSize: 10,
+    fontWeight: "700",
   },
-  saveTodoButton: {
-    width: 32,
-    height: 32,
+  inlineAddButton: {
+    width: 36,
+    height: 36,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  saveTodoDisabled: {
-    opacity: 0.3,
-  },
+
   todoList: {
     gap: 8,
   },

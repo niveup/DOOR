@@ -7,6 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "door",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#09090b",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -14,9 +15,15 @@
     "android": {
       "package": "com.jujum.door",
       "usesCleartextTraffic": false,
+      "softwareKeyboardLayoutMode": "pan",
+      "backgroundColor": "#09090b",
+      "navigationBar": {
+        "backgroundColor": "#09090b",
+        "barStyle": "light-content"
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#090d16"
+        "backgroundColor": "#09090b"
       }
     },
     "web": {
@@ -38,7 +45,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#090d16"
+          "backgroundColor": "#09090b"
         }
       ],
       "@react-native-community/datetimepicker",

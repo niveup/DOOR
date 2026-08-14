@@ -80,4 +80,33 @@ function InterviewPanel() {
   </>;
 }
 
-const styles = StyleSheet.create({ tabs: { flexDirection: "row", gap: 8 }, privacy: { flexDirection: "row", gap: 10, backgroundColor: "#21123d", borderColor: "#4c1d95", alignItems: "flex-start" }, privacyText: { flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 18 }, feedback: { borderColor: "#4c1d95", backgroundColor: "#17112b" }, feedbackLabel: { color: colors.violet, fontSize: 10, fontWeight: "900", letterSpacing: 1 }, feedbackText: { color: colors.text, fontSize: 13, lineHeight: 21 }, tomorrow: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 10, borderRadius: 10, backgroundColor: "#2e1f06" }, tomorrowText: { flex: 1, color: colors.amber, fontSize: 12, lineHeight: 18, fontWeight: "700" }, form: { gap: 12 }, formTitle: { color: colors.text, fontSize: 18, fontWeight: "900" }, formSubtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19 }, fieldLabel: { color: colors.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 }, moodRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" }, textarea: { minHeight: 154, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.canvas, padding: 13, color: colors.text, fontSize: 14, lineHeight: 20 }, shortTextArea: { minHeight: 88 }, tagInput: { minHeight: 46, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.canvas, paddingHorizontal: 13, color: colors.text, fontSize: 14 }, error: { color: colors.rose, fontSize: 12, lineHeight: 17 }, history: { color: colors.textFaint, fontSize: 11, textAlign: "center" }, explanation: { gap: 13 }, explanationText: { color: colors.text, fontSize: 14, lineHeight: 21 }, section: { gap: 5, borderLeftWidth: 2, borderColor: colors.cyan, paddingLeft: 11 }, sectionHeading: { color: colors.cyan, fontSize: 13, fontWeight: "900" }, sectionText: { color: colors.textMuted, fontSize: 13, lineHeight: 20 }, quiz: { backgroundColor: "#083344", padding: 12, borderRadius: 12, gap: 7 }, score: { color: colors.rose, fontSize: 34, fontWeight: "900" }, dimension: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderMuted, paddingVertical: 8 }, dimensionLabel: { color: colors.textMuted, fontSize: 13 }, dimensionValue: { color: colors.text, fontWeight: "900" } });
+const styles = StyleSheet.create({
+  tabs: { flexDirection: "row", gap: 8 },
+  privacy: { flexDirection: "row", gap: 10, backgroundColor: colors.surface, borderColor: colors.border, alignItems: "flex-start" },
+  privacyText: { flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  feedback: { borderColor: colors.border, backgroundColor: colors.surface },
+  feedbackLabel: { color: colors.violet, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  feedbackText: { color: colors.text, fontSize: 13, lineHeight: 21 },
+  tomorrow: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 10, borderRadius: 10, backgroundColor: colors.raised, borderColor: colors.border, borderWidth: 1 },
+  tomorrowText: { flex: 1, color: colors.amber, fontSize: 12, lineHeight: 18, fontWeight: "700" },
+  form: { gap: 12 },
+  formTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },
+  formSubtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
+  fieldLabel: { color: colors.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
+  moodRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  textarea: { minHeight: 154, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.canvas, padding: 13, color: colors.text, fontSize: 14, lineHeight: 20 },
+  shortTextArea: { minHeight: 88 },
+  tagInput: { minHeight: 46, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.canvas, paddingHorizontal: 13, color: colors.text, fontSize: 14 },
+  error: { color: colors.rose, fontSize: 12, lineHeight: 17 },
+  history: { color: colors.textFaint, fontSize: 11, textAlign: "center" },
+  explanation: { gap: 13 },
+  explanationText: { color: colors.text, fontSize: 14, lineHeight: 21 },
+  section: { gap: 5, borderLeftWidth: 2, borderColor: colors.cyan, paddingLeft: 11 },
+  sectionHeading: { color: colors.cyan, fontSize: 13, fontWeight: "900" },
+  sectionText: { color: colors.textMuted, fontSize: 13, lineHeight: 20 },
+  quiz: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, padding: 12, borderRadius: 12, gap: 7 },
+  score: { color: colors.rose, fontSize: 34, fontWeight: "900" },
+  dimension: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderMuted, paddingVertical: 8 },
+  dimensionLabel: { color: colors.textMuted, fontSize: 13 },
+  dimensionValue: { color: colors.text, fontWeight: "900" },
+});

@@ -344,14 +344,14 @@ function GoalForm({
 }
 
 const styles = StyleSheet.create({
-  readiness: { backgroundColor: "#0c2330", borderColor: "#155e75", gap: 13 },
+  readiness: { backgroundColor: colors.surface, borderColor: colors.border, gap: 13 },
   overline: { color: colors.cyan, fontSize: 10, letterSpacing: 1, fontWeight: "900" },
   readinessValue: { color: colors.text, fontSize: 39, fontWeight: "900", fontVariant: ["tabular-nums"] },
   goalBox: { alignItems: "flex-end", gap: 5 },
   goalLabel: { color: colors.textFaint, fontSize: 9, letterSpacing: 0.8, fontWeight: "900" },
   goalValue: { color: colors.amber, fontSize: 19, fontWeight: "900" },
   metrics: { flexDirection: "row", gap: 8 },
-  warning: { backgroundColor: "#2e1f06", borderColor: "#78350f" },
+  warning: { backgroundColor: colors.surface, borderColor: colors.border },
   warningHeader: { flexDirection: "row", alignItems: "center", gap: 7 },
   warningTitle: { color: colors.amber, fontSize: 14, fontWeight: "900" },
   warningText: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   flag: { fontSize: 11, fontWeight: "700" },
   logList: { gap: 8 },
   logRow: { flexDirection: "row", alignItems: "center", padding: 11, gap: 9 },
-  logIcon: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#083344" },
+  logIcon: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: colors.raised, borderColor: colors.border, borderWidth: 1 },
   logCopy: { flex: 1, gap: 3 },
   logTitle: { color: colors.text, fontSize: 13, fontWeight: "800" },
   logMeta: { color: colors.textFaint, fontSize: 10, lineHeight: 14 },
@@ -396,9 +396,9 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 90, textAlignVertical: "top", paddingTop: 12 },
   goalInput: {
     borderWidth: 1,
-    borderColor: colors.cyan,
+    borderColor: colors.border,
     color: colors.text,
-    backgroundColor: "#083344",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     textAlign: "center",
     fontSize: 40,

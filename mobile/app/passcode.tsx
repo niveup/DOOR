@@ -34,4 +34,15 @@ export default function PasscodeScreen() {
     <Text style={styles.note}>No social login. No account duplication. DOOR connects directly to your existing backend.</Text>
   </View></KeyboardAvoidingView></SafeAreaView>;
 }
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.canvas }, keyboard: { flex: 1 }, content: { flex: 1, justifyContent: "center", padding: 28, gap: 16 }, mark: { width: 62, height: 62, backgroundColor: "#083344", borderColor: colors.cyan, borderWidth: 1, borderRadius: 20, justifyContent: "center", alignItems: "center", marginBottom: 8 }, markText: { color: colors.cyan, fontSize: 31, fontWeight: "900" }, eyebrow: { color: colors.cyan, fontWeight: "800", letterSpacing: 1.5, fontSize: 10 }, title: { color: colors.text, fontSize: 32, lineHeight: 38, letterSpacing: -1, fontWeight: "900" }, description: { color: colors.textMuted, fontSize: 14, lineHeight: 21, marginBottom: 8 }, error: { color: colors.rose, backgroundColor: "#4c0519", padding: 12, borderRadius: 10, fontSize: 13, fontWeight: "700" }, note: { color: colors.textFaint, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 } });
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  keyboard: { flex: 1 },
+  content: { flex: 1, justifyContent: "center", padding: 28, gap: 16 },
+  mark: { width: 62, height: 62, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 20, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  markText: { color: colors.emerald, fontSize: 31, fontWeight: "900" },
+  eyebrow: { color: colors.emerald, fontWeight: "800", letterSpacing: 1.5, fontSize: 10 },
+  title: { color: colors.text, fontSize: 32, lineHeight: 38, letterSpacing: -1, fontWeight: "900" },
+  description: { color: colors.textMuted, fontSize: 14, lineHeight: 21, marginBottom: 8 },
+  error: { color: colors.rose, backgroundColor: "rgba(244, 63, 94, 0.14)", borderColor: colors.rose, borderWidth: 1, padding: 12, borderRadius: 10, fontSize: 13, fontWeight: "700" },
+  note: { color: colors.textFaint, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
+});

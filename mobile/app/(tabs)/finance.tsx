@@ -537,7 +537,7 @@ function BillRow({
 }
 
 const styles = StyleSheet.create({
-  balance: { backgroundColor: "#062c26", borderColor: "#065f46", gap: 9 },
+  balance: { backgroundColor: colors.surface, borderColor: colors.border, gap: 9 },
   balanceLabel: { color: colors.emerald, fontSize: 10, letterSpacing: 1, fontWeight: "900" },
   balanceValue: { color: colors.text, fontSize: 35, fontWeight: "900", fontVariant: ["tabular-nums"] },
   balanceNote: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },

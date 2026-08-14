@@ -10,9 +10,10 @@ type ScreenProps = PropsWithChildren<{
   action?: ReactNode;
   refreshing?: boolean;
   onRefresh?: () => void;
+  overlay?: ReactNode;
 }>;
 
-export function AppScreen({ title, subtitle, action, refreshing, onRefresh, children }: ScreenProps) {
+export function AppScreen({ title, subtitle, action, refreshing, onRefresh, overlay, children }: ScreenProps) {
   const { theme } = useTheme();
 
   return (
@@ -40,6 +41,7 @@ export function AppScreen({ title, subtitle, action, refreshing, onRefresh, chil
         </View>
         {children}
       </ScrollView>
+      {overlay}
     </SafeAreaView>
   );
 }
