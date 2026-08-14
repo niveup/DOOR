@@ -119,9 +119,42 @@ function PaymentMark({ method }: { method: Expense["payment"] }) {
 }
 
 export default function FinancePage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [budgetPlan, setBudgetPlan] = useState<BudgetPlan>(defaultBudgetPlan);
-  const [bills, setBills] = useState<Bill[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = window.localStorage.getItem("door-finance-expenses");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
+  const [budgetPlan, setBudgetPlan] = useState<BudgetPlan>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = window.localStorage.getItem("door-finance-budget");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed.allowance === "number") return parsed;
+        }
+      } catch {}
+    }
+    return defaultBudgetPlan;
+  });
+  const [bills, setBills] = useState<Bill[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = window.localStorage.getItem("door-finance-bills");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
   const [isLoaded, setIsLoaded] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -165,42 +198,31 @@ export default function FinancePage() {
     return { daysRemaining: remainingDays, daysInMonth: totalDays };
   }, []);
 
-  // Fetch Supabase Data & Clear Legacy Mock Storage
+  // Fetch Supabase Data
   useEffect(() => {
     let isMounted = true;
 
-    try {
-      const legacyExpenses = window.localStorage.getItem("door-finance-expenses");
-      if (legacyExpenses && legacyExpenses.includes("Hostel room fee")) {
-        window.localStorage.removeItem("door-finance-expenses");
-      }
-      const legacyBills = window.localStorage.getItem("door-finance-bills");
-      if (legacyBills && legacyBills.includes("Hostel Wi-Fi")) {
-        window.localStorage.removeItem("door-finance-bills");
-      }
-      const legacyBudget = window.localStorage.getItem("door-finance-budget");
-      if (legacyBudget && legacyBudget.includes("12000")) {
-        window.localStorage.removeItem("door-finance-budget");
-      }
-    } catch {}
-
     async function loadFinanceData() {
       try {
-        const res = await fetch("/api/backend/api/finance/data");
+        const res = await fetch("/api/backend/api/finance/data", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (isMounted) {
-            if (Array.isArray(data.expenses)) {
+            if (Array.isArray(data.expenses) && data.expenses.length > 0) {
               setExpenses(data.expenses);
+              try { window.localStorage.setItem("door-finance-expenses", JSON.stringify(data.expenses)); } catch {}
             }
-            if (data.budget && typeof data.budget.allowance === "number") {
-              setBudgetPlan({
+            if (data.budget && typeof data.budget.allowance === "number" && (data.budget.allowance > 0 || Object.values(data.budget.caps || {}).some((v) => Number(v) > 0))) {
+              const updatedBudget = {
                 allowance: data.budget.allowance,
                 caps: { ...defaultBudgetPlan.caps, ...(data.budget.caps || {}) },
-              });
+              };
+              setBudgetPlan(updatedBudget);
+              try { window.localStorage.setItem("door-finance-budget", JSON.stringify(updatedBudget)); } catch {}
             }
-            if (Array.isArray(data.bills)) {
+            if (Array.isArray(data.bills) && data.bills.length > 0) {
               setBills(data.bills);
+              try { window.localStorage.setItem("door-finance-bills", JSON.stringify(data.bills)); } catch {}
             }
           }
         }
@@ -222,15 +244,21 @@ export default function FinancePage() {
 
   // Sync to local storage as fallback backup
   useEffect(() => {
-    if (isLoaded) window.localStorage.setItem("door-finance-expenses", JSON.stringify(expenses));
+    if (isLoaded) {
+      try { window.localStorage.setItem("door-finance-expenses", JSON.stringify(expenses)); } catch {}
+    }
   }, [expenses, isLoaded]);
 
   useEffect(() => {
-    if (isLoaded) window.localStorage.setItem("door-finance-budget", JSON.stringify(budgetPlan));
+    if (isLoaded) {
+      try { window.localStorage.setItem("door-finance-budget", JSON.stringify(budgetPlan)); } catch {}
+    }
   }, [budgetPlan, isLoaded]);
 
   useEffect(() => {
-    if (isLoaded) window.localStorage.setItem("door-finance-bills", JSON.stringify(bills));
+    if (isLoaded) {
+      try { window.localStorage.setItem("door-finance-bills", JSON.stringify(bills)); } catch {}
+    }
   }, [bills, isLoaded]);
 
   const spending = useMemo(() => expenses.reduce((total, expense) => total + expense.amount, 0), [expenses]);
