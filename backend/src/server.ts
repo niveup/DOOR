@@ -2249,7 +2249,7 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
     const overallReadiness = totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : 0;
 
     // Retrieve settings cache
-    let settings = await prisma.settings.findUnique({ where: { id: "default" } });
+    let settings: any = await prisma.settings.findUnique({ where: { id: "default" } });
     if (!settings) {
       settings = await prisma.settings.create({
         data: { id: "default", name: "GATE Aspirant" },
@@ -2259,12 +2259,12 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
     // Determine Monday of current week in Asia/Kolkata timezone
     const currentMonday = getKolkataMonday();
 
-    const isStale = settings.analysisStale ||
-      !settings.weeklyAnalysis ||
-      !settings.analysisWeekOf ||
-      settings.analysisWeekOf.getTime() !== currentMonday.getTime();
+    const isStale = settings?.analysisStale ||
+      !settings?.weeklyAnalysis ||
+      !settings?.analysisWeekOf ||
+      new Date(settings?.analysisWeekOf).getTime() !== currentMonday.getTime();
 
-    let weeklyAnalysis = settings.weeklyAnalysis || "";
+    let weeklyAnalysis = settings?.weeklyAnalysis || "";
 
     if (isStale) {
       try {
@@ -2275,7 +2275,7 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
         }
 
         const sysPrompt = loadPrompt("tracker_analysis.md", {
-          user_name: settings.name,
+          user_name: settings?.name || "Aspirant",
           readiness: overallReadiness,
           subjects_table: subjectsTable,
         });
@@ -2287,7 +2287,7 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
         weeklyAnalysis = aiResponse.replace(/```(?:markdown)?/gi, "").replace(/```/g, "").trim();
 
         // Update cached values in settings
-        settings = await prisma.settings.update({
+        settings = await (prisma.settings as any).update({
           where: { id: "default" },
           data: {
             weeklyAnalysis,
@@ -2297,17 +2297,17 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
         });
       } catch (aiError) {
         console.error("Failed to generate tracker AI analysis:", aiError);
-        weeklyAnalysis = settings.weeklyAnalysis || "Unable to generate AI analysis at this time.";
+        weeklyAnalysis = settings?.weeklyAnalysis || "Unable to generate AI analysis at this time.";
       }
     }
 
     // Fetch study logs directly from Prisma Postgres (Primary Store)
-    const prismaLogs = await prisma.studyLog.findMany({
+    const prismaLogs: any[] = await ((prisma as any).studyLog?.findMany({
       orderBy: [{ logDate: "desc" }, { createdAt: "desc" }],
       take: 300,
-    });
+    }) || []);
 
-    const logs = prismaLogs.map((l) => ({
+    const logs = (prismaLogs || []).map((l: any) => ({
       id: l.id,
       logDate: l.logDate,
       timeBlock: l.timeBlock,
@@ -2316,7 +2316,7 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
       hoursStudied: l.hoursStudied,
       questionsSolved: l.questionsSolved,
       notes: l.notes,
-      createdAt: l.createdAt.getTime(),
+      createdAt: l.createdAt instanceof Date ? l.createdAt.getTime() : Number(l.createdAt || Date.now()),
     }));
 
 
