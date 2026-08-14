@@ -85,15 +85,24 @@ type Bill = {
 
 ---
 
-## 4. State Management & Hydration
+## 4. Database Architecture & State Management
 
-* **Local Storage Keys**:
-  * `door-finance-expenses`: Array of `Expense`
-  * `door-finance-budget`: `BudgetPlan` object
-  * `door-finance-bills`: Array of `Bill`
-* **Hydration Protection**:
-  * Uses an `isLoaded` state flag initialized via `useEffect` timeout to prevent Next.js SSR / client hydration mismatch errors.
-  * Seed data (`initialExpenses`, `defaultBudgetPlan`, `initialBills`) serves as default fallbacks.
+* **Supabase PostgreSQL Models (`prisma/schema.prisma`)**:
+  * `FinanceExpense`: `id`, `title`, `category`, `amount`, `date`, `payment`, `createdAt`, `updatedAt`
+  * `FinanceBudget`: `id` ("default"), `allowance`, `caps` (Json), `updatedAt`
+  * `FinanceBill`: `id`, `title`, `date`, `amount`, `category`, `paid`, `createdAt`, `updatedAt`
+* **API Endpoints**:
+  * `GET /api/backend/api/finance/data`: Loads all expenses, budget plan, and bills.
+  * `POST /api/backend/api/finance/expense`: Upserts or creates an expense.
+  * `DELETE /api/backend/api/finance/expense`: Deletes an expense by ID.
+  * `POST /api/backend/api/finance/budget`: Upserts the monthly allowance and category caps.
+  * `POST /api/backend/api/finance/bill`: Creates or edits an upcoming bill.
+  * `DELETE /api/backend/api/finance/bill`: Deletes a bill by ID.
+  * `POST /api/backend/api/finance/bill/pay`: Marks bill paid and generates an auto-linked expense.
+  * `POST /api/backend/api/finance/reset`: Clears all finance data in Supabase.
+* **Hydration Protection & Local Storage Fallback**:
+  * Loads live data asynchronously on mount.
+  * Synchronizes to browser `localStorage` as an offline cache.
 
 ---
 
@@ -108,6 +117,7 @@ type Bill = {
 
 ## 6. Guidelines for Extending the Finance Module
 
-* **Backend Integration**: If migrating from `localStorage` to server-backed persistence, preserve client-side optimistic UI state and initial seeds as fallback.
+* **Database Operations**: Perform all mutations via the native Prisma backend route handlers in Next.js and Express.
 * **Localization**: Keep currency calculations aligned with `Intl.NumberFormat("en-IN")` and date formatting with `Intl.DateTimeFormat("en-IN")`.
 * **Bill-to-Expense Pipeline**: Any feature that touches bill payment status must maintain the auto-ledger insertion pattern (`id: bill-${bill.id}`).
+

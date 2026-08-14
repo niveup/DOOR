@@ -5,48 +5,7 @@
 
 export const DEMO_DEFAULTS: Record<string, unknown> = {
   /* ── Dashboard ── */
-  "api/routine/today": {
-    plan: {
-      planId: "demo-plan-1",
-      greeting: "Welcome to your Demo Study Session!",
-      planText: "Focus on core GATE subjects: Thermodynamics, Fluid Mechanics, and Heat Transfer numericals today.",
-      mainPriority: "Focus on Thermodynamics numericals and Fluid Mechanics boundary layer theory.",
-      tasks: [
-        {
-          taskId: "demo-task-1",
-          title: "Solve 15 GATE Thermodynamics numericals",
-          taskType: "study",
-          durationMin: 90,
-          status: "NOT",
-          isPriority: true,
-        },
-        {
-          taskId: "demo-task-2",
-          title: "Revise Fluid Mechanics boundary layer notes",
-          taskType: "reading",
-          durationMin: 45,
-          status: "COMPLETED",
-          isPriority: false,
-        },
-        {
-          taskId: "demo-task-3",
-          title: "Heat Exchangers formula practice & active recall",
-          taskType: "study",
-          durationMin: 60,
-          status: "NOT",
-          isPriority: false,
-        },
-        {
-          taskId: "demo-task-4",
-          title: "Evening physical exercise & stretch routine",
-          taskType: "exercise",
-          durationMin: 30,
-          status: "NOT",
-          isPriority: false,
-        },
-      ],
-    },
-  },
+  "api/routine/today": null,
   "api/tracker/status": {
     subjects: [
       {

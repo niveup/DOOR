@@ -59,6 +59,39 @@ interface TrackerStatus {
   subjects: TrackerSubject[];
 }
 
+type FinanceCategory =
+  | "Hostel & utilities"
+  | "Food & mess"
+  | "Travel & commute"
+  | "Academics"
+  | "Personal & health"
+  | "Subscriptions"
+  | "Fun & social"
+  | "Others";
+
+interface FinanceExpenseItem {
+  id: string;
+  title: string;
+  category: FinanceCategory;
+  amount: number;
+  date: string;
+  payment: "UPI" | "Cash" | "Card";
+}
+
+interface FinanceBudgetItem {
+  allowance: number;
+  caps: Record<string, number>;
+}
+
+interface FinanceBillItem {
+  id: string;
+  title: string;
+  date: string;
+  amount: number;
+  category: FinanceCategory;
+  paid: boolean;
+}
+
 interface ManualTaskDraft {
   id: string;
   title: string;
@@ -145,9 +178,26 @@ export default function Dashboard() {
   const [plan, setPlan] = useState<RoutinePlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [readiness, setReadiness] = useState(0);
-  const [weakArea, setWeakArea] = useState("No weak subject logged yet");
-  const [hasAvoidance, setHasAvoidance] = useState(false);
+  const [financeLeft, setFinanceLeft] = useState(0);
+  const [financeReceived, setFinanceReceived] = useState(0);
+  const [financeData, setFinanceData] = useState<{
+    expenses: FinanceExpenseItem[];
+    budget: FinanceBudgetItem;
+    bills: FinanceBillItem[];
+  }>({
+    expenses: [],
+    budget: { allowance: 0, caps: {} },
+    bills: [],
+  });
+  const [quickExpenseOpen, setQuickExpenseOpen] = useState(false);
+  const [quickExpenseForm, setQuickExpenseForm] = useState({
+    title: "",
+    category: "Food & mess" as FinanceCategory,
+    amount: "",
+    date: "",
+    payment: "UPI" as "UPI" | "Cash" | "Card",
+  });
+  const [quickExpenseSaving, setQuickExpenseSaving] = useState(false);
   const [recentlyCompleted, setRecentlyCompleted] = useState<string[]>([]);
   const [manualPlanOpen, setManualPlanOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -241,52 +291,100 @@ export default function Dashboard() {
     void fetchTodayPlan(newDate);
   };
 
-  const fetchTrackerStatus = useCallback(async () => {
-    const cached = getCache<TrackerStatus>('tracker_status');
-    if (cached) {
-      const subjects = Array.isArray(cached.subjects) ? cached.subjects : [];
-      setReadiness(cached.overallReadiness || 0);
-
-      const weakSubject =
-        subjects.find((subject) => subject.hasAvoidanceWarning) ||
-        subjects.find((subject) => subject.isNeglected) ||
-        [...subjects].sort((a, b) => (a.latestRating || 5) - (b.latestRating || 5))[0];
-
-      if (weakSubject) {
-        setWeakArea(weakSubject.subjectName);
-        setHasAvoidance(Boolean(weakSubject.hasAvoidanceWarning || weakSubject.isNeglected));
-      }
-      return;
-    }
-
+  const fetchFinanceStatus = useCallback(async () => {
     try {
-      const res = await appFetch(`${backendUrl}/api/tracker/status`, {
+      const res = await appFetch(`${backendUrl}/api/finance/data`, {
         headers: {},
       });
       if (!res.ok) return;
-      const result = (await res.json()) as TrackerStatus;
-      const subjects = Array.isArray(result.subjects) ? result.subjects : [];
-      setReadiness(result.overallReadiness || 0);
+      const result = await res.json();
+      const expenses: FinanceExpenseItem[] = result.expenses || [];
+      const budget: FinanceBudgetItem = result.budget || { allowance: 0, caps: {} };
+      const bills: FinanceBillItem[] = result.bills || [];
 
-      const weakSubject =
-        subjects.find((subject) => subject.hasAvoidanceWarning) ||
-        subjects.find((subject) => subject.isNeglected) ||
-        [...subjects].sort((a, b) => (a.latestRating || 5) - (b.latestRating || 5))[0];
-
-      if (weakSubject) {
-        setWeakArea(weakSubject.subjectName);
-        setHasAvoidance(Boolean(weakSubject.hasAvoidanceWarning || weakSubject.isNeglected));
-      }
-      setCache('tracker_status', result);
+      setFinanceData({ expenses, budget, bills });
+      const received = budget.allowance || 0;
+      const totalSpent = expenses.reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
+      setFinanceReceived(received);
+      setFinanceLeft(Math.max(0, received - totalSpent));
     } catch {
-      setWeakArea("Tracker appears after the backend starts");
+      // Ignore errors for optional widget
     }
-  }, [backendUrl]);
+  }, [backendUrl, appFetch]);
+
+  const handleMarkBillPaid = async (bill: FinanceBillItem) => {
+    setFinanceData((prev) => ({
+      ...prev,
+      bills: prev.bills.map((b) => (b.id === bill.id ? { ...b, paid: true } : b)),
+    }));
+
+    try {
+      const res = await appFetch(`${backendUrl}/api/finance/bill/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: bill.id }),
+      });
+      if (res.ok) {
+        toast.success(`${bill.title} marked paid and recorded in Supabase`);
+        void fetchFinanceStatus();
+      } else {
+        toast.error("Failed to update bill payment.");
+      }
+    } catch {
+      toast.error("Network error while updating bill.");
+    }
+  };
+
+  const handleQuickExpenseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = Number(quickExpenseForm.amount);
+    if (!quickExpenseForm.title.trim() || !Number.isFinite(amount) || amount <= 0) {
+      toast.error("Please enter a valid description and amount.");
+      return;
+    }
+
+    setQuickExpenseSaving(true);
+    const dateToUse = quickExpenseForm.date || todayStr;
+    const payload = {
+      title: quickExpenseForm.title.trim(),
+      category: quickExpenseForm.category,
+      amount,
+      date: dateToUse,
+      payment: quickExpenseForm.payment,
+    };
+
+    try {
+      const res = await appFetch(`${backendUrl}/api/finance/expense`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        toast.success("Expense saved to Supabase");
+        setQuickExpenseOpen(false);
+        setQuickExpenseForm({
+          title: "",
+          category: "Food & mess",
+          amount: "",
+          date: todayStr,
+          payment: "UPI",
+        });
+        void fetchFinanceStatus();
+      } else {
+        toast.error("Failed to save expense.");
+      }
+    } catch {
+      toast.error("Network error while saving expense.");
+    } finally {
+      setQuickExpenseSaving(false);
+    }
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void fetchTodayPlan();
-      void fetchTrackerStatus();
+      void fetchFinanceStatus();
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -609,9 +707,8 @@ export default function Dashboard() {
       ) : null}
 
       <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <MetricTile index={0} label="Readiness" value={readiness} suffix="%" note={weakArea} progress={readiness} tone={hasAvoidance ? "amber" : "green"} />
         <MetricTile
-          index={1}
+          index={0}
           label="Today score"
           value={plan ? score : 0}
           suffix="/100"
@@ -619,15 +716,24 @@ export default function Dashboard() {
           progress={plan ? score : 0}
           tone="blue"
         />
-        <MetricTile index={2} label="Tasks" value={completedCount} suffix={plan && Array.isArray(plan.tasks) ? `/${plan.tasks.length}` : "/0"} note="Tap a task to update it" progress={taskProgress} tone="lavender" />
+        <MetricTile index={1} label="Tasks" value={completedCount} suffix={plan && Array.isArray(plan.tasks) ? `/${plan.tasks.length}` : "/0"} note="Tap a task to update it" progress={taskProgress} tone="lavender" />
         <MetricTile
-          index={3}
+          index={2}
           label="Time done"
           value={Math.round(completedMinutes)}
           suffix={`/${totalMinutes}m`}
           note={completedMinutes >= totalMinutes && totalMinutes > 0 ? "All planned time complete" : `${Math.max(0, Math.round(totalMinutes - completedMinutes))}m remaining`}
           progress={timeProgress}
           tone="amber"
+        />
+        <MetricTile 
+          index={3} 
+          label="Money left (₹)" 
+          value={financeLeft} 
+          suffix="" 
+          note={`Received: ₹${financeReceived.toLocaleString("en-IN")}`} 
+          progress={financeReceived > 0 ? (financeLeft / financeReceived) * 100 : 0} 
+          tone="green" 
         />
       </section>
 
@@ -680,10 +786,32 @@ export default function Dashboard() {
             />
           )}
         </PageSection>
+
+        <PageSection
+          title="Campus Expenses"
+          className="xl:col-span-5"
+        >
+          <FinanceOverviewPanel
+            data={financeData}
+            onMarkBillPaid={handleMarkBillPaid}
+            onOpenQuickExpense={() => {
+              setQuickExpenseForm((prev) => ({ ...prev, date: prev.date || todayStr }));
+              setQuickExpenseOpen(true);
+            }}
+          />
+        </PageSection>
       </div>
 
-
       <AnimatePresence>
+        {quickExpenseOpen && (
+          <QuickExpenseModal
+            form={quickExpenseForm}
+            saving={quickExpenseSaving}
+            onChange={setQuickExpenseForm}
+            onClose={() => setQuickExpenseOpen(false)}
+            onSubmit={handleQuickExpenseSubmit}
+          />
+        )}
         {manualPlanOpen && (
           <ManualPlanModal
             tasks={manualTasks}
@@ -1225,6 +1353,310 @@ function ConfirmDeleteModal({
           </button>
         </div>
       </motion.div>
+    </motion.div>,
+    document.body
+  );
+}
+
+const financeCategoryList: FinanceCategory[] = [
+  "Hostel & utilities",
+  "Food & mess",
+  "Travel & commute",
+  "Academics",
+  "Personal & health",
+  "Subscriptions",
+  "Fun & social",
+  "Others",
+];
+
+const financeCategoryMeta: Record<FinanceCategory, { color: string; soft: string }> = {
+  "Hostel & utilities": { color: "var(--lavender)", soft: "var(--lavender-soft)" },
+  "Food & mess": { color: "var(--sun)", soft: "var(--sun-soft)" },
+  "Travel & commute": { color: "var(--teal)", soft: "var(--teal-soft)" },
+  "Academics": { color: "var(--mint)", soft: "var(--mint-soft)" },
+  "Personal & health": { color: "var(--danger)", soft: "var(--danger-soft)" },
+  "Subscriptions": { color: "var(--accent)", soft: "var(--accent-soft)" },
+  "Fun & social": { color: "var(--lavender)", soft: "var(--lavender-soft)" },
+  "Others": { color: "var(--text-secondary)", soft: "var(--bg-elevated)" },
+};
+
+function formatFinanceINR(value: number): string {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function shortDateText(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(d);
+  } catch {
+    return dateStr;
+  }
+}
+
+function FinanceOverviewPanel({
+  data,
+  onMarkBillPaid,
+  onOpenQuickExpense,
+}: {
+  data: {
+    expenses: FinanceExpenseItem[];
+    budget: FinanceBudgetItem;
+    bills: FinanceBillItem[];
+  };
+  onMarkBillPaid: (bill: FinanceBillItem) => void;
+  onOpenQuickExpense: () => void;
+}) {
+  const allowance = data.budget?.allowance || 0;
+  const totalSpent = data.expenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0);
+  const remainingAllowance = Math.max(0, allowance - totalSpent);
+
+  const now = useMemo(() => new Date(), []);
+  const currentMonthName = now.toLocaleDateString("en-IN", { month: "long" });
+  const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const currentDay = now.getDate();
+  const daysRemaining = Math.max(1, totalDays - currentDay + 1);
+  const dailySafeLimit = daysRemaining > 0 ? Math.floor(remainingAllowance / daysRemaining) : 0;
+  const spendingPercent = allowance > 0 ? Math.min(100, Math.round((totalSpent / allowance) * 100)) : (totalSpent > 0 ? 100 : 0);
+
+  // Top 4 highest expenses for the current month in descending order (2x2 layout)
+  const highestExpenses = useMemo(() => {
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const thisMonthExpenses = data.expenses.filter((e) => e.date.startsWith(monthPrefix));
+    const listToUse = thisMonthExpenses.length > 0 ? thisMonthExpenses : data.expenses;
+    return [...listToUse].sort((a, b) => b.amount - a.amount).slice(0, 4);
+  }, [data.expenses, now]);
+
+  const upcomingBills = useMemo(() => {
+    return data.bills.filter((b) => !b.paid).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 2);
+  }, [data.bills]);
+
+  return (
+    <div className="space-y-4">
+      {/* Daily Safe Spend & Monthly Progress */}
+      <div className="surface p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Daily safe spend</p>
+            <div className="mt-1.5 flex items-baseline gap-1 text-[var(--text-primary)]">
+              <span className="text-sm font-medium text-[var(--text-secondary)]">₹</span>
+              <span className="text-2xl font-bold tracking-normal tabular-nums">
+                {dailySafeLimit.toLocaleString("en-IN")}
+              </span>
+              <span className="ml-1 text-xs font-normal text-[var(--text-secondary)]">/ day</span>
+            </div>
+          </div>
+          <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[10px] font-semibold text-[var(--text-secondary)]">
+            {daysRemaining} days left in {currentMonthName}
+          </span>
+        </div>
+
+        <div className="mt-4">
+          <div className="mb-1.5 flex items-center justify-between text-xs font-medium">
+            <span className="text-[var(--text-secondary)]">Monthly allowance</span>
+            <span className="font-semibold tabular-nums text-[var(--text-primary)]">
+              {formatFinanceINR(totalSpent)} <span className="text-[var(--text-faint)]">/ {formatFinanceINR(allowance)}</span>
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--track)]">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${spendingPercent}%`,
+                background: spendingPercent > 90 ? "var(--danger)" : spendingPercent > 70 ? "var(--sun)" : "var(--mint)",
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Top 4 Most Expensive Expenses this Month (2x2 Grid) */}
+      <div className="surface p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Top expenses this month</p>
+          <Link href="/finance" className="text-[10px] font-semibold text-[var(--accent)] hover:underline">
+            View all
+          </Link>
+        </div>
+
+        {highestExpenses.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2.5">
+            {highestExpenses.map((exp, idx) => {
+              const meta = financeCategoryMeta[exp.category] || financeCategoryMeta["Others"];
+              return (
+                <div
+                  key={exp.id || idx}
+                  className="flex flex-col justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-2.5 transition hover:border-[var(--border-strong)]"
+                >
+                  <div className="mb-1.5 flex items-center justify-between gap-1">
+                    <span
+                      style={{ background: meta.soft, color: meta.color }}
+                      className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold truncate max-w-[85px]"
+                    >
+                      {exp.category}
+                    </span>
+                    <span className="text-[10px] font-medium text-[var(--text-secondary)] shrink-0">
+                      {shortDateText(exp.date)}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="truncate text-xs font-semibold text-[var(--text-primary)]" title={exp.title}>
+                      {exp.title}
+                    </p>
+                    <div className="mt-1 flex items-baseline gap-0.5 font-bold text-[var(--text-primary)]">
+                      <span className="text-[10px] text-[var(--text-secondary)]">₹</span>
+                      <span className="text-xs tracking-normal tabular-nums">{exp.amount.toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-4 text-center text-xs text-[var(--text-secondary)]">
+            No expenses logged for this month yet.
+          </div>
+        )}
+      </div>
+
+      {/* Upcoming Bills (if any) */}
+      {upcomingBills.length > 0 && (
+        <div className="surface p-4">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Upcoming bills</p>
+          <div className="space-y-2">
+            {upcomingBills.map((bill) => (
+              <div key={bill.id} className="flex items-center justify-between gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-[var(--text-primary)]">{bill.title}</p>
+                  <p className="text-[10px] text-[var(--text-secondary)]">Due {shortDateText(bill.date)} · {bill.category}</p>
+                </div>
+                <span className="text-xs font-semibold tabular-nums text-[var(--text-primary)]">{formatFinanceINR(bill.amount)}</span>
+                <button
+                  type="button"
+                  onClick={() => onMarkBillPaid(bill)}
+                  className="focus-ring rounded-md bg-[var(--text-primary)] px-2.5 py-1 text-[10px] font-bold text-[var(--bg-card)] hover:opacity-90 transition cursor-pointer"
+                >
+                  Pay
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions Bar */}
+      <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={onOpenQuickExpense}
+          className="focus-ring flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition cursor-pointer"
+        >
+          <span>+</span> Log expense
+        </button>
+        <Link
+          href="/finance"
+          className="focus-ring flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--text-primary)] px-3 py-2 text-xs font-semibold text-[var(--bg-card)] hover:opacity-90 transition cursor-pointer text-center"
+        >
+          Open Finance →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function QuickExpenseModal({
+  form,
+  saving,
+  onChange,
+  onClose,
+  onSubmit,
+}: {
+  form: {
+    title: string;
+    category: FinanceCategory;
+    amount: string;
+    date: string;
+    payment: "UPI" | "Cash" | "Card";
+  };
+  saving: boolean;
+  onChange: React.Dispatch<React.SetStateAction<{
+    title: string;
+    category: FinanceCategory;
+    amount: string;
+    date: string;
+    payment: "UPI" | "Cash" | "Card";
+  }>>;
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+
+  return createPortal(
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md overflow-y-auto sm:p-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <motion.form initial={{ opacity: 0, y: 12, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.96 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }} onMouseDown={(e) => e.stopPropagation()} onSubmit={onSubmit} role="dialog" aria-modal="true" aria-labelledby="quick-expense-title" className="my-auto w-full max-w-md overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-2xl sm:p-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="section-label">QUICK ENTRY</p>
+            <h2 id="quick-expense-title" className="mt-1.5 text-lg font-semibold tracking-tight text-[var(--text-primary)]">Log an expense</h2>
+            <p className="mt-1 text-[11px] font-medium text-[var(--text-secondary)]">Record a payment to keep your daily safe spend accurate.</p>
+          </div>
+          <button type="button" onClick={onClose} className="focus-ring grid h-8 w-8 place-items-center rounded-md border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] cursor-pointer" aria-label="Close">
+            <span className="text-base leading-none">×</span>
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4">
+          <label className="grid gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Description</span>
+            <input autoFocus required value={form.title} onChange={(e) => onChange((prev) => ({ ...prev, title: e.target.value }))} placeholder="e.g. Mess lunch, Tea & snacks" className="app-input h-10 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder:text-[var(--text-faint)] outline-none" />
+          </label>
+
+          <div className="grid grid-cols-[1fr_120px] gap-3">
+            <label className="grid gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Category</span>
+              <select value={form.category} onChange={(e) => onChange((prev) => ({ ...prev, category: e.target.value as FinanceCategory }))} className="app-input h-10 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none">
+                {financeCategoryList.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Amount</span>
+              <div className="flex h-10 items-center rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3">
+                <span className="text-xs font-semibold text-[var(--text-secondary)]">₹</span>
+                <input required min="1" type="number" value={form.amount} onChange={(e) => onChange((prev) => ({ ...prev, amount: e.target.value }))} placeholder="0" className="min-w-0 flex-1 bg-transparent pl-1 text-xs font-semibold text-[var(--text-primary)] outline-none" />
+              </div>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="grid gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Date</span>
+              <input type="date" value={form.date} onChange={(e) => onChange((prev) => ({ ...prev, date: e.target.value }))} className="app-input h-10 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none" />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Paid with</span>
+              <select value={form.payment} onChange={(e) => onChange((prev) => ({ ...prev, payment: e.target.value as "UPI" | "Cash" | "Card" }))} className="app-input h-10 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none">
+                <option value="UPI">UPI</option>
+                <option value="Cash">Cash</option>
+                <option value="Card">Card</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2.5">
+          <button type="button" onClick={onClose} className="focus-ring rounded-lg border border-[var(--border)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] cursor-pointer">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="focus-ring rounded-lg bg-[var(--text-primary)] px-4 py-2 text-xs font-semibold text-[var(--bg-card)] hover:opacity-90 disabled:opacity-50 cursor-pointer">
+            {saving ? "Saving..." : "Save expense"}
+          </button>
+        </div>
+      </motion.form>
     </motion.div>,
     document.body
   );

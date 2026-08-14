@@ -331,6 +331,230 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
   return null;
 }
 
+async function handleNativeFinanceRoute(safePath: string, method: string, parsedBody: any, reqUrl: URL) {
+  // 1. GET api/finance/data
+  if (safePath === "api/finance/data" && method === "GET") {
+    const [expenses, budget, bills] = await Promise.all([
+      (prisma as any).financeExpense.findMany({
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      }),
+      (prisma as any).financeBudget.findUnique({
+        where: { id: "default" },
+      }),
+      (prisma as any).financeBill.findMany({
+        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+      }),
+    ]);
+
+    const defaultCaps = {
+      "Hostel & utilities": 0,
+      "Food & mess": 0,
+      "Travel & commute": 0,
+      "Academics": 0,
+      "Personal & health": 0,
+      "Subscriptions": 0,
+      "Fun & social": 0,
+      "Others": 0,
+    };
+
+    return NextResponse.json(
+      {
+        expenses: expenses || [],
+        budget: budget
+          ? {
+              allowance: budget.allowance,
+              caps: budget.caps || defaultCaps,
+            }
+          : {
+              allowance: 0,
+              caps: defaultCaps,
+            },
+        bills: bills || [],
+      },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
+  }
+
+  // 2. POST api/finance/expense
+  if (safePath === "api/finance/expense" && method === "POST") {
+    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
+    const { id, title, category, amount, date, payment } = parsedBody;
+    if (!title || typeof amount !== "number") {
+      return NextResponse.json({ error: "title and numeric amount are required." }, { status: 400 });
+    }
+
+    if (id) {
+      const updated = await (prisma as any).financeExpense.upsert({
+        where: { id },
+        update: {
+          title: String(title).trim(),
+          category: String(category || "Others"),
+          amount: Number(amount),
+          date: String(date || getKolkataDateString()),
+          payment: String(payment || "UPI"),
+        },
+        create: {
+          id,
+          title: String(title).trim(),
+          category: String(category || "Others"),
+          amount: Number(amount),
+          date: String(date || getKolkataDateString()),
+          payment: String(payment || "UPI"),
+        },
+      });
+      return NextResponse.json({ success: true, expense: updated });
+    } else {
+      const created = await (prisma as any).financeExpense.create({
+        data: {
+          title: String(title).trim(),
+          category: String(category || "Others"),
+          amount: Number(amount),
+          date: String(date || getKolkataDateString()),
+          payment: String(payment || "UPI"),
+        },
+      });
+      return NextResponse.json({ success: true, expense: created });
+    }
+  }
+
+  // 3. DELETE api/finance/expense
+  if ((safePath.startsWith("api/finance/expense/") || safePath === "api/finance/expense") && method === "DELETE") {
+    let id = safePath.startsWith("api/finance/expense/") ? safePath.replace("api/finance/expense/", "") : reqUrl.searchParams.get("id");
+    if (!id && parsedBody?.id) id = parsedBody.id;
+    if (!id) return NextResponse.json({ error: "Expense ID is required." }, { status: 400 });
+
+    await (prisma as any).financeExpense.deleteMany({
+      where: { id },
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  // 4. POST api/finance/budget
+  if (safePath === "api/finance/budget" && method === "POST") {
+    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
+    const { allowance, caps } = parsedBody;
+    const allowanceNum = Number(allowance || 0);
+
+    const updated = await (prisma as any).financeBudget.upsert({
+      where: { id: "default" },
+      update: {
+        allowance: allowanceNum,
+        caps: caps || {},
+      },
+      create: {
+        id: "default",
+        allowance: allowanceNum,
+        caps: caps || {},
+      },
+    });
+
+    return NextResponse.json({ success: true, budget: updated });
+  }
+
+  // 5. POST api/finance/bill
+  if (safePath === "api/finance/bill" && method === "POST") {
+    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
+    const { id, title, date, amount, category, paid } = parsedBody;
+    if (!title || typeof amount !== "number") {
+      return NextResponse.json({ error: "title and numeric amount are required." }, { status: 400 });
+    }
+
+    if (id) {
+      const updated = await (prisma as any).financeBill.upsert({
+        where: { id },
+        update: {
+          title: String(title).trim(),
+          date: String(date || getKolkataDateString()),
+          amount: Number(amount),
+          category: String(category || "Subscriptions"),
+          paid: Boolean(paid),
+        },
+        create: {
+          id,
+          title: String(title).trim(),
+          date: String(date || getKolkataDateString()),
+          amount: Number(amount),
+          category: String(category || "Subscriptions"),
+          paid: Boolean(paid),
+        },
+      });
+      return NextResponse.json({ success: true, bill: updated });
+    } else {
+      const created = await (prisma as any).financeBill.create({
+        data: {
+          title: String(title).trim(),
+          date: String(date || getKolkataDateString()),
+          amount: Number(amount),
+          category: String(category || "Subscriptions"),
+          paid: Boolean(paid),
+        },
+      });
+      return NextResponse.json({ success: true, bill: created });
+    }
+  }
+
+  // 6. POST api/finance/bill/pay
+  if (safePath === "api/finance/bill/pay" && method === "POST") {
+    if (!parsedBody) return NextResponse.json({ error: "Missing JSON body" }, { status: 400 });
+    const { id } = parsedBody;
+    if (!id) return NextResponse.json({ error: "Bill ID is required." }, { status: 400 });
+
+    const bill = await (prisma as any).financeBill.findUnique({
+      where: { id },
+    });
+    if (!bill) return NextResponse.json({ error: "Bill not found." }, { status: 404 });
+
+    const updatedBill = await (prisma as any).financeBill.update({
+      where: { id },
+      data: { paid: true },
+    });
+
+    const expenseId = `bill-${bill.id}`;
+    const expense = await (prisma as any).financeExpense.upsert({
+      where: { id: expenseId },
+      update: {
+        title: bill.title,
+        category: bill.category,
+        amount: bill.amount,
+        date: getKolkataDateString(),
+        payment: "UPI",
+      },
+      create: {
+        id: expenseId,
+        title: bill.title,
+        category: bill.category,
+        amount: bill.amount,
+        date: getKolkataDateString(),
+        payment: "UPI",
+      },
+    });
+
+    return NextResponse.json({ success: true, bill: updatedBill, expense });
+  }
+
+  // 7. DELETE api/finance/bill
+  if ((safePath.startsWith("api/finance/bill/") || safePath === "api/finance/bill") && method === "DELETE") {
+    let id = safePath.startsWith("api/finance/bill/") ? safePath.replace("api/finance/bill/", "") : reqUrl.searchParams.get("id");
+    if (!id && parsedBody?.id) id = parsedBody.id;
+    if (!id) return NextResponse.json({ error: "Bill ID is required." }, { status: 400 });
+
+    await (prisma as any).financeBill.deleteMany({
+      where: { id },
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  // 8. POST api/finance/reset
+  if (safePath === "api/finance/reset" && method === "POST") {
+    await (prisma as any).financeExpense.deleteMany({});
+    await (prisma as any).financeBill.deleteMany({});
+    await (prisma as any).financeBudget.deleteMany({});
+    return NextResponse.json({ success: true, message: "Finance data reset successfully in Supabase." });
+  }
+
+  return null;
+}
+
 async function relay(request: NextRequest, context: RouteContext) {
   const session = await getSession();
   if (!session.isLoggedIn) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -364,8 +588,11 @@ async function relay(request: NextRequest, context: RouteContext) {
 
   // Try direct native Prisma database execution first for 100% reliable cloud sync
   try {
-    const nativeRes = await handleNativeTrackerRoute(safePath, request.method, parsedBody, request.nextUrl);
-    if (nativeRes) return nativeRes;
+    const nativeTrackerRes = await handleNativeTrackerRoute(safePath, request.method, parsedBody, request.nextUrl);
+    if (nativeTrackerRes) return nativeTrackerRes;
+
+    const nativeFinanceRes = await handleNativeFinanceRoute(safePath, request.method, parsedBody, request.nextUrl);
+    if (nativeFinanceRes) return nativeFinanceRes;
   } catch (nativeErr: any) {
     console.error("Native Prisma execution warning:", nativeErr?.message || nativeErr);
   }

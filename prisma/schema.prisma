@@ -5,8 +5,9 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../frontend/node_modules/.prisma/client"
+  provider   = "prisma-client-js"
+  output     = "../frontend/node_modules/.prisma/client"
+  engineType = "binary"
 }
 
 model Settings {
@@ -207,3 +208,38 @@ model StudyLog {
   @@index([logDate])
   @@index([subjectId])
 }
+
+model FinanceExpense {
+  id        String   @id @default(uuid())
+  title     String
+  category  String
+  amount    Float
+  date      String   // "YYYY-MM-DD" format
+  payment   String   // "UPI" | "Cash" | "Card"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([category])
+}
+
+model FinanceBudget {
+  id        String   @id @default("default")
+  allowance Float    @default(0)
+  caps      Json     // Record<Category, number>
+  updatedAt DateTime @updatedAt
+}
+
+model FinanceBill {
+  id        String   @id @default(uuid())
+  title     String
+  date      String   // "YYYY-MM-DD" format
+  amount    Float
+  category  String
+  paid      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
+

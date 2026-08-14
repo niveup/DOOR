@@ -1335,14 +1335,8 @@ async function generateTodayRoutinePlan(replaceExisting: boolean) {
   };
 }
 
-app.post("/api/routine/generate", async (req: Request, res: Response) => {
-  try {
-    const result = await generateTodayRoutinePlan(Boolean(req.body?.replace));
-    const failed = result.status === "failed_existing_preserved";
-    res.status(failed ? 502 : 200).json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+app.post("/api/routine/generate", async (_req: Request, res: Response) => {
+  return res.status(400).json({ error: "Automatic plan generation has been removed. Please create your plan manually via the dashboard." });
 });
 
 // --- Cron Processing Tick Handler ---
@@ -1408,17 +1402,9 @@ app.get("/cron/tick", async (req: Request, res: Response) => {
         );
 
         console.log(`[Cron 04:00] Calculated score for yesterday: ${dailyScore}/100`);
-        // We could write dailyScore to routine_plan or logs as needed.
       }
 
       return res.json({ job: "finalize_yesterday", status: "completed" });
-    }
-
-    // 06:00 AM IST Cron - Generate Today's Routine Plan (disabled automatic generation per user request)
-    // The dashboard can also force this so the user is not stuck waiting for 6 AM.
-    const forcePlanGeneration = req.query.force === "plan";
-    if (forcePlanGeneration) {
-      return res.json(await generateTodayRoutinePlan(false));
     }
 
     return res.json({ status: "ok", message: "Hour did not match any cron jobs. No actions run." });
@@ -2277,8 +2263,262 @@ app.post("/api/tracker/goal", async (req: Request, res: Response) => {
   }
 });
 
+// --- Finance API Routes ---
+
+app.get("/api/finance/data", async (_req: Request, res: Response) => {
+  try {
+    const [expenses, budget, bills] = await Promise.all([
+      (prisma as any).financeExpense.findMany({
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      }),
+      (prisma as any).financeBudget.findUnique({
+        where: { id: "default" },
+      }),
+      (prisma as any).financeBill.findMany({
+        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+      }),
+    ]);
+
+    const defaultCaps = {
+      "Hostel & utilities": 0,
+      "Food & mess": 0,
+      "Travel & commute": 0,
+      "Academics": 0,
+      "Personal & health": 0,
+      "Subscriptions": 0,
+      "Fun & social": 0,
+      "Others": 0,
+    };
+
+    res.json({
+      expenses: expenses || [],
+      budget: budget
+        ? {
+            allowance: budget.allowance,
+            caps: budget.caps || defaultCaps,
+          }
+        : {
+            allowance: 0,
+            caps: defaultCaps,
+          },
+      bills: bills || [],
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/finance/expense", async (req: Request, res: Response) => {
+  try {
+    const { id, title, category, amount, date, payment } = req.body;
+    if (!title || typeof amount !== "number") {
+      return res.status(400).json({ error: "title and numeric amount are required." });
+    }
+
+    if (id) {
+      const updated = await (prisma as any).financeExpense.upsert({
+        where: { id },
+        update: {
+          title: String(title).trim(),
+          category: String(category || "Others"),
+          amount: Number(amount),
+          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          payment: String(payment || "UPI"),
+        },
+        create: {
+          id,
+          title: String(title).trim(),
+          category: String(category || "Others"),
+          amount: Number(amount),
+          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          payment: String(payment || "UPI"),
+        },
+      });
+      return res.json({ success: true, expense: updated });
+    } else {
+      const created = await (prisma as any).financeExpense.create({
+        data: {
+          title: String(title).trim(),
+          category: String(category || "Others"),
+          amount: Number(amount),
+          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          payment: String(payment || "UPI"),
+        },
+      });
+      return res.json({ success: true, expense: created });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/finance/expense/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "Expense ID is required." });
+    await (prisma as any).financeExpense.deleteMany({ where: { id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/finance/expense", async (req: Request, res: Response) => {
+  try {
+    const id = req.query.id as string || req.body?.id;
+    if (!id) return res.status(400).json({ error: "Expense ID is required." });
+    await (prisma as any).financeExpense.deleteMany({ where: { id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/finance/budget", async (req: Request, res: Response) => {
+  try {
+    const { allowance, caps } = req.body;
+    const allowanceNum = Number(allowance || 0);
+
+    const updated = await (prisma as any).financeBudget.upsert({
+      where: { id: "default" },
+      update: {
+        allowance: allowanceNum,
+        caps: caps || {},
+      },
+      create: {
+        id: "default",
+        allowance: allowanceNum,
+        caps: caps || {},
+      },
+    });
+
+    res.json({ success: true, budget: updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/finance/bill", async (req: Request, res: Response) => {
+  try {
+    const { id, title, date, amount, category, paid } = req.body;
+    if (!title || typeof amount !== "number") {
+      return res.status(400).json({ error: "title and numeric amount are required." });
+    }
+
+    if (id) {
+      const updated = await (prisma as any).financeBill.upsert({
+        where: { id },
+        update: {
+          title: String(title).trim(),
+          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          amount: Number(amount),
+          category: String(category || "Subscriptions"),
+          paid: Boolean(paid),
+        },
+        create: {
+          id,
+          title: String(title).trim(),
+          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          amount: Number(amount),
+          category: String(category || "Subscriptions"),
+          paid: Boolean(paid),
+        },
+      });
+      return res.json({ success: true, bill: updated });
+    } else {
+      const created = await (prisma as any).financeBill.create({
+        data: {
+          title: String(title).trim(),
+          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          amount: Number(amount),
+          category: String(category || "Subscriptions"),
+          paid: Boolean(paid),
+        },
+      });
+      return res.json({ success: true, bill: created });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/finance/bill/pay", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: "Bill ID is required." });
+
+    const bill = await (prisma as any).financeBill.findUnique({
+      where: { id },
+    });
+    if (!bill) return res.status(404).json({ error: "Bill not found." });
+
+    const updatedBill = await (prisma as any).financeBill.update({
+      where: { id },
+      data: { paid: true },
+    });
+
+    const expenseId = `bill-${bill.id}`;
+    const expense = await (prisma as any).financeExpense.upsert({
+      where: { id: expenseId },
+      update: {
+        title: bill.title,
+        category: bill.category,
+        amount: bill.amount,
+        date: getKolkataDate().toISOString().split("T")[0],
+        payment: "UPI",
+      },
+      create: {
+        id: expenseId,
+        title: bill.title,
+        category: bill.category,
+        amount: bill.amount,
+        date: getKolkataDate().toISOString().split("T")[0],
+        payment: "UPI",
+      },
+    });
+
+    res.json({ success: true, bill: updatedBill, expense });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/finance/bill/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "Bill ID is required." });
+    await (prisma as any).financeBill.deleteMany({ where: { id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/finance/bill", async (req: Request, res: Response) => {
+  try {
+    const id = req.query.id as string || req.body?.id;
+    if (!id) return res.status(400).json({ error: "Bill ID is required." });
+    await (prisma as any).financeBill.deleteMany({ where: { id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/finance/reset", async (_req: Request, res: Response) => {
+  try {
+    await (prisma as any).financeExpense.deleteMany({});
+    await (prisma as any).financeBill.deleteMany({});
+    await (prisma as any).financeBudget.deleteMany({});
+    res.json({ success: true, message: "Finance data reset successfully in Supabase." });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- Server Listen ---
 
 app.listen(PORT, () => {
   console.log(`Backend server successfully running on port ${PORT}`);
 });
+

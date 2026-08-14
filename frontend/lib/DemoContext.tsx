@@ -194,6 +194,63 @@ function createDemoResponse(
     });
   }
 
+  // Special handling for POST api/routine/manual (Create Manual Plan)
+  if (method === "POST" && apiPath === "api/routine/manual") {
+    const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, any>;
+    const tasks = Array.isArray(b.tasks) ? b.tasks : [];
+    const createdPlan = {
+      planId: "demo-plan-" + Date.now(),
+      date: new Date().toISOString().split("T")[0],
+      greeting: "Your plan is ready. Start with the first task.",
+      planText: tasks.map((t: any, i: number) => `${i + 1}. ${t.title || "Task"} (${t.durationMin || 30} mins)`).join("\n"),
+      mainPriority: tasks[0]?.title || "Daily Priority",
+      totalEstimatedMin: tasks.reduce((sum: number, t: any) => sum + (Number(t.durationMin) || 0), 0),
+      isWeekend: false,
+      tasks: tasks.map((t: any, index: number) => ({
+        taskId: "demo-task-" + Date.now() + "-" + index,
+        title: t.title || "Task",
+        taskType: t.taskType || "study",
+        durationMin: Number(t.durationMin) || 30,
+        isPriority: index === 0,
+        status: "NOT",
+      })),
+    };
+    setDemoData("api/routine/today", createdPlan);
+    return new Response(JSON.stringify(createdPlan), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  // Special handling for DELETE api/routine/today
+  if (method === "DELETE" && apiPath === "api/routine/today") {
+    try {
+      localStorage.removeItem(DEMO_STORAGE_PREFIX + "api/routine/today");
+    } catch {}
+    return new Response(JSON.stringify({ success: true, message: "Plan has been cleared." }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  // Special handling for POST api/tasks/:taskId/status
+  if (method === "POST" && apiPath.startsWith("api/tasks/") && apiPath.endsWith("/status")) {
+    const taskId = apiPath.split("/")[2];
+    const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, any>;
+    const storedPlan = getDemoData("api/routine/today") as any;
+    if (storedPlan && Array.isArray(storedPlan.tasks)) {
+      const updatedTasks = storedPlan.tasks.map((t: any) =>
+        t.taskId === taskId ? { ...t, status: b.status || "NOT" } : t
+      );
+      const updatedPlan = { ...storedPlan, tasks: updatedTasks };
+      setDemoData("api/routine/today", updatedPlan);
+      return new Response(JSON.stringify({ success: true, task: { taskId, status: b.status } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+  }
+
   // For write methods, store data locally and return success
   if (method === "POST" || method === "PUT" || method === "PATCH") {
     if (body !== undefined) {
@@ -229,9 +286,12 @@ function createDemoResponse(
     stored = DEMO_DEFAULTS["api/tracker/subjects"];
     setDemoData("api/tracker/subjects", stored);
   }
-  if (apiPath === "api/routine/today" && (!stored || !stored.plan)) {
-    stored = DEMO_DEFAULTS["api/routine/today"];
-    setDemoData("api/routine/today", stored);
+  if (apiPath === "api/routine/today") {
+    const routineData = stored !== undefined ? stored : (DEMO_DEFAULTS["api/routine/today"] ?? null);
+    return new Response(JSON.stringify(routineData), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   }
   const data = stored ?? DEMO_DEFAULTS[apiPath] ?? {};
   return new Response(JSON.stringify(data), {

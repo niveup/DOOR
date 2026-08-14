@@ -45,6 +45,23 @@ interface DailyLogEntry {
   isToday: boolean;
 }
 
+export type TimelineGranularity = "monthly" | "yearly" | "weekly" | "cumulative";
+
+export interface TimelinePeriodEntry {
+  periodKey: string;
+  label: string;
+  subLabel?: string;
+  fullLabel: string;
+  year: number;
+  hours: number;
+  questions: number;
+  activeDays: number;
+  totalDays: number;
+  cumulativeHours: number;
+  isCurrent: boolean;
+  isYearStart?: boolean;
+}
+
 type TimeRange = "7d" | "14d" | "30d" | "all";
 type Filter = "all" | "high" | "recent" | "active";
 
@@ -279,6 +296,8 @@ export default function TrackerPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+  const [timelineGranularity, setTimelineGranularity] = useState<TimelineGranularity>("monthly");
+  const [selectedTimelineYear, setSelectedTimelineYear] = useState<number | "all">("all");
   const [error, setError] = useState("");
   const [showStudyAreas, setShowStudyAreas] = useState(false);
   
@@ -531,77 +550,12 @@ export default function TrackerPage() {
     return Number(thisWeekLogs.reduce((sum, l) => sum + l.hoursStudied, 0).toFixed(2));
   }, [sessionLogs]);
 
-  // Daily / Monthly / Yearly Chart Data Generator (Past N Days or All Time)
+  // Daily Chart Data for Short Ranges (7d, 14d, 30d)
   const dailyChartData = useMemo<DailyLogEntry[]>(() => {
-    // 1. Handle "all" Time Range (Daily granularity so 0-study days dip down to 0 and study days spike up)
-    if (timeRange === "all") {
-      let minDate = new Date();
-      let maxDate = new Date();
-
-      if (sessionLogs.length > 0) {
-        const timestamps = sessionLogs
-          .map((l) => new Date(`${formatDateKey(l.logDate)}T00:00:00`).getTime())
-          .filter((t) => !isNaN(t));
-        if (timestamps.length > 0) {
-          minDate = new Date(Math.min(...timestamps));
-          maxDate = new Date(Math.max(...timestamps, new Date().getTime()));
-        }
-      } else {
-        minDate = new Date();
-        minDate.setMonth(minDate.getMonth() - 2);
-      }
-
-      // Ensure minimum 30-day window so graph has a clear timeline
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      if (minDate > thirtyDaysAgo) {
-        minDate = thirtyDaysAgo;
-      }
-
-      const logsByDate = new Map<string, { hours: number; questions: number }>();
-      for (const log of sessionLogs) {
-        const cleanDate = formatDateKey(log.logDate);
-        const existing = logsByDate.get(cleanDate) || { hours: 0, questions: 0 };
-        logsByDate.set(cleanDate, {
-          hours: existing.hours + log.hoursStudied,
-          questions: existing.questions + log.questionsSolved,
-        });
-      }
-
-      const list: DailyLogEntry[] = [];
-      const curr = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
-      curr.setHours(0, 0, 0, 0);
-
-      const todayStr = getLocalDateString();
-
-      while (curr <= maxDate || list.length < 14) {
-        const dateStr = getLocalDateString(curr);
-        const data = logsByDate.get(dateStr) || { hours: 0, questions: 0 };
-        const isToday = dateStr === todayStr;
-
-        const isFirstOfMonth = curr.getDate() === 1 || list.length === 0;
-        const monthLabel = curr.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-        const dayLabel = isFirstOfMonth ? monthLabel : "";
-
-        list.push({
-          dateStr,
-          dayLabel,
-          hours: Number(data.hours.toFixed(2)),
-          questions: data.questions,
-          isToday,
-        });
-
-        curr.setDate(curr.getDate() + 1);
-        if (curr > maxDate && list.length >= 14) break;
-      }
-
-      return list;
-    }
-
-    // 2. Handle 7d, 14d, 30d Time Ranges (Day-wise)
     let daysCount = 7;
     if (timeRange === "14d") daysCount = 14;
     else if (timeRange === "30d") daysCount = 30;
+    else if (timeRange === "all") daysCount = 30;
 
     const list: DailyLogEntry[] = [];
     const today = new Date();
@@ -634,31 +588,350 @@ export default function TrackerPage() {
     return list;
   }, [timeRange, sessionLogs]);
 
-  useEffect(() => {
-    if (chartScrollRef.current) {
-      chartScrollRef.current.scrollLeft = chartScrollRef.current.scrollWidth;
+  // Extract all distinct years for the All-Time timeline
+  const timelineYears = useMemo<number[]>(() => {
+    const yearsSet = new Set<number>();
+    for (const log of sessionLogs) {
+      const yr = new Date(`${formatDateKey(log.logDate)}T00:00:00`).getFullYear();
+      if (!isNaN(yr)) yearsSet.add(yr);
     }
-  }, [dailyChartData, timeRange]);
+    const currentYear = new Date().getFullYear();
+    yearsSet.add(currentYear);
+    return Array.from(yearsSet).sort((a, b) => a - b);
+  }, [sessionLogs]);
+
+  // Scalable Multi-Year All-Time Timeline Aggregator
+  const timelineChartData = useMemo<TimelinePeriodEntry[]>(() => {
+    if (timeRange !== "all") return [];
+
+    const logsToUse = selectedTimelineYear === "all"
+      ? sessionLogs
+      : sessionLogs.filter((l) => new Date(`${formatDateKey(l.logDate)}T00:00:00`).getFullYear() === selectedTimelineYear);
+
+    const logsByDate = new Map<string, { hours: number; questions: number }>();
+    for (const log of logsToUse) {
+      const cleanDate = formatDateKey(log.logDate);
+      const existing = logsByDate.get(cleanDate) || { hours: 0, questions: 0 };
+      logsByDate.set(cleanDate, {
+        hours: existing.hours + log.hoursStudied,
+        questions: existing.questions + log.questionsSolved,
+      });
+    }
+
+    let minDate = new Date();
+    let maxDate = new Date();
+
+    if (logsToUse.length > 0) {
+      const timestamps = logsToUse
+        .map((l) => new Date(`${formatDateKey(l.logDate)}T00:00:00`).getTime())
+        .filter((t) => !isNaN(t));
+      if (timestamps.length > 0) {
+        minDate = new Date(Math.min(...timestamps));
+        maxDate = new Date(Math.max(...timestamps, new Date().getTime()));
+      }
+    } else if (selectedTimelineYear !== "all") {
+      minDate = new Date(selectedTimelineYear, 0, 1);
+      maxDate = new Date(selectedTimelineYear, 11, 31);
+    } else {
+      minDate = new Date();
+      minDate.setMonth(minDate.getMonth() - 11);
+    }
+
+    const entries: TimelinePeriodEntry[] = [];
+    let runningCumulative = 0;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    if (timelineGranularity === "yearly") {
+      const startYear = selectedTimelineYear !== "all" ? selectedTimelineYear : minDate.getFullYear();
+      const endYear = selectedTimelineYear !== "all" ? selectedTimelineYear : Math.max(maxDate.getFullYear(), currentYear);
+
+      for (let yr = startYear; yr <= endYear; yr++) {
+        let yrHours = 0;
+        let yrQuestions = 0;
+        let activeDays = 0;
+        const isLeap = (yr % 4 === 0 && yr % 100 !== 0) || yr % 400 === 0;
+        const totalDays = isLeap ? 366 : 365;
+
+        for (const [dateStr, data] of logsByDate.entries()) {
+          if (dateStr.startsWith(`${yr}-`)) {
+            yrHours += data.hours;
+            yrQuestions += data.questions;
+            if (data.hours > 0) activeDays++;
+          }
+        }
+
+        runningCumulative += yrHours;
+
+        entries.push({
+          periodKey: `${yr}`,
+          label: `${yr}`,
+          fullLabel: `Year ${yr}`,
+          year: yr,
+          hours: Number(yrHours.toFixed(2)),
+          questions: yrQuestions,
+          activeDays,
+          totalDays,
+          cumulativeHours: Number(runningCumulative.toFixed(2)),
+          isCurrent: yr === currentYear,
+        });
+      }
+    } else if (timelineGranularity === "weekly") {
+      const start = new Date(minDate);
+      const day = start.getDay();
+      const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+      start.setDate(diff);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(maxDate);
+      end.setDate(end.getDate() + (7 - end.getDay()));
+      end.setHours(0, 0, 0, 0);
+
+      const curr = new Date(start);
+      let weekNum = 1;
+
+      while (curr <= end) {
+        const weekEnd = new Date(curr);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+
+        let wkHours = 0;
+        let wkQuestions = 0;
+        let activeDays = 0;
+
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(curr);
+          d.setDate(d.getDate() + i);
+          const dStr = getLocalDateString(d);
+          const data = logsByDate.get(dStr);
+          if (data) {
+            wkHours += data.hours;
+            wkQuestions += data.questions;
+            if (data.hours > 0) activeDays++;
+          }
+        }
+
+        runningCumulative += wkHours;
+        const yr = curr.getFullYear();
+        const monthShort = curr.toLocaleDateString("en-US", { month: "short" });
+        const label = `W${weekNum} ${monthShort}`;
+        const fullLabel = `Week ${weekNum}, ${yr} (${curr.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
+
+        entries.push({
+          periodKey: `${yr}-W${weekNum}`,
+          label,
+          subLabel: `${yr}`,
+          fullLabel,
+          year: yr,
+          hours: Number(wkHours.toFixed(2)),
+          questions: wkQuestions,
+          activeDays,
+          totalDays: 7,
+          cumulativeHours: Number(runningCumulative.toFixed(2)),
+          isCurrent: curr <= now && now <= weekEnd,
+          isYearStart: curr.getMonth() === 0 && curr.getDate() <= 7,
+        });
+
+        curr.setDate(curr.getDate() + 7);
+        weekNum++;
+        if (curr.getFullYear() !== yr) weekNum = 1;
+      }
+    } else {
+      // "monthly" or "cumulative"
+      const startYr = selectedTimelineYear !== "all" ? selectedTimelineYear : minDate.getFullYear();
+      const startMo = selectedTimelineYear !== "all" ? 0 : minDate.getMonth();
+      const endYr = selectedTimelineYear !== "all" ? selectedTimelineYear : Math.max(maxDate.getFullYear(), currentYear);
+      const endMo = selectedTimelineYear !== "all" ? 11 : (endYr === currentYear ? currentMonth : 11);
+
+      const curr = new Date(startYr, startMo, 1);
+      const targetEnd = new Date(endYr, endMo, 1);
+
+      while (curr <= targetEnd) {
+        const yr = curr.getFullYear();
+        const mo = curr.getMonth();
+        const moStr = String(mo + 1).padStart(2, "0");
+        const prefix = `${yr}-${moStr}`;
+        const daysInMo = new Date(yr, mo + 1, 0).getDate();
+
+        let moHours = 0;
+        let moQuestions = 0;
+        let activeDays = 0;
+
+        for (const [dateStr, data] of logsByDate.entries()) {
+          if (dateStr.startsWith(prefix)) {
+            moHours += data.hours;
+            moQuestions += data.questions;
+            if (data.hours > 0) activeDays++;
+          }
+        }
+
+        runningCumulative += moHours;
+        const monthShort = curr.toLocaleDateString("en-US", { month: "short" });
+        const label = selectedTimelineYear !== "all" ? monthShort : `${monthShort} '${String(yr).slice(2)}`;
+        const fullLabel = curr.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+        entries.push({
+          periodKey: prefix,
+          label,
+          subLabel: String(yr),
+          fullLabel,
+          year: yr,
+          hours: Number(moHours.toFixed(2)),
+          questions: moQuestions,
+          activeDays,
+          totalDays: daysInMo,
+          cumulativeHours: Number(runningCumulative.toFixed(2)),
+          isCurrent: yr === currentYear && mo === currentMonth,
+          isYearStart: mo === 0,
+        });
+
+        curr.setMonth(curr.getMonth() + 1);
+      }
+    }
+
+    return entries;
+  }, [timeRange, sessionLogs, timelineGranularity, selectedTimelineYear]);
+
+  // Macro stats for the All-Time header banner
+  const timelineStats = useMemo(() => {
+    if (timeRange !== "all") return null;
+
+    const totalHours = Number(sessionLogs.reduce((sum, l) => sum + l.hoursStudied, 0).toFixed(1));
+    const totalQuestions = sessionLogs.reduce((sum, l) => sum + l.questionsSolved, 0);
+
+    const activeDates = new Set(sessionLogs.filter((l) => l.hoursStudied > 0).map((l) => formatDateKey(l.logDate)));
+    const totalActiveDays = activeDates.size;
+
+    const hoursByMonth = new Map<string, number>();
+    for (const log of sessionLogs) {
+      const key = formatDateKey(log.logDate).slice(0, 7);
+      hoursByMonth.set(key, (hoursByMonth.get(key) || 0) + log.hoursStudied);
+    }
+
+    let bestMonthKey = "";
+    let bestMonthHours = 0;
+    for (const [key, hrs] of hoursByMonth.entries()) {
+      if (hrs > bestMonthHours) {
+        bestMonthHours = hrs;
+        bestMonthKey = key;
+      }
+    }
+
+    let bestMonthLabel = "N/A";
+    if (bestMonthKey) {
+      const [y, m] = bestMonthKey.split("-");
+      const d = new Date(Number(y), Number(m) - 1, 1);
+      bestMonthLabel = `${d.toLocaleDateString("en-US", { month: "short", year: "numeric" })} (${bestMonthHours.toFixed(1)}h)`;
+    }
+
+    const monthsCount = Math.max(hoursByMonth.size, 1);
+    const monthlyAvg = Number((totalHours / monthsCount).toFixed(1));
+
+    let horizonText = "All recorded history";
+    if (sessionLogs.length > 0) {
+      const timestamps = sessionLogs.map((l) => new Date(`${formatDateKey(l.logDate)}T00:00:00`).getTime()).filter((t) => !isNaN(t));
+      if (timestamps.length > 0) {
+        const minD = new Date(Math.min(...timestamps));
+        const maxD = new Date(Math.max(...timestamps, new Date().getTime()));
+        const yearsDiff = Number(((maxD.getTime() - minD.getTime()) / (365.25 * 24 * 3600 * 1000)).toFixed(1));
+        const startStr = minD.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        const endStr = maxD.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        horizonText = `${startStr} – ${endStr} (${yearsDiff >= 1 ? `${yearsDiff} yrs` : "Lifetime"})`;
+      }
+    }
+
+    return {
+      totalHours,
+      totalQuestions,
+      totalActiveDays,
+      bestMonthLabel,
+      monthlyAvg,
+      horizonText,
+    };
+  }, [timeRange, sessionLogs]);
+
+  const maxTimelineValue = useMemo(() => {
+    if (timelineGranularity === "cumulative") {
+      const maxCum = Math.max(...timelineChartData.map((d) => d.cumulativeHours), 1);
+      return Math.ceil(maxCum * 1.08);
+    }
+    const maxVal = Math.max(...timelineChartData.map((d) => d.hours), 1);
+    return Math.ceil(maxVal * 1.15);
+  }, [timelineChartData, timelineGranularity]);
+
+  const timelineCumulativePaths = useMemo(() => {
+    if (timeRange !== "all" || timelineGranularity !== "cumulative" || timelineChartData.length === 0) {
+      return { linePath: "", areaPath: "", points: [] };
+    }
+
+    const n = timelineChartData.length;
+    const maxVal = maxTimelineValue;
+
+    const points = timelineChartData.map((d, i) => {
+      const x = n > 1 ? (i / (n - 1)) * 1000 : 500;
+      const yPct = maxVal > 0 ? d.cumulativeHours / maxVal : 0;
+      const y = 180 - yPct * 150;
+      return { x, y, yPct, ...d };
+    });
+
+    if (points.length === 1) {
+      const p = points[0];
+      return {
+        linePath: `M 0,${p.y} L 1000,${p.y}`,
+        areaPath: `M 0,195 L 0,${p.y} L 1000,${p.y} L 1000,195 Z`,
+        points,
+      };
+    }
+
+    let linePath = `M ${points[0].x},${points[0].y}`;
+    let areaPath = `M ${points[0].x},195 L ${points[0].x},${points[0].y}`;
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      const dx = p1.x - p0.x;
+      const cp1x = p0.x + dx * 0.4;
+      const cp1y = p0.y;
+      const cp2x = p0.x + dx * 0.6;
+      const cp2y = p1.y;
+
+      const curve = ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
+      linePath += curve;
+      areaPath += curve;
+    }
+
+    areaPath += ` L ${points[points.length - 1].x},195 Z`;
+
+    return { linePath, areaPath, points };
+  }, [timeRange, timelineGranularity, timelineChartData, maxTimelineValue]);
 
   const todayHours = useMemo(() => {
-    const todayEntry = dailyChartData.find((d) => d.isToday);
-    return todayEntry ? Number(todayEntry.hours.toFixed(2)) : 0;
-  }, [dailyChartData]);
+    const todayStr = getLocalDateString();
+    const todayLogs = sessionLogs.filter((l) => formatDateKey(l.logDate) === todayStr);
+    return Number(todayLogs.reduce((sum, l) => sum + l.hoursStudied, 0).toFixed(2));
+  }, [sessionLogs]);
 
   const todayQuestions = useMemo(() => {
-    const todayEntry = dailyChartData.find((d) => d.isToday);
-    return todayEntry ? todayEntry.questions : 0;
-  }, [dailyChartData]);
+    const todayStr = getLocalDateString();
+    const todayLogs = sessionLogs.filter((l) => formatDateKey(l.logDate) === todayStr);
+    return todayLogs.reduce((sum, l) => sum + l.questionsSolved, 0);
+  }, [sessionLogs]);
 
   const activeDaysCount = useMemo(() => {
+    if (timeRange === "all") {
+      const activeDates = new Set(sessionLogs.filter((l) => l.hoursStudied > 0).map((l) => formatDateKey(l.logDate)));
+      return activeDates.size;
+    }
     return dailyChartData.filter((d) => d.hours > 0).length;
-  }, [dailyChartData]);
+  }, [timeRange, sessionLogs, dailyChartData]);
 
   const dailyAvg = useMemo(() => {
-    const rangeTotal = dailyChartData.reduce((sum, l) => sum + l.hours, 0);
     if (activeDaysCount === 0) return 0;
-    return Number((rangeTotal / activeDaysCount).toFixed(1));
-  }, [dailyChartData, activeDaysCount]);
+    const total = timeRange === "all"
+      ? sessionLogs.reduce((sum, l) => sum + l.hoursStudied, 0)
+      : dailyChartData.reduce((sum, l) => sum + l.hours, 0);
+    return Number((total / activeDaysCount).toFixed(1));
+  }, [timeRange, sessionLogs, dailyChartData, activeDaysCount]);
 
   const weeklyGoalHours = dailyGoal * 7;
   const weeklyGoalProgress = Math.min(100, Math.round((weeklyHours / weeklyGoalHours) * 100));
@@ -684,57 +957,8 @@ export default function TrackerPage() {
 
   const maxChartHours = useMemo(() => {
     const maxVal = Math.max(...dailyChartData.map((d) => d.hours), 0);
-    if (timeRange === "all") {
-      return Math.max(Math.ceil(maxVal), 1);
-    }
     return Math.max(Math.ceil(Math.max(maxVal, dailyGoal)), 1);
-  }, [dailyChartData, dailyGoal, timeRange]);
-
-  const lineGraphPaths = useMemo(() => {
-    if (timeRange !== "all" || dailyChartData.length === 0) {
-      return { linePath: "", areaPath: "", points: [] };
-    }
-
-    const n = dailyChartData.length;
-    const maxVal = maxChartHours;
-
-    const points = dailyChartData.map((d, i) => {
-      const x = ((i + 0.5) / n) * 1000;
-      const yPct = maxVal > 0 ? d.hours / maxVal : 0;
-      const y = 180 - yPct * 150;
-      return { x, y, yPct };
-    });
-
-    let linePath = "";
-    let areaPath = "";
-
-    if (points.length === 1) {
-      const p = points[0];
-      linePath = `M 0,${p.y} L 1000,${p.y}`;
-      areaPath = `M 0,195 L 0,${p.y} L 1000,${p.y} L 1000,195 Z`;
-    } else {
-      linePath = `M ${points[0].x},${points[0].y}`;
-      areaPath = `M ${points[0].x},195 L ${points[0].x},${points[0].y}`;
-
-      for (let i = 0; i < points.length - 1; i++) {
-        const p0 = points[i];
-        const p1 = points[i + 1];
-        const dx = p1.x - p0.x;
-        const cp1x = p0.x + dx * 0.38;
-        const cp1y = p0.y;
-        const cp2x = p0.x + dx * 0.62;
-        const cp2y = p1.y;
-
-        const curve = ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
-        linePath += curve;
-        areaPath += curve;
-      }
-
-      areaPath += ` L ${points[points.length - 1].x},195 Z`;
-    }
-
-    return { linePath, areaPath, points };
-  }, [dailyChartData, maxChartHours, timeRange]);
+  }, [dailyChartData, dailyGoal]);
 
 
 
@@ -1157,112 +1381,272 @@ export default function TrackerPage() {
             </div>
           </div>
 
-          {/* Chart Container (Line Graph for 'all', Bar Chart for 7d/14d/30d) */}
+          {/* Chart Container (Scalable Multi-Year Timeline for 'all', Day-wise Bar Chart for 7d/14d/30d) */}
           {timeRange === "all" ? (
-            <div ref={chartScrollRef} className="relative w-full pt-12 pb-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div
-                className="relative h-48 min-w-full"
-                style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
-              >
-                {/* SVG Line Graph with Simple Rose-Gold Accent */}
-                <svg
-                  viewBox="0 0 1000 200"
-                  preserveAspectRatio="none"
-                  className="absolute inset-0 h-full w-full overflow-visible pointer-events-none"
-                >
-                  <defs>
-                    <linearGradient id="allTimeLineStroke" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#fb7185" />
-                      <stop offset="100%" stopColor="#f43f5e" />
-                    </linearGradient>
-                    <linearGradient id="allTimeAreaFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.18" />
-                      <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
+            <div className="space-y-4">
+              {/* All-Time Macro Summary Banner & Controls */}
+              <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)]/60 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+                {/* Left: Horizon Span & Key Macro Metrics */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+                    <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+                    <span>{timelineStats?.horizonText || "All-Time Timeline"}</span>
+                  </div>
+                  <div className="text-[var(--text-secondary)]">
+                    Total: <span className="font-bold text-[var(--text-primary)]">{timelineStats?.totalHours ?? 0} hrs</span>
+                  </div>
+                  <div className="text-[var(--text-secondary)]">
+                    Pace: <span className="font-bold text-[var(--text-primary)]">{timelineStats?.monthlyAvg ?? 0} hrs/mo</span>
+                  </div>
+                  {timelineStats?.bestMonthLabel && timelineStats.bestMonthLabel !== "N/A" && (
+                    <div className="text-[var(--text-secondary)]">
+                      Peak: <span className="font-bold text-[var(--accent)]">{timelineStats.bestMonthLabel}</span>
+                    </div>
+                  )}
+                </div>
 
-                  {/* Horizontal Grid Guide Lines */}
-                  <line x1="0" y1="45" x2="1000" y2="45" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
-                  <line x1="0" y1="105" x2="1000" y2="105" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
-                  <line x1="0" y1="165" x2="1000" y2="165" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
+                {/* Right: Granularity & Year Switcher Controls */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Year filter pills if multiple years */}
+                  {timelineYears.length > 1 && (
+                    <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-0.5 text-[10.5px]">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTimelineYear("all")}
+                        className={`focus-ring rounded-md px-2 py-0.5 font-semibold transition ${
+                          selectedTimelineYear === "all"
+                            ? "bg-[var(--accent)] text-white"
+                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        All
+                      </button>
+                      {timelineYears.map((yr) => (
+                        <button
+                          key={yr}
+                          type="button"
+                          onClick={() => setSelectedTimelineYear(yr)}
+                          className={`focus-ring rounded-md px-2 py-0.5 font-semibold transition ${
+                            selectedTimelineYear === yr
+                              ? "bg-[var(--accent)] text-white"
+                              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                          }`}
+                        >
+                          {yr}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-                  {/* Soft Gradient Area Fill */}
-                  <motion.path
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5 }}
-                    d={lineGraphPaths.areaPath}
-                    fill="url(#allTimeAreaFill)"
-                  />
-
-                  {/* Minimal Curved Line Path */}
-                  <motion.path
-                    initial={{ pathLength: 0, opacity: 0 }}
-                    animate={{ pathLength: 1, opacity: 1 }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    d={lineGraphPaths.linePath}
-                    fill="none"
-                    stroke="url(#allTimeLineStroke)"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-
-                  {/* Clean Data Nodes */}
-                  {lineGraphPaths.points.map((pt, idx) => (
-                    <g key={idx}>
-                      <circle cx={pt.x} cy={pt.y} r="5" fill="none" stroke="#f43f5e" strokeOpacity="0.3" strokeWidth="1.5" />
-                      <circle cx={pt.x} cy={pt.y} r="3" className="fill-[#f43f5e] stroke-[var(--bg-card)] stroke-[2]" />
-                    </g>
-                  ))}
-                </svg>
-
-                {/* Interactive Columns & Hover Overlay */}
-                <div className="relative z-10 flex h-full items-end justify-between w-full">
-                  {dailyChartData.map((d, idx) => {
-                    const pt = lineGraphPaths.points[idx] || { x: 500, y: 100 };
-                    const isLast = idx >= dailyChartData.length - 2;
-                    const isFirst = idx <= 1;
-                    const tooltipPos = isLast ? "right-0" : isFirst ? "left-0" : "left-1/2 -translate-x-1/2";
-                    const isHigh = pt.y < 80;
-                    const tooltipY = isHigh ? "top-2" : "-top-11";
-
-                    return (
-                      <div key={d.dateStr || idx} className="group relative flex flex-1 flex-col items-center h-full justify-end cursor-pointer">
-                        {/* Vertical Hover Guideline */}
-                        <div className="absolute inset-y-0 w-px bg-rose-500/25 hidden group-hover:block pointer-events-none" />
-
-                        {/* Hover Node Dot */}
-                        <div
-                          className="absolute h-3.5 w-3.5 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shadow-md shadow-rose-500/30 hidden group-hover:block pointer-events-none -translate-x-1/2 -translate-y-1/2 z-20 border-2 border-[var(--bg-card)]"
-                          style={{ top: `${(pt.y / 200) * 100}%`, left: "50%" }}
-                        />
-
-                        {/* Sleek Minimal Hover Tooltip */}
-                        <div className={`absolute ${tooltipY} z-40 hidden rounded-xl border border-rose-500/30 bg-[var(--bg-elevated)]/95 backdrop-blur-md px-3 py-1.5 text-center text-[10.5px] font-bold text-[var(--text-primary)] shadow-xl group-hover:block whitespace-nowrap pointer-events-none ${tooltipPos}`}>
-                          <div className="text-[10px] tracking-wide text-[var(--text-secondary)] uppercase font-semibold">{formatDisplayDate(d.dateStr) || d.dayLabel}</div>
-                          <div className="text-rose-400 font-extrabold">{d.hours} hrs studied</div>
-                          {d.questions > 0 && <div className="text-[var(--text-secondary)] text-[10px]">{d.questions} Qs solved</div>}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* Granularity switch: Monthly | Yearly | Weekly | Cumulative */}
+                  <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-0.5 text-[10.5px]">
+                    {(["monthly", "yearly", "weekly", "cumulative"] as TimelineGranularity[]).map((g) => {
+                      const isSel = timelineGranularity === g;
+                      const gLabel = g === "monthly" ? "Monthly" : g === "yearly" ? "Yearly" : g === "weekly" ? "Weekly" : "Cumulative";
+                      return (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => setTimelineGranularity(g)}
+                          className={`focus-ring relative z-10 rounded-md px-2 py-0.5 font-bold capitalize transition ${
+                            isSel ? "text-[var(--accent)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                          }`}
+                        >
+                          {isSel && (
+                            <motion.div
+                              layoutId="activeTimelineGranularity"
+                              className="absolute inset-0 rounded-md bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xs -z-10"
+                              transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                            />
+                          )}
+                          {gLabel}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {/* X-Axis Labels Row */}
-              <div
-                className="flex items-center justify-between min-w-full pt-2.5 mt-1 border-t border-[var(--border)]/60"
-                style={{ width: dailyChartData.length > 25 ? `${dailyChartData.length * 24}px` : "100%" }}
-              >
-                {dailyChartData.map((d, idx) => (
-                  <div key={d.dateStr || idx} className="flex-1 text-center">
-                    <span className={`text-[10px] font-semibold truncate block ${d.isToday ? "text-[var(--accent)] font-extrabold" : "text-[var(--text-secondary)]"}`}>
-                      {d.dayLabel}
-                    </span>
+              {/* Chart Plot Area */}
+              {timelineChartData.length === 0 ? (
+                <div className="flex h-48 w-full flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-xs text-[var(--text-secondary)]">
+                  <p className="font-semibold text-[var(--text-primary)]">No study logs in this timeline period</p>
+                  <p className="mt-1">Log a study session to start building your long-term study timeline.</p>
+                </div>
+              ) : timelineGranularity === "cumulative" ? (
+                /* Cumulative Growth SVG Area & Line Chart */
+                <div className="relative w-full pt-6 pb-2">
+                  <div className="relative h-48 w-full">
+                    <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible pointer-events-none">
+                      <defs>
+                        <linearGradient id="allTimeCumStroke" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#f43f5e" />
+                          <stop offset="100%" stopColor="#fb7185" />
+                        </linearGradient>
+                        <linearGradient id="allTimeCumArea" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Guide Lines */}
+                      <line x1="0" y1="45" x2="1000" y2="45" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
+                      <line x1="0" y1="105" x2="1000" y2="105" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
+                      <line x1="0" y1="165" x2="1000" y2="165" stroke="var(--border)" strokeOpacity="0.3" strokeDasharray="4 4" />
+
+                      <motion.path
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.5 }}
+                        d={timelineCumulativePaths.areaPath}
+                        fill="url(#allTimeCumArea)"
+                      />
+
+                      <motion.path
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 1 }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        d={timelineCumulativePaths.linePath}
+                        fill="none"
+                        stroke="url(#allTimeCumStroke)"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {timelineCumulativePaths.points.map((pt, idx) => (
+                        <g key={idx}>
+                          <circle cx={pt.x} cy={pt.y} r="5" fill="none" stroke="#f43f5e" strokeOpacity="0.3" strokeWidth="1.5" />
+                          <circle cx={pt.x} cy={pt.y} r="3" className="fill-[#f43f5e] stroke-[var(--bg-card)] stroke-[2]" />
+                        </g>
+                      ))}
+                    </svg>
+
+                    {/* Interactive Overlay */}
+                    <div className="relative z-10 flex h-full items-end justify-between w-full">
+                      {timelineChartData.map((d, idx) => {
+                        const pt = timelineCumulativePaths.points[idx] || { x: 500, y: 100 };
+                        const isLast = idx >= timelineChartData.length - 2;
+                        const isFirst = idx <= 1;
+                        const tooltipPos = isLast ? "right-0" : isFirst ? "left-0" : "left-1/2 -translate-x-1/2";
+                        const isHigh = pt.y < 80;
+                        const tooltipY = isHigh ? "top-2" : "-top-12";
+
+                        return (
+                          <div key={d.periodKey || idx} className="group relative flex flex-1 flex-col items-center h-full justify-end cursor-pointer">
+                            <div className="absolute inset-y-0 w-px bg-rose-500/25 hidden group-hover:block pointer-events-none" />
+                            <div
+                              className="absolute h-3.5 w-3.5 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shadow-md shadow-rose-500/30 hidden group-hover:block pointer-events-none -translate-x-1/2 -translate-y-1/2 z-20 border-2 border-[var(--bg-card)]"
+                              style={{ top: `${(pt.y / 200) * 100}%`, left: "50%" }}
+                            />
+                            <div className={`absolute ${tooltipY} z-40 hidden rounded-xl border border-rose-500/30 bg-[var(--bg-elevated)]/95 backdrop-blur-md px-3 py-2 text-center text-[10.5px] font-bold text-[var(--text-primary)] shadow-xl group-hover:block whitespace-nowrap pointer-events-none ${tooltipPos}`}>
+                              <div className="text-[10px] tracking-wide text-[var(--text-secondary)] uppercase font-semibold">{d.fullLabel}</div>
+                              <div className="text-rose-400 font-extrabold">{d.cumulativeHours} hrs accumulated</div>
+                              <div className="text-[var(--text-secondary)] text-[10px]">{d.hours} hrs in this period • {d.questions} Qs</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  {/* X-Axis Ticks */}
+                  <div className="flex items-center justify-between w-full pt-2.5 mt-1 border-t border-[var(--border)]/60">
+                    {timelineChartData.map((d, idx) => {
+                      const totalCount = timelineChartData.length;
+                      const skip = totalCount > 36 ? 4 : totalCount > 20 ? 2 : 1;
+                      const showLabel = idx === 0 || idx === totalCount - 1 || idx % skip === 0;
+
+                      return (
+                        <div key={d.periodKey || idx} className="flex-1 text-center min-w-0">
+                          {showLabel ? (
+                            <span className={`text-[10px] font-semibold truncate block ${d.isCurrent ? "text-[var(--accent)] font-extrabold" : "text-[var(--text-secondary)]"}`}>
+                              {d.label}
+                            </span>
+                          ) : (
+                            <span className="inline-block h-1 w-1 rounded-full bg-[var(--border)]" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* Period Bars (Monthly / Yearly / Weekly) */
+                <div className="relative w-full pt-6 pb-2">
+                  <div className="relative h-48 w-full">
+                    {/* Bars Flex Container */}
+                    <div className="relative z-10 flex h-full items-end justify-between gap-1 sm:gap-1.5 w-full">
+                      {timelineChartData.map((d, idx) => {
+                        const heightPercent = maxTimelineValue > 0 ? Math.max((d.hours / maxTimelineValue) * 100, d.hours > 0 ? 4 : 2) : 2;
+                        const isLast = idx >= timelineChartData.length - 2;
+                        const isFirst = idx <= 1;
+                        const tooltipPos = isLast ? "right-0" : isFirst ? "left-0" : "left-1/2 -translate-x-1/2";
+                        const isHigh = heightPercent > 70;
+                        const tooltipY = isHigh ? "top-2" : "-top-14";
+                        const dailyRate = d.activeDays > 0 ? Number((d.hours / d.activeDays).toFixed(1)) : 0;
+                        const consistencyPct = d.totalDays > 0 ? Math.round((d.activeDays / d.totalDays) * 100) : 0;
+
+                        return (
+                          <div key={d.periodKey || idx} className="group relative flex flex-1 flex-col items-center h-full justify-end">
+                            {/* Hover Tooltip Card */}
+                            <div className={`absolute ${tooltipY} z-40 hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)]/95 backdrop-blur-md px-3 py-2 text-center text-[10px] font-bold text-[var(--text-primary)] shadow-xl group-hover:block whitespace-nowrap pointer-events-none ${tooltipPos}`}>
+                              <div className="text-[10px] tracking-wide text-[var(--text-secondary)] uppercase font-semibold">{d.fullLabel}</div>
+                              <div className="text-[var(--accent)] font-extrabold text-xs">{d.hours} hrs studied</div>
+                              <div className="text-[var(--text-secondary)] text-[10px] mt-0.5">
+                                {d.activeDays} active {d.activeDays === 1 ? "day" : "days"} ({consistencyPct}%) • {d.questions} Qs
+                              </div>
+                              {dailyRate > 0 && (
+                                <div className="text-[var(--text-secondary)] text-[9.5px]">Avg: {dailyRate}h / active day</div>
+                              )}
+                            </div>
+
+                            {/* Bar Visual */}
+                            <motion.div
+                              layout
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: `${heightPercent}%`, opacity: 1 }}
+                              whileHover={{ scaleY: 1.05, originY: 1 }}
+                              transition={{
+                                height: { type: "spring", stiffness: 220, damping: 19, mass: 0.8 },
+                                opacity: { duration: 0.2 },
+                              }}
+                              className={`w-full max-w-[32px] rounded-t-md cursor-pointer transition-colors ${
+                                d.isCurrent
+                                  ? "bg-[var(--accent)] shadow-sm shadow-[var(--accent)]/30"
+                                  : d.hours > 0
+                                  ? "bg-[var(--accent)]/80 hover:bg-[var(--accent)]"
+                                  : "bg-[var(--track)] opacity-40 hover:opacity-70"
+                              }`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* X-Axis Labels */}
+                  <div className="flex items-center justify-between gap-1 sm:gap-1.5 w-full pt-2.5 mt-1 border-t border-[var(--border)]/60">
+                    {timelineChartData.map((d, idx) => {
+                      const totalCount = timelineChartData.length;
+                      const skip = totalCount > 36 ? 4 : totalCount > 20 ? 2 : 1;
+                      const showLabel = idx === 0 || idx === totalCount - 1 || idx % skip === 0;
+
+                      return (
+                        <div key={d.periodKey || idx} className="flex-1 text-center min-w-0">
+                          {showLabel ? (
+                            <span className={`text-[10px] font-semibold truncate block ${d.isCurrent ? "text-[var(--accent)] font-extrabold" : "text-[var(--text-secondary)]"}`}>
+                              {d.label}
+                            </span>
+                          ) : (
+                            <span className="inline-block h-1 w-1 rounded-full bg-[var(--border)]" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="relative w-full pt-12 pb-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1342,115 +1726,6 @@ export default function TrackerPage() {
         </div>
       </PageSection>
 
-      {/* Optional study-area organisation stays out of the primary daily flow. */}
-      <PageSection
-        title="Study areas (optional)"
-        titleClassName="text-lg font-semibold tracking-tight text-[var(--text-primary)]"
-        className="mt-6"
-        headerClassName="mb-4"
-        action={
-          <div className="flex items-center gap-2">
-            {showStudyAreas ? (
-              <>
-                <div className="relative hidden items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] p-1 md:flex">
-                  {filters.map((f) => {
-                    const isSelected = filter === f.id;
-                    return <button key={f.id} onClick={() => setFilter(f.id)} className={`focus-ring relative z-10 rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors ${isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>{isSelected && <motion.div layoutId="activeFilterTab" className="absolute inset-0 rounded-full border border-[var(--border)] bg-[var(--bg-card)] shadow-xs -z-10" transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }} />}{f.label.replace(" Subjects", "")}</button>;
-                  })}
-                </div>
-                <button type="button" onClick={() => setIsAddSubjectModalOpen(true)} className="focus-ring hidden rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] sm:inline-flex cursor-pointer">Add area</button>
-              </>
-            ) : null}
-            <button type="button" onClick={() => setShowStudyAreas((current) => !current)} className="focus-ring rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] cursor-pointer">{showStudyAreas ? "Hide" : "Organise areas"}</button>
-          </div>
-        }
-      >
-        {!showStudyAreas ? (
-          <div className="surface flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center">
-            <div><p className="text-sm font-semibold text-[var(--text-primary)]">You don&apos;t need to manage subjects to use this tracker.</p><p className="mt-1 text-xs text-[var(--text-secondary)]">Use the timer, log sessions, and set daily goals. Study areas are optional labels for course reports.</p></div>
-            <button type="button" onClick={() => setShowStudyAreas(true)} className="focus-ring shrink-0 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--accent)] hover:border-[var(--accent)]/40 cursor-pointer">Show areas</button>
-          </div>
-        ) : loading && !data ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="surface h-36 animate-pulse bg-[var(--track)]" />
-            ))}
-          </div>
-        ) : visibleSubjects.length ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {visibleSubjects.map((subject) => {
-              const subLogs = sessionLogs.filter((l) => l.subjectId === subject.subjectId);
-              const subHours = subLogs.length > 0
-                ? Number(subLogs.reduce((sum, l) => sum + l.hoursStudied, 0).toFixed(2))
-                : subject.cumulativeHours || subject.hoursStudied || 0;
-              const subQuestions = subLogs.length > 0
-                ? subLogs.reduce((sum, l) => sum + l.questionsSolved, 0)
-                : subject.cumulativeQuestions || subject.questionsSolved || 0;
-              const progressPct = Math.min((subHours / 30) * 100, 100);
-
-              return (
-                <article key={subject.subjectId} className="surface p-4 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-sm leading-tight text-[var(--text-primary)]">
-                          {subject.subjectName}
-                        </h3>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
-                          Exam Weight {Math.round(subject.importanceLevel * 100)}%
-                        </p>
-                      </div>
-                      <span className="inline-flex items-center rounded-full border border-[var(--accent)]/15 bg-[var(--accent-soft)] px-2.5 py-0.5 text-[10px] font-extrabold text-[var(--accent)] shrink-0">
-                        {subHours} hrs
-                      </span>
-                    </div>
-
-                    <div className="mt-3">
-                      <ProgressBar value={progressPct} tone="blue" />
-                    </div>
-
-                    <p className="mt-3 line-clamp-2 text-xs text-[var(--text-secondary)]">
-                      {subject.topics.join(", ")}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3">
-                    <span className="text-[11px] font-medium text-[var(--text-secondary)]">
-                      {subQuestions} Qs solved
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => openDeleteSubjectModal(subject)}
-                        title={`Delete ${subject.subjectName}`}
-                        className="rounded-md p-1.5 text-[var(--text-secondary)] transition hover:bg-rose-500/10 hover:text-rose-500"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => openLogModal(subject)}
-                        className="btn-secondary py-1 text-xs font-semibold min-h-[1.8rem]"
-                      >
-                        + Log Time
-                      </button>
-                    </div>
-                  </div>
-
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyState
-            mark="S"
-            title="No subjects match filter"
-            description="Try changing the filter option to see more subjects."
-            className="min-h-[240px]"
-          />
-        )}
-      </PageSection>
 
       {/* Compact Single-Line Recent Logs Banner */}
       {sessionLogs.length > 0 ? (
