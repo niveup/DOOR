@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { AppScreen } from "@/src/components/screen";
-import { Card, ProgressBar, SectionTitle, ui } from "@/src/components/ui";
+import { Card, ProgressBar, SectionTitle } from "@/src/components/ui";
 import { todayInKolkata } from "@/src/lib/format";
 import { useTheme } from "@/src/providers/theme-provider";
 
@@ -15,14 +15,13 @@ interface PersonalTodo {
   text: string;
   completed: boolean;
   tag: TodoTag;
-  estimatedMin?: number;
   createdAt: number;
 }
 
 const DEFAULT_TODOS: PersonalTodo[] = [
-  { id: "def-1", text: "Revise 1 weak topic formula sheet", completed: false, tag: "GATE", estimatedMin: 25, createdAt: Date.now() - 3000 },
-  { id: "def-2", text: "Complete 15 practice PYQs", completed: false, tag: "GATE", estimatedMin: 30, createdAt: Date.now() - 2000 },
-  { id: "def-3", text: "Log today's cashflow expenses", completed: false, tag: "Quick", estimatedMin: 5, createdAt: Date.now() - 1000 },
+  { id: "def-1", text: "Revise 1 weak topic formula sheet", completed: false, tag: "GATE", createdAt: Date.now() - 3000 },
+  { id: "def-2", text: "Complete 15 practice PYQs", completed: false, tag: "GATE", createdAt: Date.now() - 2000 },
+  { id: "def-3", text: "Log today's cashflow expenses", completed: false, tag: "Quick", createdAt: Date.now() - 1000 },
 ];
 
 export default function TodayScreen() {
@@ -91,7 +90,6 @@ export default function TodayScreen() {
       text: newTodoText.trim(),
       completed: false,
       tag: selectedTag,
-      estimatedMin: selectedTag === "GATE" ? 30 : selectedTag === "Quick" ? 5 : 20,
       createdAt: Date.now(),
     };
     setTodos((current) => [newEntry, ...current]);
@@ -114,12 +112,7 @@ export default function TodayScreen() {
   const totalCount = todos.length;
   const pendingCount = totalCount - completedCount;
   const progressPercent = totalCount ? Math.round((completedCount / totalCount) * 100) : 0;
-
-  // Next upcoming pending task
   const nextPendingTask = todos.find((t) => !t.completed);
-  const totalEstimatedMinutes = todos
-    .filter((t) => !t.completed)
-    .reduce((sum, t) => sum + (t.estimatedMin || (t.tag === "GATE" ? 25 : 10)), 0);
 
   return (
     <AppScreen
@@ -152,7 +145,7 @@ export default function TodayScreen() {
         </Pressable>
       }
     >
-      {/* 1. Spacious & Non-Overlapping Hero Card */}
+      {/* 1. Spacious & Non-Overlapping Hero Progress Card */}
       <Card
         style={[
           styles.heroCard,
@@ -217,68 +210,14 @@ export default function TodayScreen() {
 
         <Text style={[styles.heroMessage, { color: theme.textMuted }]}>
           {progressPercent === 100
-            ? "✨ Superb discipline today! Every goal hit."
+            ? "✨ Superb discipline today! Every action completed."
             : nextPendingTask
             ? `Next focus: "${nextPendingTask.text}"`
             : "Small, honest daily actions compound into huge breakthroughs."}
         </Text>
       </Card>
 
-      {/* 2. Informative Focus & Momentum Insights Card */}
-      <Card
-        style={[
-          styles.insightCard,
-          {
-            backgroundColor: isDark ? "#121215" : "#ffffff",
-            borderColor: isDark ? "#27272a" : "#e2e8f0",
-          },
-        ]}
-      >
-        <View style={styles.insightHeader}>
-          <Ionicons name="flash-outline" size={16} color={theme.amber} />
-          <Text style={[styles.insightTitle, { color: theme.text }]}>Focus Velocity</Text>
-        </View>
-
-        <View style={styles.insightGrid}>
-          <View
-            style={[
-              styles.insightTile,
-              { backgroundColor: isDark ? "#18181d" : "#f8fafc", borderColor: isDark ? "#27272a" : "#f1f5f9" },
-            ]}
-          >
-            <Text style={[styles.insightTileLabel, { color: theme.textFaint }]}>EST. TIME</Text>
-            <Text style={[styles.insightTileValue, { color: theme.cyan }]}>
-              {pendingCount > 0 ? `~${totalEstimatedMinutes}m` : "Done"}
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.insightTile,
-              { backgroundColor: isDark ? "#18181d" : "#f8fafc", borderColor: isDark ? "#27272a" : "#f1f5f9" },
-            ]}
-          >
-            <Text style={[styles.insightTileLabel, { color: theme.textFaint }]}>PRIORITY</Text>
-            <Text style={[styles.insightTileValue, { color: theme.emerald }]}>
-              {nextPendingTask ? nextPendingTask.tag : "Free"}
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.insightTile,
-              { backgroundColor: isDark ? "#18181d" : "#f8fafc", borderColor: isDark ? "#27272a" : "#f1f5f9" },
-            ]}
-          >
-            <Text style={[styles.insightTileLabel, { color: theme.textFaint }]}>FLOW</Text>
-            <Text style={[styles.insightTileValue, { color: theme.amber }]}>
-              {progressPercent >= 80 ? "On fire" : progressPercent > 0 ? "Building" : "Ready"}
-            </Text>
-          </View>
-        </View>
-      </Card>
-
-      {/* 3. Clean Task Checklist Section (No clutter filter chips) */}
+      {/* 2. Clean Task Checklist Section */}
       <View style={styles.todoSection}>
         <SectionTitle
           title="Today's Tasks"
@@ -453,11 +392,6 @@ export default function TodayScreen() {
                         {tagCfg.label}
                       </Text>
                     </View>
-                    {item.estimatedMin && !item.completed ? (
-                      <Text style={[styles.metaTimeText, { color: theme.textFaint }]}>
-                        {item.estimatedMin}m
-                      </Text>
-                    ) : null}
                   </View>
                 </View>
 
@@ -509,7 +443,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // 1. Hero Card
+  // Hero Card
   heroCard: {
     padding: 16,
     gap: 12,
@@ -562,49 +496,10 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
-  // 2. Insight Card
-  insightCard: {
-    padding: 14,
-    gap: 10,
-    borderRadius: 18,
-    borderWidth: 1,
-  },
-  insightHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  insightTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: -0.2,
-  },
-  insightGrid: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  insightTile: {
-    flex: 1,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 3,
-  },
-  insightTileLabel: {
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-  },
-  insightTileValue: {
-    fontSize: 15,
-    fontWeight: "900",
-  },
-
-  // 3. To-Do Section
+  // To-Do Section
   todoSection: {
     gap: 10,
-    marginTop: 2,
+    marginTop: 4,
   },
   addPillButton: {
     flexDirection: "row",
@@ -717,10 +612,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800",
     letterSpacing: 0.3,
-  },
-  metaTimeText: {
-    fontSize: 10,
-    fontWeight: "600",
   },
   deleteIconButton: {
     padding: 4,
