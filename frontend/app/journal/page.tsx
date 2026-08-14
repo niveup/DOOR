@@ -178,6 +178,14 @@ const promptSheets = [
   { title: "Daily accountability", note: "Facts before feelings", copy: "What I said I would do:\n\nWhat actually happened:\n\nWhat I will protect tomorrow:" },
 ];
 
+function getTodayDateString(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }).format(new Date(`${date}T12:00:00+05:30`));
 }
@@ -256,7 +264,6 @@ export default function JournalPage() {
   const [error, setError] = useState("");
   const [isWriting, setIsWriting] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const writingTimer = useRef<number | null>(null);
   const router = useRouter();
   const { isDemoMode } = useDemoMode();
@@ -267,6 +274,35 @@ export default function JournalPage() {
   const [activeTab, setActiveTab] = useState<"today" | "history">("today");
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<JournalEntry | null>(null);
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const calendarDropdownRef = useRef<HTMLDivElement>(null);
+  const [calViewDate, setCalViewDate] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  // Sync calendar view when selectedHistoryDate changes
+  useEffect(() => {
+    if (selectedHistoryDate) {
+      const [y, m] = selectedHistoryDate.split("-").map(Number);
+      if (y && m) {
+        setCalViewDate({ year: y, month: m - 1 });
+      }
+    }
+  }, [selectedHistoryDate]);
+
+  // Click outside to close calendar
+  useEffect(() => {
+    if (!isCalendarOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (calendarDropdownRef.current && !calendarDropdownRef.current.contains(e.target as Node)) {
+        setIsCalendarOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isCalendarOpen]);
+
   const [pinnedPrompt, setPinnedPrompt] = useState<PinnedPrompt>(DEFAULT_PINNED_PROMPT);
   const [pinnedDraft, setPinnedDraft] = useState<PinnedPrompt>(DEFAULT_PINNED_PROMPT);
   const [editingPinned, setEditingPinned] = useState(false);
@@ -698,23 +734,140 @@ export default function JournalPage() {
                     </button>
                   </div>
                   {selectedHistoryDate ? (
-                    <div className="journal-date-selector-wrapper relative inline-block">
-                      <div className="journal-date-display flex items-center gap-1.5">
-                        <span className="font-semibold">{formatDate(selectedHistoryDate)}</span>
-                        <svg className="w-3.5 h-3.5 text-[#8b6e48]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
+                    <div className="flex items-center gap-2">
+                      <h2 className="select-none">
+                        {formatDate(selectedHistoryDate)}
+                      </h2>
+                      <div className="relative inline-flex items-center" ref={calendarDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => setIsCalendarOpen(prev => !prev)}
+                          className="focus-ring flex h-6 w-6 items-center justify-center rounded-md border border-[rgba(162,131,93,0.38)] bg-[rgba(255,253,245,0.85)] text-[#5c4331] hover:text-[#2d1e15] hover:border-[#8b6e48] hover:bg-[#ffffff] shadow-sm transition-all duration-150 cursor-pointer shrink-0"
+                          aria-expanded={isCalendarOpen}
+                          aria-label="Toggle calendar date picker"
+                          title="Pick date"
+                        >
+                          <motion.svg 
+                            animate={{ rotate: isCalendarOpen ? 180 : 0 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className="w-3.5 h-3.5" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor" 
+                            strokeWidth="2.4"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </motion.svg>
+                        </button>
+
+                        <AnimatePresence>
+                          {isCalendarOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                              className="journal-custom-calendar"
+                              style={{ left: "-12px", top: "calc(100% + 8px)" }}
+                            >
+                              {/* Calendar Header */}
+                              <div className="flex items-center justify-between mb-2.5 px-0.5 border-b border-[rgba(162,131,93,0.18)] pb-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCalViewDate(prev => {
+                                      if (prev.month === 0) return { year: prev.year - 1, month: 11 };
+                                      return { year: prev.year, month: prev.month - 1 };
+                                    });
+                                  }}
+                                  className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-[rgba(162,131,93,0.16)] text-[#5c4331] transition-colors cursor-pointer"
+                                  aria-label="Previous month"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                </button>
+
+                                <span className="font-semibold text-xs tracking-wider text-[#3d2e24] uppercase font-sans">
+                                  {new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(new Date(calViewDate.year, calViewDate.month, 1))}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCalViewDate(prev => {
+                                      if (prev.month === 11) return { year: prev.year + 1, month: 0 };
+                                      return { year: prev.year, month: prev.month + 1 };
+                                    });
+                                  }}
+                                  disabled={
+                                    (() => {
+                                      const now = new Date();
+                                      return calViewDate.year > now.getFullYear() || (calViewDate.year === now.getFullYear() && calViewDate.month >= now.getMonth());
+                                    })()
+                                  }
+                                  className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-[rgba(162,131,93,0.16)] text-[#5c4331] disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                                  aria-label="Next month"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {/* Weekday Names Header */}
+                              <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                                {["S", "M", "T", "W", "T", "F", "S"].map((d, dIdx) => (
+                                  <span key={dIdx} className="text-[10px] font-bold text-[#9c8470] font-sans">
+                                    {d}
+                                  </span>
+                                ))}
+                              </div>
+
+                              {/* Days Grid */}
+                              <div className="grid grid-cols-7 gap-1 text-center">
+                                {Array.from({ length: new Date(calViewDate.year, calViewDate.month, 1).getDay() }).map((_, i) => (
+                                  <span key={`blank-${i}`} />
+                                ))}
+                                {Array.from({ length: new Date(calViewDate.year, calViewDate.month + 1, 0).getDate() }).map((_, i) => {
+                                  const dayNum = i + 1;
+                                  const dateStr = `${calViewDate.year}-${String(calViewDate.month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                                  const isSelected = dateStr === selectedHistoryDate;
+                                  const isToday = dateStr === getTodayDateString();
+                                  const isFuture = dateStr > getTodayDateString();
+                                  const hasEntry = history?.some(e => e.date === dateStr);
+
+                                  return (
+                                    <button
+                                      key={dateStr}
+                                      type="button"
+                                      disabled={isFuture}
+                                      onClick={() => {
+                                        handleDateChange(dateStr);
+                                        setIsCalendarOpen(false);
+                                      }}
+                                      className={`relative h-7 w-7 mx-auto rounded-full flex flex-col items-center justify-center transition-all duration-150 cursor-pointer ${
+                                        isSelected
+                                          ? "bg-[#3e2c21] text-[#fffdf8] font-bold shadow-md scale-105"
+                                          : isToday
+                                          ? "border border-[#9c7b5d] text-[#3e2c21] font-semibold hover:bg-[rgba(162,131,93,0.16)]"
+                                          : isFuture
+                                          ? "opacity-25 pointer-events-none text-[#a89887]"
+                                          : "text-[#4a382d] font-normal hover:bg-[rgba(162,131,93,0.16)] hover:text-[#211610]"
+                                      }`}
+                                    >
+                                      <span className="journal-cal-day-num">{dayNum}</span>
+                                      {hasEntry && !isSelected && (
+                                        <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-[#a25e48]" />
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                      <input 
-                        type="date"
-                        ref={dateInputRef}
-                        aria-label="Pick journal date"
-                        value={selectedHistoryDate}
-                        onChange={(e) => {
-                          if (e.target.value) handleDateChange(e.target.value);
-                        }}
-                        className="journal-date-input"
-                      />
                     </div>
                   ) : (
                     <h2>No past page selected</h2>
@@ -747,26 +900,32 @@ export default function JournalPage() {
                 </div>
 
                 <div className="journal-writing-area">
-                  {selectedHistoryEntry ? (
-                    <div
-                      dangerouslySetInnerHTML={{ __html: formatJournalTextToHTML(selectedHistoryEntry.entryText) }}
-                      className="journal-textarea read-only"
-                    />
-                  ) : (
-                    <div className="journal-empty-paper-state">
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor" 
-                        strokeWidth="1.5" 
-                        className="w-8 h-8 opacity-40 mb-3"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <p>No journal page was sealed on this date.</p>
-                    </div>
-                  )}
+                  <div className="journal-textarea read-only relative flex flex-col">
+                    {selectedHistoryEntry ? (
+                      <div dangerouslySetInnerHTML={{ __html: formatJournalTextToHTML(selectedHistoryEntry.entryText) }} />
+                    ) : (
+                      <div className="journal-empty-paper-state my-auto">
+                        <div className="journal-empty-paper-card">
+                          <div className="journal-empty-paper-icon-wrapper">
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              fill="none" 
+                              viewBox="0 0 24 24" 
+                              stroke="currentColor" 
+                              strokeWidth="1.6" 
+                              className="w-5 h-5 text-[#8b6e48]"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                            </svg>
+                          </div>
+                          <h3 className="journal-empty-paper-title">No Entry Recorded</h3>
+                          <p className="journal-empty-paper-desc">
+                            No journal page was sealed on this date.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Fixed Floating Bottom Controls Overlay */}
