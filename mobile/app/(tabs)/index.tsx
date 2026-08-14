@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { AppScreen } from "@/src/components/screen";
-import { Card, Metric, ProgressBar, SectionTitle, ui } from "@/src/components/ui";
+import { Card, ProgressBar, SectionTitle, ui } from "@/src/components/ui";
 import { todayInKolkata } from "@/src/lib/format";
 import { useTheme } from "@/src/providers/theme-provider";
 
@@ -15,14 +15,14 @@ interface PersonalTodo {
   text: string;
   completed: boolean;
   tag: TodoTag;
+  estimatedMin?: number;
   createdAt: number;
 }
 
 const DEFAULT_TODOS: PersonalTodo[] = [
-  { id: "def-1", text: "Revise 1 weak topic formula sheet", completed: false, tag: "GATE", createdAt: Date.now() - 3000 },
-  { id: "def-2", text: "Complete 15 practice PYQs", completed: false, tag: "GATE", createdAt: Date.now() - 2000 },
-  { id: "def-3", text: "Log today's cashflow expenses", completed: false, tag: "Quick", createdAt: Date.now() - 1000 },
-  { id: "def-4", text: "Review engineering math notes", completed: false, tag: "College", createdAt: Date.now() },
+  { id: "def-1", text: "Revise 1 weak topic formula sheet", completed: false, tag: "GATE", estimatedMin: 25, createdAt: Date.now() - 3000 },
+  { id: "def-2", text: "Complete 15 practice PYQs", completed: false, tag: "GATE", estimatedMin: 30, createdAt: Date.now() - 2000 },
+  { id: "def-3", text: "Log today's cashflow expenses", completed: false, tag: "Quick", estimatedMin: 5, createdAt: Date.now() - 1000 },
 ];
 
 export default function TodayScreen() {
@@ -39,13 +39,12 @@ export default function TodayScreen() {
     [theme]
   );
 
-  // --- Personal To-Do State ---
+  // --- State ---
   const [todos, setTodos] = useState<PersonalTodo[]>([]);
   const [isTodosLoaded, setIsTodosLoaded] = useState(false);
   const [newTodoText, setNewTodoText] = useState("");
   const [selectedTag, setSelectedTag] = useState<TodoTag>("GATE");
   const [showAddBox, setShowAddBox] = useState(false);
-  const [filterTag, setFilterTag] = useState<TodoTag | "All">("All");
 
   // Load To-Dos from AsyncStorage
   useEffect(() => {
@@ -92,6 +91,7 @@ export default function TodayScreen() {
       text: newTodoText.trim(),
       completed: false,
       tag: selectedTag,
+      estimatedMin: selectedTag === "GATE" ? 30 : selectedTag === "Quick" ? 5 : 20,
       createdAt: Date.now(),
     };
     setTodos((current) => [newEntry, ...current]);
@@ -115,10 +115,11 @@ export default function TodayScreen() {
   const pendingCount = totalCount - completedCount;
   const progressPercent = totalCount ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  const filteredTodos = useMemo(() => {
-    if (filterTag === "All") return todos;
-    return todos.filter((t) => t.tag === filterTag);
-  }, [todos, filterTag]);
+  // Next upcoming pending task
+  const nextPendingTask = todos.find((t) => !t.completed);
+  const totalEstimatedMinutes = todos
+    .filter((t) => !t.completed)
+    .reduce((sum, t) => sum + (t.estimatedMin || (t.tag === "GATE" ? 25 : 10)), 0);
 
   return (
     <AppScreen
@@ -129,141 +130,158 @@ export default function TodayScreen() {
         month: "short",
       }).format(new Date())}
       action={
-        <View style={styles.topActions}>
-          {/* Apple Style Dark / Light Mode Switcher */}
-          <Pressable
-            onPress={toggleTheme}
-            style={({ pressed }) => [
-              styles.themeSwitchButton,
-              {
-                backgroundColor: isDark ? "#1a1a1f" : "#f1f5f9",
-                borderColor: isDark ? "#27272a" : "#e2e8f0",
-              },
-              pressed && { opacity: 0.7, transform: [{ scale: 0.96 }] },
-            ]}
-          >
-            <Ionicons
-              name={isDark ? "sunny-outline" : "moon-outline"}
-              size={18}
-              color={isDark ? theme.amber : theme.text}
-            />
-            <Text style={[styles.themeSwitchText, { color: theme.text }]}>
-              {isDark ? "Light" : "Dark"}
-            </Text>
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={toggleTheme}
+          style={({ pressed }) => [
+            styles.themeSwitchButton,
+            {
+              backgroundColor: isDark ? "#16161a" : "#f1f5f9",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
+            },
+            pressed && { opacity: 0.7, transform: [{ scale: 0.96 }] },
+          ]}
+        >
+          <Ionicons
+            name={isDark ? "sunny-outline" : "moon-outline"}
+            size={16}
+            color={isDark ? theme.amber : theme.text}
+          />
+          <Text style={[styles.themeSwitchText, { color: theme.text }]}>
+            {isDark ? "Light" : "Dark"}
+          </Text>
+        </Pressable>
       }
     >
-      {/* Daily Progress Hero Card (Neutral Obsidian in Dark, Clean White in Light) */}
+      {/* 1. Spacious & Non-Overlapping Hero Card */}
       <Card
         style={[
-          styles.hero,
+          styles.heroCard,
           {
             backgroundColor: isDark ? "#121215" : "#ffffff",
             borderColor: isDark ? "#27272a" : "#e2e8f0",
           },
         ]}
       >
-        <View style={ui.spread}>
-          <View>
-            <Text style={[styles.heroLabel, { color: theme.textFaint }]}>TODAY'S COMPLETION</Text>
-            <Text style={[styles.heroValue, { color: theme.text }]}>{progressPercent}%</Text>
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroLeftBlock}>
+            <Text style={[styles.heroLabel, { color: theme.textFaint }]}>TODAY'S PROGRESS</Text>
+            <View style={styles.heroValueRow}>
+              <Text style={[styles.heroPercent, { color: theme.text }]}>{progressPercent}%</Text>
+              <Text style={[styles.heroCountSub, { color: theme.textMuted }]}>
+                ({completedCount}/{totalCount} done)
+              </Text>
+            </View>
           </View>
+
           <View
             style={[
-              styles.priority,
+              styles.heroStatusBadge,
               {
-                backgroundColor: isDark ? "#1a1a1f" : "#f8fafc",
-                borderColor: isDark ? "#27272a" : "#e2e8f0",
+                backgroundColor: isDark
+                  ? progressPercent === 100
+                    ? "rgba(16, 185, 129, 0.18)"
+                    : "#1a1a20"
+                  : progressPercent === 100
+                  ? "rgba(5, 150, 105, 0.14)"
+                  : "#f1f5f9",
+                borderColor: isDark
+                  ? progressPercent === 100
+                    ? theme.emerald
+                    : "#27272a"
+                  : progressPercent === 100
+                  ? theme.emerald
+                  : "#e2e8f0",
               },
             ]}
           >
             <Ionicons
-              name={progressPercent === 100 ? "sparkles" : "checkmark-circle-outline"}
-              color={theme.emerald}
-              size={18}
+              name={progressPercent === 100 ? "checkmark-circle" : "time-outline"}
+              color={progressPercent === 100 ? theme.emerald : theme.amber}
+              size={16}
             />
-            <Text style={[styles.priorityText, { color: theme.text }]}>
-              {progressPercent === 100
-                ? "All finished! Superb work."
-                : `${pendingCount} focus ${pendingCount === 1 ? "task" : "tasks"} remaining`}
+            <Text
+              style={[
+                styles.heroStatusText,
+                { color: progressPercent === 100 ? theme.emerald : theme.text },
+              ]}
+            >
+              {progressPercent === 100 ? "All completed!" : `${pendingCount} remaining`}
             </Text>
           </View>
         </View>
+
         <ProgressBar
           value={progressPercent}
-          tone={progressPercent >= 75 ? theme.emerald : progressPercent >= 40 ? theme.cyan : theme.amber}
+          tone={progressPercent >= 80 ? theme.emerald : progressPercent >= 40 ? theme.cyan : theme.amber}
         />
-        <Text style={[styles.heroNote, { color: theme.textMuted }]}>
-          Small, honest daily actions compound into huge breakthroughs.
+
+        <Text style={[styles.heroMessage, { color: theme.textMuted }]}>
+          {progressPercent === 100
+            ? "✨ Superb discipline today! Every goal hit."
+            : nextPendingTask
+            ? `Next focus: "${nextPendingTask.text}"`
+            : "Small, honest daily actions compound into huge breakthroughs."}
         </Text>
       </Card>
 
-      {/* Quick Metrics */}
+      {/* 2. Informative Focus & Momentum Insights Card */}
       <Card
         style={[
-          styles.metrics,
+          styles.insightCard,
           {
             backgroundColor: isDark ? "#121215" : "#ffffff",
             borderColor: isDark ? "#27272a" : "#e2e8f0",
           },
         ]}
       >
-        <Metric label="Completed" value={`${completedCount}/${totalCount}`} accent={theme.emerald} />
-        <Metric label="Remaining" value={pendingCount} accent={theme.amber} />
-        <Metric
-          label="Status"
-          value={progressPercent >= 80 ? "On fire" : progressPercent > 0 ? "In flow" : "Ready"}
-          accent={theme.cyan}
-        />
+        <View style={styles.insightHeader}>
+          <Ionicons name="flash-outline" size={16} color={theme.amber} />
+          <Text style={[styles.insightTitle, { color: theme.text }]}>Focus Velocity</Text>
+        </View>
+
+        <View style={styles.insightGrid}>
+          <View
+            style={[
+              styles.insightTile,
+              { backgroundColor: isDark ? "#18181d" : "#f8fafc", borderColor: isDark ? "#27272a" : "#f1f5f9" },
+            ]}
+          >
+            <Text style={[styles.insightTileLabel, { color: theme.textFaint }]}>EST. TIME</Text>
+            <Text style={[styles.insightTileValue, { color: theme.cyan }]}>
+              {pendingCount > 0 ? `~${totalEstimatedMinutes}m` : "Done"}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.insightTile,
+              { backgroundColor: isDark ? "#18181d" : "#f8fafc", borderColor: isDark ? "#27272a" : "#f1f5f9" },
+            ]}
+          >
+            <Text style={[styles.insightTileLabel, { color: theme.textFaint }]}>PRIORITY</Text>
+            <Text style={[styles.insightTileValue, { color: theme.emerald }]}>
+              {nextPendingTask ? nextPendingTask.tag : "Free"}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.insightTile,
+              { backgroundColor: isDark ? "#18181d" : "#f8fafc", borderColor: isDark ? "#27272a" : "#f1f5f9" },
+            ]}
+          >
+            <Text style={[styles.insightTileLabel, { color: theme.textFaint }]}>FLOW</Text>
+            <Text style={[styles.insightTileValue, { color: theme.amber }]}>
+              {progressPercent >= 80 ? "On fire" : progressPercent > 0 ? "Building" : "Ready"}
+            </Text>
+          </View>
+        </View>
       </Card>
 
-      {/* Category Filter Chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterScroll}
-      >
-        {(["All", "GATE", "Quick", "College", "Personal"] as const).map((tag) => {
-          const active = filterTag === tag;
-          const count = tag === "All" ? todos.length : todos.filter((t) => t.tag === tag).length;
-          return (
-            <Pressable
-              key={tag}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setFilterTag(tag);
-              }}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: isDark ? "#121215" : "#ffffff",
-                  borderColor: isDark ? "#27272a" : "#e2e8f0",
-                },
-                active && {
-                  backgroundColor: isDark ? "rgba(16, 185, 129, 0.16)" : "rgba(5, 150, 105, 0.12)",
-                  borderColor: theme.emerald,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: theme.textFaint },
-                  active && { color: theme.emerald, fontWeight: "800" },
-                ]}
-              >
-                {tag} {count > 0 ? `(${count})` : ""}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* Focus Checklist Section */}
+      {/* 3. Clean Task Checklist Section (No clutter filter chips) */}
       <View style={styles.todoSection}>
         <SectionTitle
-          title={filterTag === "All" ? "Today's Checklist" : `${filterTag} Tasks`}
+          title="Today's Tasks"
           trailing={
             <Pressable
               onPress={() => {
@@ -281,7 +299,7 @@ export default function TodayScreen() {
             >
               <Ionicons name={showAddBox ? "close" : "add"} size={16} color={theme.emerald} />
               <Text style={[styles.addPillText, { color: theme.emerald }]}>
-                {showAddBox ? "Cancel" : "Add to-do"}
+                {showAddBox ? "Cancel" : "Add task"}
               </Text>
             </Pressable>
           }
@@ -293,7 +311,7 @@ export default function TodayScreen() {
             style={[
               styles.addCard,
               {
-                backgroundColor: isDark ? "#141418" : "#ffffff",
+                backgroundColor: isDark ? "#16161b" : "#ffffff",
                 borderColor: theme.emerald,
               },
             ]}
@@ -309,7 +327,7 @@ export default function TodayScreen() {
               ]}
               value={newTodoText}
               onChangeText={setNewTodoText}
-              placeholder="What do you want to accomplish?"
+              placeholder="What do you need to focus on?"
               placeholderTextColor={theme.textFaint}
               autoFocus
               autoCapitalize="sentences"
@@ -331,7 +349,7 @@ export default function TodayScreen() {
                       style={[
                         styles.tagChip,
                         {
-                          backgroundColor: isDark ? "#1a1a1f" : "#f8fafc",
+                          backgroundColor: isDark ? "#1a1a20" : "#f8fafc",
                           borderColor: isDark ? "#27272a" : "#e2e8f0",
                         },
                         active && { backgroundColor: `${cfg.color}22`, borderColor: cfg.color },
@@ -373,7 +391,7 @@ export default function TodayScreen() {
 
         {/* List of Tasks */}
         <View style={styles.todoList}>
-          {filteredTodos.map((item) => {
+          {todos.map((item) => {
             const tagCfg = TAG_CONFIG[item.tag] || TAG_CONFIG.Quick;
             return (
               <Pressable
@@ -435,6 +453,11 @@ export default function TodayScreen() {
                         {tagCfg.label}
                       </Text>
                     </View>
+                    {item.estimatedMin && !item.completed ? (
+                      <Text style={[styles.metaTimeText, { color: theme.textFaint }]}>
+                        {item.estimatedMin}m
+                      </Text>
+                    ) : null}
                   </View>
                 </View>
 
@@ -472,17 +495,12 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  topActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   themeSwitchButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
     paddingHorizontal: 11,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
   },
@@ -490,70 +508,109 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  hero: {
+
+  // 1. Hero Card
+  heroCard: {
+    padding: 16,
     gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  heroLeftBlock: {
+    gap: 2,
   },
   heroLabel: {
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1,
   },
-  heroValue: {
-    fontSize: 42,
+  heroValueRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  heroPercent: {
+    fontSize: 34,
     fontWeight: "900",
     fontVariant: ["tabular-nums"],
   },
-  priority: {
-    maxWidth: "58%",
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  priorityText: {
+  heroCountSub: {
     fontSize: 12,
-    lineHeight: 16,
-    fontWeight: "700",
-    flex: 1,
+    fontWeight: "600",
   },
-  heroNote: {
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  metrics: {
+  heroStatusBadge: {
     flexDirection: "row",
-    gap: 8,
-  },
-
-  filterScroll: {
-    flexDirection: "row",
-    gap: 8,
-    paddingVertical: 2,
-  },
-  filterChip: {
-    paddingHorizontal: 13,
-    paddingVertical: 7,
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
   },
-  filterChipText: {
+  heroStatusText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
+  },
+  heroMessage: {
+    fontSize: 12,
+    lineHeight: 17,
   },
 
-  // --- To-Do Section ---
+  // 2. Insight Card
+  insightCard: {
+    padding: 14,
+    gap: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  insightHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  insightTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  insightGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  insightTile: {
+    flex: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 3,
+  },
+  insightTileLabel: {
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  insightTileValue: {
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  // 3. To-Do Section
   todoSection: {
     gap: 10,
-    marginTop: 4,
+    marginTop: 2,
   },
   addPillButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
@@ -565,6 +622,8 @@ const styles = StyleSheet.create({
   addCard: {
     padding: 12,
     gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
   },
   addInput: {
     fontSize: 14,
@@ -643,7 +702,7 @@ const styles = StyleSheet.create({
   todoMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   metaTagBadge: {
     flexDirection: "row",
@@ -658,6 +717,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800",
     letterSpacing: 0.3,
+  },
+  metaTimeText: {
+    fontSize: 10,
+    fontWeight: "600",
   },
   deleteIconButton: {
     padding: 4,

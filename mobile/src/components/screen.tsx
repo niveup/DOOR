@@ -13,7 +13,7 @@ type ScreenProps = PropsWithChildren<{
 }>;
 
 export function AppScreen({ title, subtitle, action, refreshing, onRefresh, children }: ScreenProps) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.canvas }]} edges={["top"]}>
@@ -33,7 +33,6 @@ export function AppScreen({ title, subtitle, action, refreshing, onRefresh, chil
       >
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={[styles.eyebrow, { color: theme.accent }]}>DOOR / JUJUM AI</Text>
             <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
             {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
           </View>
@@ -48,9 +47,15 @@ export function AppScreen({ title, subtitle, action, refreshing, onRefresh, chil
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { padding: spacing.md, paddingBottom: 120, gap: spacing.md },
-  header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm, marginBottom: 2 },
-  headerCopy: { flex: 1, gap: 3 },
-  eyebrow: { fontSize: 10, letterSpacing: 1.6, fontWeight: "800" },
-  title: { fontSize: 28, letterSpacing: -0.7, fontWeight: "800" },
-  subtitle: { fontSize: 13, lineHeight: 19, marginTop: 2 },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: 4,
+    paddingTop: 2,
+  },
+  headerCopy: { flex: 1, gap: 2 },
+  title: { fontSize: 30, letterSpacing: -0.8, fontWeight: "900" },
+  subtitle: { fontSize: 13, lineHeight: 18, marginTop: 1 },
 });
