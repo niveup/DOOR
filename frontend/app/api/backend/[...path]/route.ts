@@ -413,9 +413,23 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
   if (safePath.startsWith("api/routine/tasks/") && method === "DELETE") {
     const taskId = safePath.replace("api/routine/tasks/", "");
     const taskModel = (prisma as any).task || (prisma as any).Task;
-    await taskModel.delete({
+    const planModel = (prisma as any).routinePlan || (prisma as any).RoutinePlan;
+
+    const deleted = await taskModel.delete({
       where: { taskId },
     });
+
+    if (deleted?.planId && planModel?.delete) {
+      const remainingCount = await taskModel.count({
+        where: { planId: deleted.planId },
+      });
+      if (remainingCount === 0) {
+        await planModel.delete({
+          where: { planId: deleted.planId },
+        }).catch(() => {});
+      }
+    }
+
     return NextResponse.json({ success: true, message: "Task deleted." });
   }
 

@@ -679,6 +679,7 @@ export default function Dashboard() {
   }, [plan]);
 
   const visibleTasks = Array.isArray(plan?.tasks) ? plan.tasks : [];
+  const hasTasks = visibleTasks.length > 0;
   const completedCount = visibleTasks.filter((task) => task.status === "COMPLETED").length;
   const totalMinutes = visibleTasks.reduce((sum, task) => sum + task.durationMin, 0);
   const completedMinutes = visibleTasks.reduce(
@@ -731,13 +732,13 @@ export default function Dashboard() {
         <MetricTile
           index={0}
           label="Today score"
-          value={plan ? score : 0}
+          value={hasTasks ? score : 0}
           suffix="/100"
-          note={plan ? (score === 0 ? "Starts when a task moves" : scoreBand(score)) : "Waiting for plan"}
-          progress={plan ? score : 0}
+          note={hasTasks ? (score === 0 ? "Starts when a task moves" : scoreBand(score)) : "Waiting for plan"}
+          progress={hasTasks ? score : 0}
           tone="blue"
         />
-        <MetricTile index={1} label="Tasks" value={completedCount} suffix={plan && Array.isArray(plan.tasks) ? `/${plan.tasks.length}` : "/0"} note="Tap a task to update it" progress={taskProgress} tone="lavender" />
+        <MetricTile index={1} label="Tasks" value={completedCount} suffix={hasTasks && plan ? `/${plan.tasks.length}` : "/0"} note="Tap a task to update it" progress={taskProgress} tone="lavender" />
         <MetricTile
           index={2}
           label="Time done"
@@ -785,7 +786,7 @@ export default function Dashboard() {
                 <div className="h-10 rounded bg-[var(--track)]" />
               </div>
             </div>
-          ) : plan ? (
+          ) : hasTasks && plan ? (
             <PlanPanel
               plan={plan}
               priority={priority}

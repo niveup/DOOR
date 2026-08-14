@@ -1303,9 +1303,20 @@ app.post("/api/routine/tasks", async (req: Request, res: Response) => {
 // Delete a single task from Routine Plan
 app.delete("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
   try {
-    await prisma.task.delete({
+    const deletedTask = await prisma.task.delete({
       where: { taskId: req.params.taskId },
     });
+
+    const remainingCount = await prisma.task.count({
+      where: { planId: deletedTask.planId },
+    });
+
+    if (remainingCount === 0) {
+      await prisma.routinePlan.delete({
+        where: { planId: deletedTask.planId },
+      }).catch(() => {});
+    }
+
     res.json({ success: true, message: "Task deleted." });
   } catch (error: any) {
     const status = error?.code === "P2025" ? 404 : 500;
