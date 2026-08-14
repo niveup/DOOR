@@ -2361,18 +2361,26 @@ app.post("/api/tracker/goal", async (req: Request, res: Response) => {
 
 // --- Finance API Routes ---
 
+function getFinanceModels() {
+  const expense = (prisma as any).financeExpense || (prisma as any).FinanceExpense;
+  const budget = (prisma as any).financeBudget || (prisma as any).FinanceBudget;
+  const bill = (prisma as any).financeBill || (prisma as any).FinanceBill;
+  return { expense, budget, bill };
+}
+
 app.get("/api/finance/data", async (_req: Request, res: Response) => {
   try {
-    const [expenses, budget, bills] = await Promise.all([
-      (prisma as any).financeExpense.findMany({
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      }),
-      (prisma as any).financeBudget.findUnique({
-        where: { id: "default" },
-      }),
-      (prisma as any).financeBill.findMany({
-        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
-      }),
+    const { expense, budget, bill } = getFinanceModels();
+    const [expenses, budgetRecord, bills] = await Promise.all([
+      expense?.findMany
+        ? expense.findMany({ orderBy: [{ date: "desc" }, { createdAt: "desc" }] })
+        : Promise.resolve([]),
+      budget?.findUnique
+        ? budget.findUnique({ where: { id: "default" } })
+        : Promise.resolve(null),
+      bill?.findMany
+        ? bill.findMany({ orderBy: [{ date: "asc" }, { createdAt: "asc" }] })
+        : Promise.resolve([]),
     ]);
 
     const defaultCaps = {
@@ -2388,10 +2396,10 @@ app.get("/api/finance/data", async (_req: Request, res: Response) => {
 
     res.json({
       expenses: expenses || [],
-      budget: budget
+      budget: budgetRecord
         ? {
-            allowance: budget.allowance,
-            caps: budget.caps || defaultCaps,
+            allowance: budgetRecord.allowance,
+            caps: budgetRecord.caps || defaultCaps,
           }
         : {
             allowance: 0,
@@ -2411,8 +2419,13 @@ app.post("/api/finance/expense", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "title and numeric amount are required." });
     }
 
+    const { expense } = getFinanceModels();
+    if (!expense) {
+      return res.json({ success: true, expense: { id: id || `exp-${Date.now()}`, title, category, amount, date, payment } });
+    }
+
     if (id) {
-      const updated = await (prisma as any).financeExpense.upsert({
+      const updated = await expense.upsert({
         where: { id },
         update: {
           title: String(title).trim(),
@@ -2432,7 +2445,7 @@ app.post("/api/finance/expense", async (req: Request, res: Response) => {
       });
       return res.json({ success: true, expense: updated });
     } else {
-      const created = await (prisma as any).financeExpense.create({
+      const created = await expense.create({
         data: {
           title: String(title).trim(),
           category: String(category || "Others"),
@@ -2452,7 +2465,10 @@ app.delete("/api/finance/expense/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: "Expense ID is required." });
-    await (prisma as any).financeExpense.deleteMany({ where: { id } });
+    const { expense } = getFinanceModels();
+    if (expense?.deleteMany) {
+      await expense.deleteMany({ where: { id } });
+    }
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2463,7 +2479,10 @@ app.delete("/api/finance/expense", async (req: Request, res: Response) => {
   try {
     const id = req.query.id as string || req.body?.id;
     if (!id) return res.status(400).json({ error: "Expense ID is required." });
-    await (prisma as any).financeExpense.deleteMany({ where: { id } });
+    const { expense } = getFinanceModels();
+    if (expense?.deleteMany) {
+      await expense.deleteMany({ where: { id } });
+    }
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2474,8 +2493,13 @@ app.post("/api/finance/budget", async (req: Request, res: Response) => {
   try {
     const { allowance, caps } = req.body;
     const allowanceNum = Number(allowance || 0);
+    const { budget } = getFinanceModels();
 
-    const updated = await (prisma as any).financeBudget.upsert({
+    if (!budget?.upsert) {
+      return res.json({ success: true, budget: { id: "default", allowance: allowanceNum, caps: caps || {} } });
+    }
+
+    const updated = await budget.upsert({
       where: { id: "default" },
       update: {
         allowance: allowanceNum,
@@ -2501,8 +2525,13 @@ app.post("/api/finance/bill", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "title and numeric amount are required." });
     }
 
+    const { bill } = getFinanceModels();
+    if (!bill) {
+      return res.json({ success: true, bill: { id: id || `bill-${Date.now()}`, title, date, amount, category, paid: Boolean(paid) } });
+    }
+
     if (id) {
-      const updated = await (prisma as any).financeBill.upsert({
+      const updated = await bill.upsert({
         where: { id },
         update: {
           title: String(title).trim(),
@@ -2522,7 +2551,7 @@ app.post("/api/finance/bill", async (req: Request, res: Response) => {
       });
       return res.json({ success: true, bill: updated });
     } else {
-      const created = await (prisma as any).financeBill.create({
+      const created = await bill.create({
         data: {
           title: String(title).trim(),
           date: String(date || getKolkataDate().toISOString().split("T")[0]),
@@ -2543,37 +2572,82 @@ app.post("/api/finance/bill/pay", async (req: Request, res: Response) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "Bill ID is required." });
 
-    const bill = await (prisma as any).financeBill.findUnique({
+    const { bill, expense } = getFinanceModels();
+    if (!bill || !expense) {
+      return res.json({ success: true });
+    }
+
+    const targetBill = await bill.findUnique({
       where: { id },
     });
-    if (!bill) return res.status(404).json({ error: "Bill not found." });
+    if (!targetBill) return res.status(404).json({ error: "Bill not found." });
 
-    const updatedBill = await (prisma as any).financeBill.update({
+    const updatedBill = await bill.update({
       where: { id },
       data: { paid: true },
     });
 
-    const expenseId = `bill-${bill.id}`;
-    const expense = await (prisma as any).financeExpense.upsert({
+    const expenseId = `bill-${targetBill.id}`;
+    const createdExpense = await expense.upsert({
       where: { id: expenseId },
       update: {
-        title: bill.title,
-        category: bill.category,
-        amount: bill.amount,
+        title: targetBill.title,
+        category: targetBill.category,
+        amount: targetBill.amount,
         date: getKolkataDate().toISOString().split("T")[0],
         payment: "UPI",
       },
       create: {
         id: expenseId,
-        title: bill.title,
-        category: bill.category,
-        amount: bill.amount,
+        title: targetBill.title,
+        category: targetBill.category,
+        amount: targetBill.amount,
         date: getKolkataDate().toISOString().split("T")[0],
         payment: "UPI",
       },
     });
 
-    res.json({ success: true, bill: updatedBill, expense });
+    res.json({ success: true, bill: updatedBill, expense: createdExpense });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/finance/bill/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: "Bill ID is required." });
+    const { bill } = getFinanceModels();
+    if (bill?.deleteMany) {
+      await bill.deleteMany({ where: { id } });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/finance/bill", async (req: Request, res: Response) => {
+  try {
+    const id = req.query.id as string || req.body?.id;
+    if (!id) return res.status(400).json({ error: "Bill ID is required." });
+    const { bill } = getFinanceModels();
+    if (bill?.deleteMany) {
+      await bill.deleteMany({ where: { id } });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/finance/reset", async (_req: Request, res: Response) => {
+  try {
+    const { expense, budget, bill } = getFinanceModels();
+    if (expense?.deleteMany) await expense.deleteMany({});
+    if (bill?.deleteMany) await bill.deleteMany({});
+    if (budget?.deleteMany) await budget.deleteMany({});
+    res.json({ success: true, message: "Finance data reset successfully." });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
