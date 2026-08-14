@@ -26,6 +26,10 @@ export type PrivateJournalEntry = {
   readingDone: boolean;
 };
 
+export type PrivateJournalPayload = Omit<PrivateJournalEntry, "journalId" | "date">;
+
+type WorkerSavePayload = { entry: StoredJournalRecord };
+
 function requiredSecret(name: string, value: string | undefined, minLength = 32) {
   if (!value || value.length < minLength) throw new Error(`${name} is not configured.`);
   return value;
@@ -65,6 +69,35 @@ function decrypt(record: StoredJournalRecord): PrivateJournalEntry {
   };
 }
 
+function encrypt(payload: PrivateJournalPayload) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", journalEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${CIPHER_PREFIX}${Buffer.concat([iv, authTag, encrypted]).toString("base64url")}`;
+}
+
+async function storeRequest<T>(method: "GET" | "POST", pathname: string, body?: unknown): Promise<T> {
+  const { url, secret } = storeConfig();
+  const bodyText = body === undefined ? "" : JSON.stringify(body);
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = crypto.createHmac("sha256", secret).update(`${timestamp}.${bodyText}`).digest("base64url");
+  const response = await fetch(`${url}${pathname}`, {
+    method,
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Journal-Timestamp": timestamp,
+      "X-Journal-Signature": signature,
+    },
+    body: method === "POST" ? bodyText : undefined,
+  });
+  const parsed = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(parsed.error || "Private journal storage is unavailable.");
+  return parsed;
+}
+
 export async function listPrivateJournalEntries(limit: number) {
   const safeLimit = Math.min(Math.max(Math.trunc(limit) || 1, 1), 90);
   const { url, secret } = storeConfig();
@@ -87,4 +120,21 @@ export async function privateJournalByDate(date: Date) {
   const target = date.toISOString().slice(0, 10);
   const entries = await listPrivateJournalEntries(90);
   return entries.find((entry) => entry.date.toISOString().slice(0, 10) === target) || null;
+}
+
+/**
+ * Persists an encrypted journal record through the private D1 service. The
+ * device never receives the journal-service secret or encryption key.
+ */
+export async function savePrivateJournalEntry(date: string, payload: PrivateJournalPayload) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Journal date must be YYYY-MM-DD.");
+  const now = Date.now();
+  const result = await storeRequest<WorkerSavePayload>("POST", "/v1/entries", {
+    id: crypto.randomUUID(),
+    date,
+    ciphertext: encrypt(payload),
+    createdAt: now,
+    editedAt: now,
+  });
+  return decrypt(result.entry);
 }

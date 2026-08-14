@@ -8,7 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import { createAiProvider, AiProviderName } from "./lib/ai/provider";
 import { decryptApiKey, encryptApiKey } from "./lib/ai/credentials";
 import { jsonrepair } from "jsonrepair";
-import { listPrivateJournalEntries, privateJournalByDate } from "./lib/private-journal-store";
+import { listPrivateJournalEntries, privateJournalByDate, savePrivateJournalEntry } from "./lib/private-journal-store";
 import { saveStudyLogToD1, fetchStudyLogsFromD1, clearTrackerLogsInD1 } from "./lib/private-tracker-store";
 
 // Stub types for initial compilation prior to running 'prisma generate'
@@ -278,14 +278,87 @@ function passcodeAuth(req: Request, res: Response, next: NextFunction) {
 
 app.use(passcodeAuth);
 
+// Mobile clients use this authenticated no-op to validate a locally stored
+// passcode without exposing any account data or treating /health as proof of
+// authentication.
+app.get("/api/auth/verify", (_req: Request, res: Response) => {
+  res.set("Cache-Control", "no-store").json({ success: true });
+});
+
 // Journal records used to be persisted through these PostgreSQL endpoints.
 // Leave them unavailable so an app-level passcode can never bypass the private
 // journal's separate lock, encryption, and D1 service authentication.
 app.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.path === "/api/journal" || req.path === "/api/journal/history") {
+  if (req.path === "/api/journal") {
     return res.status(410).set("Cache-Control", "no-store").json({ error: "The legacy journal endpoint is retired." });
   }
   return next();
+});
+
+// Private mobile journal contract. Journal encryption and the D1 service
+// credentials stay server-side; the phone only submits its passcode-authenticated
+// entry over HTTPS.
+app.get("/api/journal/entry", async (req: Request, res: Response) => {
+  const date = typeof req.query.date === "string" ? req.query.date : getKolkataDateString();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "date must be YYYY-MM-DD." });
+  try {
+    const entry = await privateJournalByDate(new Date(`${date}T00:00:00.000Z`));
+    res.set("Cache-Control", "no-store, private").json({ entry });
+  } catch (error: any) {
+    res.status(503).set("Cache-Control", "no-store").json({ error: error.message || "Private journal storage is unavailable." });
+  }
+});
+
+app.post("/api/journal/entry", async (req: Request, res: Response) => {
+  const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
+  const mood = typeof req.body?.mood === "string" ? req.body.mood.slice(0, 20) : null;
+  const tags = Array.isArray(req.body?.tags)
+    ? req.body.tags.filter((tag: unknown): tag is string => typeof tag === "string" && tag.length <= 40).slice(0, 6)
+    : [];
+  const date = typeof req.body?.date === "string" ? req.body.date : getKolkataDateString();
+  if (content.length < 20 || content.length > 5000 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).set("Cache-Control", "no-store").json({ error: "Journal content must be 20–5000 characters and date must be YYYY-MM-DD." });
+  }
+
+  try {
+    const [settings, history] = await Promise.all([
+      prisma.settings.findUnique({ where: { id: "default" } }),
+      listPrivateJournalEntries(7),
+    ]);
+    const historyContext = history
+      .filter((item) => item.date.toISOString().slice(0, 10) !== date)
+      .map((item) => `- ${item.date.toISOString().slice(0, 10)}: ${item.entryText} (Mood: ${item.mood || "N/A"})`)
+      .join("\n") || "No previous journal entries found.";
+    const prompt = loadPrompt("journal.md", {
+      user_name: settings?.name || "Aspirant",
+      date,
+      entry_text: content,
+      mood: mood || "N/A",
+      tags: JSON.stringify(tags),
+      history_context: historyContext,
+      weak_subjects: "Not requested for this private response",
+    });
+    const feedback = await aiChat(
+      "You are Jujum AI, a strict, honest Hinglish mentor. Return five clear sections separated by ---.",
+      prompt,
+    );
+    const parts = feedback.split("---").map((part) => part.trim());
+    const entry = await savePrivateJournalEntry(date, {
+      entryText: content,
+      mood,
+      tags,
+      aiFeedback: feedback,
+      tomorrowTask: parts[3] || null,
+      patternDetected: parts[2] || null,
+      studyDone: false,
+      exerciseDone: false,
+      readingDone: false,
+    });
+    res.set("Cache-Control", "no-store, private").json({ entry, feedback, tomorrowTask: entry.tomorrowTask });
+  } catch (error: any) {
+    console.error("Private mobile journal failed", error instanceof Error ? error.message : "unknown error");
+    res.status(502).set("Cache-Control", "no-store").json({ error: "Your journal could not be saved securely right now." });
+  }
 });
 
 // --- API Endpoints ---
@@ -671,27 +744,10 @@ app.get("/api/journal/history", async (req: Request, res: Response) => {
   try {
     const requestedLimit = Number(req.query.limit || 30);
     const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 30, 1), 90);
-    const entries = await prisma.journal.findMany({
-      orderBy: { date: "desc" },
-      take: limit,
-      select: {
-        journalId: true,
-        date: true,
-        entryText: true,
-        mood: true,
-        tags: true,
-        tomorrowTask: true,
-        patternDetected: true,
-        studyDone: true,
-        exerciseDone: true,
-        readingDone: true,
-        editedAt: true,
-      },
-    });
-
-    res.json({ entries });
+    const entries = await listPrivateJournalEntries(limit);
+    res.set("Cache-Control", "no-store, private").json({ entries });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(503).set("Cache-Control", "no-store").json({ error: error.message || "Private journal storage is unavailable." });
   }
 });
 
@@ -1169,6 +1225,31 @@ app.post("/api/tasks/:taskId/status", async (req: Request, res: Response) => {
   }
 });
 
+// Mobile compatibility route. Keep the original web route above so older
+// clients continue working, while accepting the lower-case status contract
+// used by the native app.
+app.patch("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
+  const statusMap: Record<string, "COMPLETED" | "PARTIAL" | "NOT"> = {
+    completed: "COMPLETED",
+    partial: "PARTIAL",
+    not_completed: "NOT",
+  };
+  const requested = typeof req.body?.status === "string" ? req.body.status.toLowerCase() : "";
+  const status = statusMap[requested];
+  if (!status) return res.status(400).json({ error: "status must be completed, partial, or not_completed." });
+
+  try {
+    const task = await prisma.task.update({
+      where: { taskId: req.params.taskId },
+      data: { status, finalizedAt: status === "NOT" ? null : new Date() },
+    });
+    res.set("Cache-Control", "no-store").json({ task });
+  } catch (error: any) {
+    const status = error?.code === "P2025" ? 404 : 500;
+    res.status(status).json({ error: status === 404 ? "Task not found." : error.message });
+  }
+});
+
 function inferTaskType(title: string): "study" | "exercise" | "reading" | "routine" {
   const normalized = title.toLowerCase();
   if (/(exercise|workout|walk|run|stretch|gym)/.test(normalized)) return "exercise";
@@ -1624,7 +1705,7 @@ function robustJsonExtract(rawAiOutput: string): { data: any; error: string | nu
   }
 }
 
-app.post("/api/explainer/query", async (req: Request, res: Response) => {
+async function explainConcept(req: Request, res: Response) {
   const { topic, mode, deep, image, ocrText: providedOcrText, history } = req.body;
   const requestedProvider = isAiProviderName(req.body?.aiProvider) ? req.body.aiProvider : undefined;
   const requestedModel = typeof req.body?.aiModel === "string" && req.body.aiModel.trim().length <= 160
@@ -1823,6 +1904,19 @@ app.post("/api/explainer/query", async (req: Request, res: Response) => {
     console.error("Explainer API Error:", error);
     res.status(500).json({ error: error.message });
   }
+}
+
+app.post("/api/explainer/query", explainConcept);
+app.post("/api/explainer/explain", (req: Request, res: Response) => {
+  const subject = typeof req.body?.subject === "string" ? req.body.subject.trim() : "";
+  const topic = typeof req.body?.topic === "string" ? req.body.topic.trim() : "";
+  const userQuery = typeof req.body?.userQuery === "string" ? req.body.userQuery.trim() : "";
+  req.body = {
+    ...req.body,
+    topic: [subject, topic, userQuery].filter(Boolean).join(": ") || topic || userQuery,
+    mode: req.body?.mode || "detailed",
+  };
+  return explainConcept(req, res);
 });
 
 // --- Progress Tracker (Phase 2) ---
