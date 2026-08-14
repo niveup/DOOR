@@ -328,6 +328,83 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
     return NextResponse.json({ success: true, message: "Plan has been cleared." });
   }
 
+  // 9. POST /api/routine/tasks
+  if (safePath === "api/routine/tasks" && method === "POST") {
+    const title = typeof parsedBody?.title === "string" ? parsedBody.title.trim() : "";
+    if (!title) {
+      return NextResponse.json({ error: "Task title is required." }, { status: 400 });
+    }
+
+    const durationMin = Math.max(5, Math.min(480, Math.round(Number(parsedBody?.durationMin) || 30)));
+    const dateQuery = reqUrl.searchParams.get("date") || parsedBody?.date;
+    const dateStr = dateQuery || getKolkataDateString();
+    const targetDate = new Date(`${dateStr}T00:00:00.000Z`);
+
+    let plan: any = await (prisma.routinePlan as any).findUnique({
+      where: { date: targetDate },
+      include: { Task: true, tasks: true },
+    });
+
+    if (!plan) {
+      plan = await (prisma.routinePlan as any).create({
+        data: {
+          date: targetDate,
+          greeting: "Your plan is ready. Start with the first task.",
+          planText: `1. ${title} (Duration: ${durationMin} mins)`,
+          mainPriority: title,
+          totalEstimatedMin: durationMin,
+          isWeekend: targetDate.getDay() === 0 || targetDate.getDay() === 6,
+        },
+      });
+    }
+
+    const taskModel = (prisma as any).task || (prisma as any).Task;
+    const newTask = await taskModel.create({
+      data: {
+        date: targetDate,
+        planId: plan.planId,
+        title,
+        taskType: "study",
+        durationMin,
+        status: "NOT",
+        isPriority: false,
+      },
+    });
+
+    return NextResponse.json({ success: true, task: newTask }, { status: 201 });
+  }
+
+  // 10. PATCH /api/routine/tasks/:taskId
+  if (safePath.startsWith("api/routine/tasks/") && method === "PATCH") {
+    const taskId = safePath.replace("api/routine/tasks/", "");
+    const statusMap: Record<string, "COMPLETED" | "PARTIAL" | "NOT"> = {
+      completed: "COMPLETED",
+      partial: "PARTIAL",
+      not_completed: "NOT",
+    };
+    const requested = typeof parsedBody?.status === "string" ? parsedBody.status.toLowerCase() : "";
+    const status = statusMap[requested];
+    if (!status) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+
+    const taskModel = (prisma as any).task || (prisma as any).Task;
+    const updated = await taskModel.update({
+      where: { taskId },
+      data: { status, finalizedAt: status === "NOT" ? null : new Date() },
+    });
+
+    return NextResponse.json({ task: updated }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  // 11. DELETE /api/routine/tasks/:taskId
+  if (safePath.startsWith("api/routine/tasks/") && method === "DELETE") {
+    const taskId = safePath.replace("api/routine/tasks/", "");
+    const taskModel = (prisma as any).task || (prisma as any).Task;
+    await taskModel.delete({
+      where: { taskId },
+    });
+    return NextResponse.json({ success: true, message: "Task deleted." });
+  }
+
   return null;
 }
 

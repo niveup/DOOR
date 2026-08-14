@@ -57,10 +57,15 @@ export const api = {
   routine: {
     today: (date: string) => request<RoutinePlan>(`/api/routine/today?date=${encodeURIComponent(date)}`),
     generate: () => request<RoutinePlan>("/api/routine/generate", { method: "POST" }),
+    addTask: (input: { title: string; durationMin?: number; date?: string }) => request<{ success: true; task: any }>("/api/routine/tasks", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
     updateTask: (taskId: string, status: RoutineStatus) => request<{ task: unknown }>(`/api/routine/tasks/${taskId}`, {
       method: "PATCH",
       body: JSON.stringify({ status: status === "COMPLETED" ? "completed" : status === "PARTIAL" ? "partial" : "not_completed" }),
     }),
+    deleteTask: (taskId: string) => request<{ success: true }>(`/api/routine/tasks/${taskId}`, { method: "DELETE" }),
     clear: (date: string) => request<{ success: true }>(`/api/routine/today?date=${encodeURIComponent(date)}`, { method: "DELETE" }),
   },
   finance: {

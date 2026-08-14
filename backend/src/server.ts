@@ -1227,7 +1227,7 @@ app.post("/api/tasks/:taskId/status", async (req: Request, res: Response) => {
 
 // Mobile compatibility route. Keep the original web route above so older
 // clients continue working, while accepting the lower-case status contract
-// used by the native app.
+// Mobile compatibility route for task status update
 app.patch("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
   const statusMap: Record<string, "COMPLETED" | "PARTIAL" | "NOT"> = {
     completed: "COMPLETED",
@@ -1244,6 +1244,69 @@ app.patch("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
       data: { status, finalizedAt: status === "NOT" ? null : new Date() },
     });
     res.set("Cache-Control", "no-store").json({ task });
+  } catch (error: any) {
+    const status = error?.code === "P2025" ? 404 : 500;
+    res.status(status).json({ error: status === 404 ? "Task not found." : error.message });
+  }
+});
+
+// Add a single task to today's Routine Plan
+app.post("/api/routine/tasks", async (req: Request, res: Response) => {
+  const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
+  if (!title) {
+    return res.status(400).json({ error: "Task title is required." });
+  }
+
+  const durationMin = Math.max(5, Math.min(480, Math.round(Number(req.body?.durationMin) || 30)));
+  const taskType = inferTaskType(title);
+  const dateQuery = req.query.date as string || req.body?.date as string;
+  const targetDate = dateQuery ? new Date(dateQuery) : getKolkataDate();
+
+  try {
+    let plan = await prisma.routinePlan.findUnique({
+      where: { date: targetDate },
+      include: { tasks: true },
+    });
+
+    if (!plan) {
+      plan = await prisma.routinePlan.create({
+        data: {
+          date: targetDate,
+          greeting: "Your plan is ready. Start with the first task.",
+          planText: `1. ${title} (Duration: ${durationMin} mins)`,
+          mainPriority: title,
+          totalEstimatedMin: durationMin,
+          isWeekend: targetDate.getDay() === 0 || targetDate.getDay() === 6,
+        },
+        include: { tasks: true },
+      });
+    }
+
+    const newTask = await prisma.task.create({
+      data: {
+        date: targetDate,
+        planId: plan.planId,
+        title,
+        taskType,
+        durationMin,
+        status: "NOT",
+        isPriority: (plan.tasks?.length || 0) === 0,
+      },
+    });
+
+    res.status(201).json({ success: true, task: newTask });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a single task from Routine Plan
+app.delete("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
+  try {
+    await prisma.task.delete({
+      where: { taskId: req.params.taskId },
+    });
+    res.json({ success: true, message: "Task deleted." });
   } catch (error: any) {
     const status = error?.code === "P2025" ? 404 : 500;
     res.status(status).json({ error: status === 404 ? "Task not found." : error.message });

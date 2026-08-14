@@ -21,6 +21,7 @@ export function AppScreen({ title, subtitle, action, refreshing, onRefresh, over
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           onRefresh ? (
             <RefreshControl
