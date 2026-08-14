@@ -295,10 +295,24 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
     const dateStr = dateQuery || getKolkataDateString();
     const targetDate = new Date(`${dateStr}T00:00:00.000Z`);
 
-    const plan: any = await (prisma.routinePlan as any).findUnique({
-      where: { date: targetDate },
-      include: { Task: true },
-    });
+    let plan: any = null;
+    try {
+      plan = await (prisma.routinePlan as any).findUnique({
+        where: { date: targetDate },
+        include: { tasks: true },
+      });
+    } catch {
+      try {
+        plan = await (prisma.routinePlan as any).findUnique({
+          where: { date: targetDate },
+          include: { Task: true },
+        });
+      } catch {
+        plan = await (prisma.routinePlan as any).findUnique({
+          where: { date: targetDate },
+        });
+      }
+    }
 
     if (plan) {
       const formattedPlan = {

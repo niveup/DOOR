@@ -253,20 +253,23 @@ export default function Dashboard() {
   const fetchTodayPlan = useCallback(async (dateStr?: string, forceRefresh = false) => {
     const queryDate = dateStr || selectedDate;
 
+    // 1. Instant optimistic render from cache if available
     if (!forceRefresh) {
       const cached = getCache<{ plan: RoutinePlan | null }>(`routine_plan_${queryDate}`);
       if (cached) {
         setPlan(cached.plan);
         setLoading(false);
-        setError("");
-        return;
+      } else {
+        setLoading(true);
       }
+    } else {
+      setLoading(true);
     }
 
-    setLoading(true);
+    // 2. Always perform background live fetch to keep in sync with Mobile
     try {
       const res = await appFetch(`${backendUrl}/api/routine/today?date=${queryDate}`, {
-        headers: {},
+        headers: { "Cache-Control": "no-cache" },
       });
       if (res.ok) {
         const data = (await res.json()) as RoutinePlan | null;
@@ -274,13 +277,16 @@ export default function Dashboard() {
         setCache(`routine_plan_${queryDate}`, { plan: data });
         setError("");
       } else {
-        setPlan(null);
-        setCache(`routine_plan_${queryDate}`, { plan: null });
-        setError("Plan could not be loaded.");
+        if (forceRefresh || !getCache(`routine_plan_${queryDate}`)) {
+          setPlan(null);
+          setCache(`routine_plan_${queryDate}`, { plan: null });
+        }
       }
     } catch {
-      setPlan(null);
-      setError("Backend is not reachable. Showing a preview state.");
+      if (forceRefresh || !getCache(`routine_plan_${queryDate}`)) {
+        setPlan(null);
+        setError("Backend is not reachable. Showing a preview state.");
+      }
     } finally {
       setLoading(false);
     }
@@ -387,7 +393,22 @@ export default function Dashboard() {
       void fetchFinanceStatus();
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    const onFocus = () => {
+      void fetchTodayPlan(undefined, true);
+      void fetchFinanceStatus();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        onFocus();
+      }
+    });
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", onFocus);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
