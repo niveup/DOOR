@@ -18,8 +18,8 @@ export default function TabLayout() {
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: theme.accent,
-        tabBarInactiveTintColor: theme.textFaint,
+        tabBarActiveTintColor: isDark ? "#18B887" : "#059669",
+        tabBarInactiveTintColor: isDark ? "#71717A" : theme.textFaint,
         tabBarStyle: [
           styles.tabBar,
           {
@@ -27,8 +27,8 @@ export default function TabLayout() {
             bottom: 0,
             left: 0,
             right: 0,
-            backgroundColor: theme.surface,
-            borderTopColor: theme.border,
+            backgroundColor: isDark ? "#08080A" : "#ffffff",
+            borderTopColor: isDark ? "#202025" : "#e2e8f0",
             shadowColor: isDark ? "#000000" : "#64748b",
             shadowOpacity: isDark ? 0.3 : 0.08,
             shadowRadius: 10,
@@ -44,7 +44,7 @@ export default function TabLayout() {
                 : tabIcons[route.name]
             }
             color={color}
-            size={21}
+            size={22}
           />
         ),
       })}
@@ -60,14 +60,14 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: Platform.select({ ios: 88, default: 68 }),
+    height: Platform.select({ ios: 82, default: 62 }),
     paddingTop: 6,
-    paddingBottom: Platform.select({ ios: 28, default: 8 }),
+    paddingBottom: Platform.select({ ios: 24, default: 8 }),
     borderTopWidth: 1,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "600",
     marginTop: 2,
   },
 });

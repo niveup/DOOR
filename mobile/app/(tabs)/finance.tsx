@@ -1,270 +1,2111 @@
-import { useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ScrollView as GHScrollView } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetScrollView,
+  BottomSheetTextInput,
+} from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppScreen } from "@/src/components/screen";
-import { ActionButton, Card, Chip, EmptyState, IconButton, LoadingCard, ProgressBar, SectionTitle, ui } from "@/src/components/ui";
+import { ProgressBar, SectionTitle } from "@/src/components/ui";
 import { api } from "@/src/services/api";
 import { formatINR, shortDate, todayInKolkata } from "@/src/lib/format";
 import { Bill, Budget, Expense, FinanceCategory, financeCategories } from "@/src/types/domain";
-import { categoryColors, colors } from "@/src/theme/tokens";
+import { useTheme } from "@/src/providers/theme-provider";
 
-type SheetMode = "expense" | "budget" | "bill";
+// -------------------------------------------------------------
+// Centralized Fintech Design & Category Color Tokens
+// -------------------------------------------------------------
+const SEMANTIC = {
+  crimson: "#D94A62", // Muted crimson for over-budget & warnings (financial state ONLY)
+  amber: "#C58A2A",   // Muted amber for near-limit
+  emerald: "#18B887", // Restrained accent green for on-track / positive state
+};
+
+const CATEGORY_TOKENS: Record<
+  FinanceCategory,
+  {
+    icon: keyof typeof Ionicons.glyphMap;
+    darkIcon: string;
+    darkBg: string;
+    darkBorder: string;
+    lightIcon: string;
+    lightBg: string;
+    lightBorder: string;
+    barColor: string;
+  }
+> = {
+  "Food & mess": {
+    icon: "restaurant-outline",
+    darkIcon: "#C98A3A",
+    darkBg: "#241F18",
+    darkBorder: "#342C22",
+    lightIcon: "#9A6218",
+    lightBg: "#FDF6EC",
+    lightBorder: "#F3E2CC",
+    barColor: "#F59E0B",
+  },
+  Subscriptions: {
+    icon: "tv-outline",
+    darkIcon: "#8B7CF6",
+    darkBg: "#1F1C2B",
+    darkBorder: "#2D283E",
+    lightIcon: "#6355D8",
+    lightBg: "#F4F2FD",
+    lightBorder: "#E2DCFA",
+    barColor: "#A855F7",
+  },
+  "Hostel & utilities": {
+    icon: "home-outline",
+    darkIcon: "#6F8FAF",
+    darkBg: "#1B2025",
+    darkBorder: "#272E36",
+    lightIcon: "#486B8C",
+    lightBg: "#F0F4F8",
+    lightBorder: "#DCE5EE",
+    barColor: "#38BDF8",
+  },
+  "Travel & commute": {
+    icon: "car-outline",
+    darkIcon: "#4FA39A",
+    darkBg: "#182321",
+    darkBorder: "#233330",
+    lightIcon: "#2E7C74",
+    lightBg: "#EEF7F6",
+    lightBorder: "#D2EBE8",
+    barColor: "#14B8A6",
+  },
+  Academics: {
+    icon: "school-outline",
+    darkIcon: "#7180B5",
+    darkBg: "#1C1E27",
+    darkBorder: "#282C3A",
+    lightIcon: "#4E5F97",
+    lightBg: "#F1F3F9",
+    lightBorder: "#DCE1F1",
+    barColor: "#6366F1",
+  },
+  "Personal & health": {
+    icon: "fitness-outline",
+    darkIcon: "#B56F7E",
+    darkBg: "#241B1F",
+    darkBorder: "#35272E",
+    lightIcon: "#964C5C",
+    lightBg: "#FBF1F3",
+    lightBorder: "#F3DAE0",
+    barColor: "#EC4899",
+  },
+  "Fun & social": {
+    icon: "game-controller-outline",
+    darkIcon: "#8B78B0",
+    darkBg: "#211D26",
+    darkBorder: "#302A37",
+    lightIcon: "#6E5A93",
+    lightBg: "#F5F2F9",
+    lightBorder: "#E5DEEF",
+    barColor: "#FB923C",
+  },
+  Others: {
+    icon: "receipt-outline",
+    darkIcon: "#85858F",
+    darkBg: "#1B1B20",
+    darkBorder: "#26262D",
+    lightIcon: "#5C5C66",
+    lightBg: "#F3F3F6",
+    lightBorder: "#E1E1E6",
+    barColor: "#94A3B8",
+  },
+};
+
+type FormMode = "expense" | "bill" | null;
+type DetailMode = "budget" | "all-spending" | "all-bills" | "all-activity" | null;
+
+function getDateLabel(dateStr: string): string {
+  const today = todayInKolkata();
+  if (dateStr === today) return "Today";
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().slice(0, 10);
+  if (dateStr === yStr) return "Yesterday";
+  try {
+    return shortDate(dateStr);
+  } catch {
+    return dateStr;
+  }
+}
+
+// -------------------------------------------------------------
+// Standardized Category Icon Badge Component
+// -------------------------------------------------------------
+function CategoryIconBadge({
+  category,
+  isDark,
+  customIcon,
+}: {
+  category: FinanceCategory;
+  isDark: boolean;
+  customIcon?: keyof typeof Ionicons.glyphMap;
+}) {
+  const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Others;
+  const iconName = customIcon || meta.icon;
+  const iconColor = isDark ? meta.darkIcon : meta.lightIcon;
+  const bgColor = isDark ? meta.darkBg : meta.lightBg;
+  const borderColor = isDark ? meta.darkBorder : meta.lightBorder;
+
+  return (
+    <View
+      style={[
+        styles.categoryIconBadge,
+        {
+          backgroundColor: bgColor,
+          borderColor: borderColor,
+        },
+      ]}
+    >
+      <Ionicons name={iconName} size={18} color={iconColor} />
+    </View>
+  );
+}
 
 export default function FinanceScreen() {
   const client = useQueryClient();
-  const sheetRef = useRef<BottomSheetModal>(null);
-  const [mode, setMode] = useState<SheetMode>("expense");
-  const finance = useQuery({ queryKey: ["finance"], queryFn: api.finance.get });
+  const formSheetRef = useRef<BottomSheetModal>(null);
+
+  const [formMode, setFormMode] = useState<FormMode>(null);
+  const [detailMode, setDetailMode] = useState<DetailMode>(null);
+  const [formSessionKey, setFormSessionKey] = useState(1);
+  const { theme, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  // Intercept Android hardware back press
+  useEffect(() => {
+    if (!detailMode && !formMode) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (detailMode) {
+        setDetailMode(null);
+        return true;
+      }
+      if (formMode) {
+        formSheetRef.current?.dismiss();
+        setFormMode(null);
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [detailMode, formMode]);
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        pressBehavior="close"
+        opacity={isDark ? 0.65 : 0.4}
+      />
+    ),
+    [isDark]
+  );
+
+  const finance = useQuery({
+    queryKey: ["finance"],
+    queryFn: api.finance.get,
+    staleTime: 5_000,
+  });
   const data = finance.data;
 
-  const open = (next: SheetMode) => {
-    setMode(next);
-    sheetRef.current?.present();
+  const openForm = (mode: "expense" | "bill") => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setFormMode(mode);
+    setFormSessionKey((prev) => prev + 1);
+    formSheetRef.current?.present();
+  };
+
+  const openDetail = (mode: NonNullable<DetailMode>) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setDetailMode(mode);
+    setFormSessionKey((prev) => prev + 1);
   };
 
   const refresh = () => client.invalidateQueries({ queryKey: ["finance"] });
 
+  // 1. Optimistic Expense Mutation
   const expenseMutation = useMutation({
     mutationFn: api.finance.saveExpense,
-    onSuccess: async () => {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      sheetRef.current?.dismiss();
-      refresh();
+    onMutate: async (newExpense) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      formSheetRef.current?.dismiss();
+      setFormMode(null);
+
+      await client.cancelQueries({ queryKey: ["finance"] });
+      const previous = client.getQueryData<typeof data>(["finance"]);
+      const optimisticEntry: Expense = {
+        id: `temp-${Date.now()}`,
+        title: newExpense.title,
+        amount: Number(newExpense.amount),
+        category: newExpense.category,
+        payment: newExpense.payment || "UPI",
+        date: newExpense.date || todayInKolkata(),
+      };
+
+      client.setQueryData<typeof data>(["finance"], (current) =>
+        current
+          ? { ...current, expenses: [optimisticEntry, ...current.expenses] }
+          : { expenses: [optimisticEntry], bills: [], budget: { allowance: 0, caps: {} as any } }
+      );
+      return { previous };
     },
+    onError: (_error, _variables, context) => {
+      client.setQueryData(["finance"], context?.previous);
+      Alert.alert("Save Failed", "Could not reach cloud database. Please try again.");
+    },
+    onSettled: refresh,
   });
 
+  // 2. Optimistic Budget Mutation
   const budgetMutation = useMutation({
     mutationFn: api.finance.saveBudget,
-    onSuccess: async () => {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      sheetRef.current?.dismiss();
-      refresh();
+    onMutate: async (newBudget) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setDetailMode(null);
+
+      await client.cancelQueries({ queryKey: ["finance"] });
+      const previous = client.getQueryData<typeof data>(["finance"]);
+      client.setQueryData<typeof data>(["finance"], (current) => {
+        if (!current) {
+          return { expenses: [], bills: [], budget: newBudget };
+        }
+        return {
+          ...current,
+          budget: {
+            allowance: Number(newBudget.allowance || 0),
+            caps: newBudget.caps || ({} as any),
+          },
+        };
+      });
+      return { previous };
     },
+    onError: (_error, _variables, context) => {
+      client.setQueryData(["finance"], context?.previous);
+      Alert.alert("Budget Save Failed", "Could not sync budget with cloud.");
+    },
+    onSettled: refresh,
   });
 
+  // 3. Optimistic Bill Mutation
   const billMutation = useMutation({
     mutationFn: api.finance.saveBill,
-    onSuccess: async () => {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      sheetRef.current?.dismiss();
-      refresh();
+    onMutate: async (newBill) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      formSheetRef.current?.dismiss();
+      setFormMode(null);
+
+      await client.cancelQueries({ queryKey: ["finance"] });
+      const previous = client.getQueryData<typeof data>(["finance"]);
+      const optimisticBill: Bill = {
+        id: `temp-${Date.now()}`,
+        title: newBill.title,
+        amount: Number(newBill.amount),
+        category: newBill.category,
+        date: newBill.date || todayInKolkata(),
+        paid: false,
+      };
+
+      client.setQueryData<typeof data>(["finance"], (current) =>
+        current
+          ? { ...current, bills: [optimisticBill, ...current.bills] }
+          : { expenses: [], bills: [optimisticBill], budget: { allowance: 0, caps: {} as any } }
+      );
+      return { previous };
     },
+    onError: (_error, _variables, context) => {
+      client.setQueryData(["finance"], context?.previous);
+    },
+    onSettled: refresh,
   });
 
+  // 4. Pay Bill Mutation
   const payMutation = useMutation({
     mutationFn: api.finance.payBill,
     onMutate: async (id) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      await client.cancelQueries({ queryKey: ["finance"] });
+      const previous = client.getQueryData<typeof data>(["finance"]);
+      client.setQueryData<typeof data>(["finance"], (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          bills: current.bills.map((b) => (b.id === id ? { ...b, paid: true } : b)),
+        };
+      });
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      client.setQueryData(["finance"], context?.previous);
+      Alert.alert("Payment Failed", "Could not record payment. Please try again.");
+    },
+    onSettled: refresh,
+  });
+
+  // 5. Delete Expense Mutation
+  const deleteExpense = useMutation({
+    mutationFn: api.finance.deleteExpense,
+    onMutate: async (id) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       await client.cancelQueries({ queryKey: ["finance"] });
       const previous = client.getQueryData<typeof data>(["finance"]);
       client.setQueryData<typeof data>(["finance"], (current) =>
         current
           ? {
               ...current,
-              bills: current.bills.map((item) => (item.id === id ? { ...item, paid: true } : item)),
+              expenses: current.expenses.filter((e) => e.id !== id),
             }
           : current
       );
       return { previous };
     },
-    onError: (_error, _id, context) => client.setQueryData(["finance"], context?.previous),
-    onSuccess: () => {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onSettled: refresh,
+  });
+
+  // 6. Delete Bill Mutation
+  const deleteBill = useMutation({
+    mutationFn: api.finance.deleteBill,
+    onMutate: async (id) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      await client.cancelQueries({ queryKey: ["finance"] });
+      const previous = client.getQueryData<typeof data>(["finance"]);
+      client.setQueryData<typeof data>(["finance"], (current) =>
+        current
+          ? {
+              ...current,
+              bills: current.bills.filter((b) => b.id !== id),
+            }
+          : current
+      );
+      return { previous };
     },
     onSettled: refresh,
   });
 
-  const deleteExpense = useMutation({ mutationFn: api.finance.deleteExpense, onSuccess: refresh });
-  const deleteBill = useMutation({ mutationFn: api.finance.deleteBill, onSuccess: refresh });
-
   const month = todayInKolkata().slice(0, 7);
-  const expensesList = data?.expenses || [];
-  const billsList = data?.bills || [];
-  const budgetData = data?.budget || { allowance: 0, caps: {} };
-  const spent = expensesList
-    .filter((item) => item?.date?.startsWith(month))
-    .reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+  const expensesList = useMemo(() => data?.expenses || [], [data?.expenses]);
+  const billsList = useMemo(() => data?.bills || [], [data?.bills]);
+  const budgetData = data?.budget || { allowance: 0, caps: {} as any };
+
+  const spent = useMemo(
+    () =>
+      expensesList
+        .filter((item) => item?.date?.startsWith(month))
+        .reduce((sum, item) => sum + (Number(item?.amount) || 0), 0),
+    [expensesList, month]
+  );
+  
   const allowance = Number(budgetData.allowance || 0);
-  const remaining = Math.max(allowance - spent, 0);
+  const isOverBudget = allowance > 0 && spent > allowance;
+  const overBudgetAmount = isOverBudget ? spent - allowance : 0;
+  const remaining = allowance > spent ? allowance - spent : 0;
+  
   const daysLeft = Math.max(
     1,
     new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate() + 1
   );
+  const safeDailySpend = allowance && !isOverBudget ? Math.floor(remaining / daysLeft) : 0;
+  const rawSpendPercent = allowance > 0 ? Math.round((spent / allowance) * 100) : 0;
+
+  // Active Spending Categories
+  const allCategoryStats = useMemo(() => {
+    return financeCategories
+      .map((category) => {
+        const cap = Number((budgetData.caps as any)?.[category] || 0);
+        const total = expensesList
+          .filter((item) => item?.date?.startsWith(month) && item?.category === category)
+          .reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+        return {
+          category,
+          cap,
+          total,
+          percent: cap ? Math.round((total / cap) * 100) : 0,
+          isOver: cap > 0 && total > cap,
+        };
+      })
+      .filter((c) => c.cap > 0 || c.total > 0)
+      .sort((a, b) => {
+        if (a.isOver && !b.isOver) return -1;
+        if (!a.isOver && b.isOver) return 1;
+        return b.total - a.total;
+      });
+  }, [budgetData.caps, expensesList, month]);
+
+  // Dashboard Capped Previews
+  const top3Spending = useMemo(() => allCategoryStats.slice(0, 3), [allCategoryStats]);
+
+  const unpaidBills = useMemo(() => {
+    return (billsList || [])
+      .filter((item) => !item?.paid)
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  }, [billsList]);
+  const top2Bills = useMemo(() => unpaidBills.slice(0, 2), [unpaidBills]);
+
+  const top5Expenses = useMemo(() => expensesList.slice(0, 5), [expensesList]);
+
+  const groupedTop5Expenses = useMemo(() => {
+    const groups: { dateLabel: string; items: Expense[] }[] = [];
+    top5Expenses.forEach((item) => {
+      const label = getDateLabel(item.date);
+      const existing = groups.find((g) => g.dateLabel === label);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        groups.push({ dateLabel: label, items: [item] });
+      }
+    });
+    return groups;
+  }, [top5Expenses]);
 
   return (
     <AppScreen
       title="Campus Cashflow"
-      subtitle="Calm money decisions, one ledger at a time."
       refreshing={finance.isRefetching}
       onRefresh={finance.refetch}
-      action={<IconButton icon="add" label="Add expense" onPress={() => open("expense")} tone={colors.emerald} />}
-    >
-      {finance.isLoading ? <LoadingCard /> : null}
-      {finance.error ? (
-        <EmptyState
-          icon="cloud-offline-outline"
-          title="Cashflow is offline"
-          description="Pull down when your connection returns. Your last synced ledger remains available."
-          action={<ActionButton label="Retry" compact onPress={() => finance.refetch()} />}
-        />
-      ) : null}
-      {data ? (
+      overlay={
         <>
-          <Card style={styles.balance}>
-            <Text style={styles.balanceLabel}>MONTHLY RUNWAY</Text>
-            <Text style={styles.balanceValue}>{formatINR(remaining)}</Text>
-            <Text style={styles.balanceNote}>
-              {allowance
-                ? `${formatINR(Math.floor(remaining / daysLeft))} safe to spend per day for ${daysLeft} days`
-                : "Set your allowance to unlock a daily runway."}
-            </Text>
-            <ProgressBar value={allowance ? (spent / allowance) * 100 : 0} tone={spent > allowance ? colors.rose : colors.emerald} />
-            <View style={styles.balanceRow}>
-              <Text style={styles.balanceMeta}>{formatINR(spent)} used</Text>
-              <Text style={styles.balanceMeta}>{formatINR(allowance)} allowance</Text>
+          {/* Quick Form Bottom Sheet (Log Expense & Add Bill) */}
+          <BottomSheetModal
+            ref={formSheetRef}
+            snapPoints={["54%", "92%"]}
+            topInset={insets.top + 16}
+            enablePanDownToClose={true}
+            backdropComponent={renderBackdrop}
+            keyboardBehavior="extend"
+            keyboardBlurBehavior="restore"
+            android_keyboardInputMode="adjustResize"
+            handleComponent={() => null}
+            onDismiss={() => setFormMode(null)}
+            backgroundStyle={{
+              backgroundColor: isDark ? "#0E0E11" : "#ffffff",
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+            }}
+          >
+            <BottomSheetScrollView
+              keyboardShouldPersistTaps="always"
+              contentContainerStyle={[styles.sheetContent, { paddingBottom: 32 }]}
+            >
+              <View style={styles.sheetDragHandleWrapper}>
+                <View
+                  style={[
+                    styles.sheetDragHandleBar,
+                    { backgroundColor: isDark ? "#3f3f46" : "#cbd5e1" },
+                  ]}
+                />
+              </View>
+
+              {formMode === "expense" ? (
+                <ExpenseForm
+                  key={`expense-${formSessionKey}`}
+                  onClose={() => {
+                    formSheetRef.current?.dismiss();
+                    setFormMode(null);
+                  }}
+                  onSave={(expense) => {
+                    const amount = Number(expense.amount);
+                    if (!expense.title.trim() || !Number.isFinite(amount) || amount <= 0) {
+                      return Alert.alert("Check expense", "Enter a title and an amount above ₹0.");
+                    }
+                    expenseMutation.mutate({ ...expense, title: expense.title.trim(), amount });
+                  }}
+                  busy={expenseMutation.isPending}
+                />
+              ) : formMode === "bill" ? (
+                <BillForm
+                  key={`bill-${formSessionKey}`}
+                  onClose={() => {
+                    formSheetRef.current?.dismiss();
+                    setFormMode(null);
+                  }}
+                  onSave={(bill) => {
+                    const amount = Number(bill.amount);
+                    if (!bill.title.trim() || amount <= 0) {
+                      return Alert.alert("Check bill", "Enter a bill title and amount.");
+                    }
+                    billMutation.mutate({ ...bill, title: bill.title.trim(), amount, paid: false });
+                  }}
+                  busy={billMutation.isPending}
+                />
+              ) : null}
+            </BottomSheetScrollView>
+          </BottomSheetModal>
+
+          {/* Dedicated View All Full-Height Sheets with Robust Gesture Arbitration */}
+          <ViewAllModal
+            visible={detailMode === "budget"}
+            title="Plan Budget"
+            subtitle="Set your monthly allowance and category limits."
+            onClose={() => setDetailMode(null)}
+          >
+            {({ scrollHandler, contentContainerStyle }) => (
+              <BudgetFormContent
+                key={`budget-${formSessionKey}`}
+                initialBudget={data?.budget || { allowance: 0, caps: {} as any }}
+                onSave={(budget) => {
+                  budgetMutation.mutate(budget);
+                }}
+                busy={budgetMutation.isPending}
+                scrollHandler={scrollHandler}
+                contentContainerStyle={contentContainerStyle}
+              />
+            )}
+          </ViewAllModal>
+
+          <ViewAllModal
+            visible={detailMode === "all-spending"}
+            title="Spending Breakdown"
+            subtitle={`${formatINR(spent)} total spent across categories this month.`}
+            onClose={() => setDetailMode(null)}
+            action={
+              <Pressable onPress={() => setDetailMode("budget")} hitSlop={8} style={styles.textActionPill}>
+                <Text style={[styles.textActionLabel, { color: isDark ? "#FAFBFD" : theme.text, fontWeight: "700" }]}>
+                  Edit budgets →
+                </Text>
+              </Pressable>
+            }
+          >
+            {({ scrollHandler, contentContainerStyle }) => (
+              <AllSpendingContent
+                key={`spending-${formSessionKey}`}
+                allStats={allCategoryStats}
+                scrollHandler={scrollHandler}
+                contentContainerStyle={contentContainerStyle}
+              />
+            )}
+          </ViewAllModal>
+
+          <ViewAllModal
+            visible={detailMode === "all-bills"}
+            title="Upcoming & Paid Bills"
+            subtitle={`${unpaidBills.length} upcoming bill${unpaidBills.length === 1 ? "" : "s"} due.`}
+            onClose={() => setDetailMode(null)}
+            action={
+              <Pressable
+                onPress={() => {
+                  setDetailMode(null);
+                  setTimeout(() => openForm("bill"), 250);
+                }}
+                hitSlop={8}
+                style={styles.textActionPill}
+              >
+                <Text style={[styles.textActionLabel, { color: isDark ? "#FAFBFD" : theme.text, fontWeight: "700" }]}>
+                  + Add bill
+                </Text>
+              </Pressable>
+            }
+          >
+            {({ scrollHandler, contentContainerStyle }) => (
+              <AllBillsContent
+                key={`bills-${formSessionKey}`}
+                bills={billsList}
+                onPay={(id) => payMutation.mutate(id)}
+                onDelete={(id) => deleteBill.mutate(id)}
+                payingId={payMutation.isPending ? payMutation.variables : null}
+                scrollHandler={scrollHandler}
+                contentContainerStyle={contentContainerStyle}
+              />
+            )}
+          </ViewAllModal>
+
+          <ViewAllModal
+            visible={detailMode === "all-activity"}
+            title="Transaction History"
+            subtitle={`${expensesList.length} total transaction${expensesList.length === 1 ? "" : "s"} recorded.`}
+            onClose={() => setDetailMode(null)}
+          >
+            {({ scrollHandler, contentContainerStyle }) => (
+              <AllActivityContent
+                key={`activity-${formSessionKey}`}
+                expenses={expensesList}
+                onDelete={(id) => deleteExpense.mutate(id)}
+                scrollHandler={scrollHandler}
+                contentContainerStyle={contentContainerStyle}
+              />
+            )}
+          </ViewAllModal>
+        </>
+      }
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.screenScrollContent}
+      >
+        {/* Section 1 — Major: Monthly Runway Hero */}
+        <View
+          style={[
+            styles.heroCard,
+            {
+              backgroundColor: isDark ? "#151519" : "#ffffff",
+              borderColor: isDark ? "#202025" : "#e2e8f0",
+            },
+          ]}
+        >
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroLeftCol}>
+              <Text style={[styles.heroLabel, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                MONTHLY RUNWAY
+              </Text>
+              
+              <Text
+                style={[
+                  styles.heroBalanceValue,
+                  {
+                    color: isOverBudget
+                      ? SEMANTIC.crimson
+                      : isDark
+                      ? "#F5F5F7"
+                      : theme.text,
+                  },
+                ]}
+              >
+                {isOverBudget
+                  ? `- ${formatINR(overBudgetAmount)}`
+                  : allowance > 0
+                  ? formatINR(remaining)
+                  : formatINR(spent)}
+              </Text>
+
+              <Text
+                style={[
+                  styles.heroRemainingSub,
+                  {
+                    color: isOverBudget
+                      ? SEMANTIC.crimson
+                      : isDark
+                      ? "#71717A"
+                      : theme.textFaint,
+                  },
+                ]}
+              >
+                {isOverBudget
+                  ? "Over monthly allowance"
+                  : allowance > 0
+                  ? "Remaining this month"
+                  : "Spent this month (No allowance set)"}
+              </Text>
             </View>
-          </Card>
-          <View style={styles.actions}>
-            <ActionButton label="Add expense" icon="add-circle-outline" tone="emerald" onPress={() => open("expense")} />
-            <ActionButton label="Plan budget" icon="pie-chart-outline" tone="ghost" onPress={() => open("budget")} />
           </View>
-          <SectionTitle title="Category envelopes" />
-          <Card>
-            {financeCategories.map((category) => {
-              const cap = Number((budgetData.caps as any)?.[category] || 0);
-              const total = expensesList
-                .filter((item) => item?.date?.startsWith(month) && item?.category === category)
-                .reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
-              const tone = total > cap && cap ? colors.rose : categoryColors[category];
-              return cap ? (
-                <View key={category} style={styles.envelope}>
-                  <View style={ui.spread}>
-                    <Text style={styles.envelopeLabel}>{category}</Text>
-                    <Text style={[styles.envelopeValue, { color: tone }]}>
-                      {formatINR(total)} / {formatINR(cap)}
-                    </Text>
-                  </View>
-                  <ProgressBar value={(total / cap) * 100} tone={tone} />
+
+          <View style={styles.heroMetricRow}>
+            <Text style={[styles.heroMetricPrimary, { color: isDark ? "#F5F5F7" : theme.text }]}>
+              {allowance
+                ? isOverBudget
+                  ? "₹0/day safe spend"
+                  : `${formatINR(safeDailySpend)}/day`
+                : "No limit set"}
+            </Text>
+            <Text style={[styles.heroMetricDot, { color: isDark ? "#71717A" : theme.textFaint }]}>·</Text>
+            <Text style={[styles.heroMetricSecondary, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+              {daysLeft} {daysLeft === 1 ? "day" : "days"} left
+            </Text>
+          </View>
+
+          <ProgressBar
+            value={rawSpendPercent}
+            height={4.5}
+            tone={isOverBudget ? SEMANTIC.crimson : rawSpendPercent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
+          />
+
+          <View style={styles.heroCollapsedFooter}>
+            <Text style={[styles.heroFooterMeta, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+              <Text style={{ fontWeight: "700", color: isDark ? "#F5F5F7" : theme.text }}>
+                {rawSpendPercent}% spent
+              </Text>
+              {allowance ? ` · ${formatINR(spent)} of ${formatINR(allowance)}` : ` · ${formatINR(spent)}`}
+            </Text>
+
+            {isOverBudget ? (
+              <Text style={[styles.heroStatusWarning, { color: SEMANTIC.crimson }]}>
+                ● {formatINR(overBudgetAmount)} over allowance
+              </Text>
+            ) : rawSpendPercent >= 80 ? (
+              <Text style={[styles.heroStatusWarning, { color: SEMANTIC.amber }]}>
+                ● Near monthly limit
+              </Text>
+            ) : allowance > 0 ? (
+              <Text style={[styles.heroStatusHealthy, { color: SEMANTIC.emerald }]}>
+                ● On track this month
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Section 2 — Primary Actions */}
+        <View style={styles.actionRow}>
+          <Pressable
+            onPress={() => openForm("expense")}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              {
+                backgroundColor: isDark ? "#FAFBFD" : "#0f172a",
+                borderColor: isDark ? "#FAFBFD" : "#0f172a",
+              },
+              pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            <Ionicons name="add" size={16} color={isDark ? "#09090b" : "#ffffff"} />
+            <Text style={[styles.primaryButtonText, { color: isDark ? "#09090b" : "#ffffff" }]}>
+              Log Expense
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => openDetail("budget")}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                backgroundColor: isDark ? "#111113" : "#ffffff",
+                borderColor: isDark ? "#202025" : "#e2e8f0",
+              },
+              pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            <Ionicons name="options-outline" size={15} color={isDark ? "#A1A1AA" : theme.textMuted} />
+            <Text style={[styles.secondaryButtonText, { color: isDark ? "#F5F5F7" : theme.text }]}>
+              Plan Budget
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Section 3 — Spending Overview */}
+        <View style={styles.sectionContainer}>
+          <SectionTitle
+            title="Spending"
+            trailing={
+              <Pressable
+                onPress={() => openDetail("all-spending")}
+                hitSlop={8}
+                style={styles.textActionPill}
+              >
+                <Text style={[styles.textActionLabel, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  View all →
+                </Text>
+              </Pressable>
+            }
+          />
+
+          <View
+            style={[
+              styles.unifiedCard,
+              {
+                backgroundColor: isDark ? "#111113" : "#ffffff",
+                borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+              },
+            ]}
+          >
+            {/* Vibrant, bold category allocation strip */}
+            {spent > 0 && allCategoryStats.length > 0 ? (
+              <View style={styles.spendingBarContainer}>
+                <View style={styles.segmentedProgressBar}>
+                  {allCategoryStats.map((item) => {
+                    const flexShare = Math.max(item.total / spent, 0.05);
+                    const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
+                    return (
+                      <View
+                        key={`seg-${item.category}`}
+                        style={[
+                          styles.segmentBarSlice,
+                          {
+                            flex: flexShare,
+                            backgroundColor: meta.barColor,
+                          },
+                        ]}
+                      />
+                    );
+                  })}
                 </View>
-              ) : null;
-            })}
-          </Card>
+              </View>
+            ) : null}
+
+            {top3Spending.length > 0 ? (
+              top3Spending.map((item, idx) => {
+                return (
+                  <Pressable
+                    key={item.category}
+                    onPress={() => openDetail("all-spending")}
+                    style={({ pressed }) => [
+                      styles.spendingRowItem,
+                      (idx > 0 || (spent > 0 && allCategoryStats.length > 0)) && [
+                        styles.hairlineDivider,
+                        { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                      ],
+                      pressed && { opacity: 0.75 },
+                    ]}
+                  >
+                    <View style={styles.spendingRowLeft}>
+                      <CategoryIconBadge category={item.category} isDark={isDark} />
+                      <View style={{ gap: 2 }}>
+                        <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                          {item.category}
+                        </Text>
+                        {item.isOver ? (
+                          <Text style={{ color: SEMANTIC.crimson, fontSize: 12.5, fontWeight: "600" }}>
+                            {formatINR(item.total - item.cap)} over budget
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+
+                    <View style={styles.spendingRowRight}>
+                      <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        {formatINR(item.total)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })
+            ) : (
+              <Pressable
+                onPress={() => openDetail("budget")}
+                style={({ pressed }) => [
+                  styles.emptyEnvelopesPrompt,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Ionicons name="pie-chart-outline" size={18} color={isDark ? "#71717A" : theme.textFaint} />
+                <View style={{ gap: 2, alignItems: "center" }}>
+                  <Text style={[styles.emptyEnvelopesTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                    Plan Spending Limits
+                  </Text>
+                  <Text style={[styles.emptyEnvelopesText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                    Tap to set monthly budgets for Food, Travel & Hostel.
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+
+            <Pressable
+              onPress={() => openDetail("all-spending")}
+              style={({ pressed }) => [
+                styles.collapseBottomButton,
+                {
+                  borderTopColor: isDark ? "#18181D" : "#f1f5f9",
+                },
+                pressed && { opacity: 0.65 },
+              ]}
+            >
+              <Text style={[styles.collapseBottomText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                View all {allCategoryStats.length || 8} categories →
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Section 4 — Upcoming Bills */}
+        <View style={styles.sectionContainer}>
           <SectionTitle
             title="Upcoming bills"
-            trailing={<ActionButton label="Add bill" compact tone="ghost" onPress={() => open("bill")} />}
+            trailing={
+              <Pressable
+                onPress={() => openForm("bill")}
+                hitSlop={8}
+                style={styles.textActionPill}
+              >
+                <Text style={[styles.textActionLabel, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  + Add bill
+                </Text>
+              </Pressable>
+            }
           />
-          {billsList.filter((item) => !item?.paid).length ? (
-            <View style={styles.list}>
-              {billsList
-                .filter((item) => !item?.paid)
-                .slice(0, 3)
-                .map((item) => (
-                  <BillRow
+
+          {unpaidBills.length > 0 ? (
+            <View
+              style={[
+                styles.unifiedCard,
+                {
+                  backgroundColor: isDark ? "#111113" : "#ffffff",
+                  borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+                },
+              ]}
+            >
+              {top2Bills.map((item, idx) => {
+                return (
+                  <Pressable
                     key={item.id}
-                    bill={item}
-                    busy={payMutation.isPending}
-                    onPay={() => payMutation.mutate(item.id)}
-                    onDelete={() =>
-                      Alert.alert("Delete bill?", item.title, [
-                        { text: "Cancel", style: "cancel" },
-                        { text: "Delete", style: "destructive", onPress: () => deleteBill.mutate(item.id) },
-                      ])
-                    }
-                  />
-                ))}
+                    onPress={() => openDetail("all-bills")}
+                    style={({ pressed }) => [
+                      styles.unifiedItemRow,
+                      idx > 0 && [
+                        styles.hairlineDivider,
+                        { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                      ],
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <View style={styles.itemLeftBlock}>
+                      <CategoryIconBadge
+                        category={item.category}
+                        isDark={isDark}
+                        customIcon="calendar-outline"
+                      />
+
+                      <View style={styles.itemDetails}>
+                        <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.itemSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                          {item.date ? `${shortDate(item.date)} · ` : ""}{item.category}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.itemRightActionBlock}>
+                      <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        {formatINR(item.amount)}
+                      </Text>
+
+                      <Pressable
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={() => payMutation.mutate(item.id)}
+                        disabled={payMutation.isPending && payMutation.variables === item.id}
+                        style={({ pressed }) => [
+                          styles.payButton,
+                          {
+                            backgroundColor: isDark ? "#1f1f26" : "#0f172a",
+                            borderColor: isDark ? "#353540" : "#0f172a",
+                          },
+                          pressed && { opacity: 0.7, transform: [{ scale: 0.96 }] },
+                        ]}
+                      >
+                        {payMutation.isPending && payMutation.variables === item.id ? (
+                          <ActivityIndicator size="small" color={isDark ? "#fafafa" : "#ffffff"} />
+                        ) : (
+                          <Text style={[styles.payButtonText, { color: isDark ? "#fafafa" : "#ffffff" }]}>
+                            Pay
+                          </Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </Pressable>
+                );
+              })}
+
+              <Pressable
+                onPress={() => openDetail("all-bills")}
+                style={({ pressed }) => [
+                  styles.collapseBottomButton,
+                  {
+                    borderTopColor: isDark ? "#18181D" : "#f1f5f9",
+                  },
+                  pressed && { opacity: 0.65 },
+                ]}
+              >
+                <Text style={[styles.collapseBottomText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  View all {unpaidBills.length} bills →
+                </Text>
+              </Pressable>
             </View>
           ) : (
-            <Card>
-              <Text style={styles.muted}>No unpaid bills. Nice—your payment calendar is clear.</Text>
-            </Card>
+            <View
+              style={[
+                styles.compactEmptyRow,
+                {
+                  backgroundColor: isDark ? "#111113" : "#ffffff",
+                  borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+                },
+              ]}
+            >
+              <Ionicons name="checkmark-circle-outline" size={15} color={SEMANTIC.emerald} />
+              <Text style={[styles.quietStatusText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                All clear · No upcoming bills
+              </Text>
+            </View>
           )}
-          <SectionTitle title="Recent ledger" />
-          {expensesList.length ? (
-            <View style={styles.list}>
-              {expensesList.slice(0, 8).map((item) => (
-                <ExpenseRow
-                  key={item.id}
-                  expense={item}
-                  onDelete={() =>
-                    Alert.alert("Delete expense?", item.title, [
-                      { text: "Cancel", style: "cancel" },
-                      { text: "Delete", style: "destructive", onPress: () => deleteExpense.mutate(item.id) },
-                    ])
-                  }
-                />
+        </View>
+
+        {/* Section 5 — Recent Activity */}
+        <View style={styles.sectionContainer}>
+          <SectionTitle
+            title="Recent activity"
+            trailing={
+              <Pressable
+                onPress={() => openDetail("all-activity")}
+                hitSlop={8}
+                style={styles.textActionPill}
+              >
+                <Text style={[styles.textActionLabel, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  View all →
+                </Text>
+              </Pressable>
+            }
+          />
+
+          {expensesList.length > 0 ? (
+            <View
+              style={[
+                styles.unifiedCard,
+                {
+                  backgroundColor: isDark ? "#111113" : "#ffffff",
+                  borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+                },
+              ]}
+            >
+              {groupedTop5Expenses.map((group, gIdx) => (
+                <View key={group.dateLabel}>
+                  <View
+                    style={[
+                      styles.dateHeaderRow,
+                      {
+                        backgroundColor: isDark ? "#141418" : "#f8fafc",
+                        borderTopColor: isDark ? "#18181D" : "#f1f5f9",
+                        borderTopWidth: gIdx > 0 ? StyleSheet.hairlineWidth : 0,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.dateHeaderText, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      {group.dateLabel}
+                    </Text>
+                  </View>
+
+                  {group.items.map((item, idx) => {
+                    return (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => openDetail("all-activity")}
+                        style={({ pressed }) => [
+                          styles.unifiedItemRow,
+                          idx > 0 && [
+                            styles.hairlineDivider,
+                            { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                          ],
+                          pressed && { opacity: 0.8 },
+                        ]}
+                      >
+                        <CategoryIconBadge category={item.category} isDark={isDark} />
+
+                        <View style={styles.itemDetails}>
+                          <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]} numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                          <Text style={[styles.itemSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                            {item.payment || "UPI"} · {item.category}
+                          </Text>
+                        </View>
+
+                        <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                          - {formatINR(item.amount)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               ))}
+
+              <Pressable
+                onPress={() => openDetail("all-activity")}
+                style={({ pressed }) => [
+                  styles.collapseBottomButton,
+                  {
+                    borderTopColor: isDark ? "#18181D" : "#f1f5f9",
+                  },
+                  pressed && { opacity: 0.65 },
+                ]}
+              >
+                <Text style={[styles.collapseBottomText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  View all {expensesList.length} transactions →
+                </Text>
+              </Pressable>
             </View>
           ) : (
-            <EmptyState
-              icon="receipt-outline"
-              title="No expenses yet"
-              description="Your money story starts with one honest entry."
-              action={<ActionButton label="Log first expense" compact tone="emerald" onPress={() => open("expense")} />}
-            />
+            <View
+              style={[
+                styles.compactEmptyRow,
+                {
+                  backgroundColor: isDark ? "#111113" : "#ffffff",
+                  borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+                },
+              ]}
+            >
+              <Ionicons name="receipt-outline" size={14} color={isDark ? "#71717A" : theme.textFaint} />
+              <Text style={[styles.quietStatusText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                No recent activity · Tap "Log Expense" to begin.
+              </Text>
+            </View>
           )}
-        </>
-      ) : null}
-      <BottomSheetModal
-        ref={sheetRef}
-        snapPoints={["78%"]}
-        backgroundStyle={styles.sheet}
-        handleIndicatorStyle={styles.handle}
-      >
-        <BottomSheetScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.sheetContent}
-        >
-          {mode === "expense" ? (
-            <ExpenseForm
-              key={`expense-${Date.now()}`}
-              onSave={(expense) => {
-                const amount = Number(expense.amount);
-                if (!expense.title.trim() || !Number.isFinite(amount) || amount <= 0) {
-                  return Alert.alert("Check the expense", "Add a title and an amount above ₹0.");
-                }
-                expenseMutation.mutate({ ...expense, title: expense.title.trim(), amount });
-              }}
-              busy={expenseMutation.isPending}
-            />
-          ) : mode === "budget" ? (
-            <BudgetForm
-              key={`budget-${data?.budget?.allowance || 0}`}
-              initialBudget={data?.budget || { allowance: 0, caps: {} }}
-              onSave={(budget) => {
-                if (budget.allowance <= 0) {
-                  return Alert.alert("Set an allowance", "Your monthly allowance needs to be above ₹0.");
-                }
-                if (
-                  Object.values(budget.caps).reduce((sum, value) => sum + Number(value || 0), 0) >
-                  budget.allowance
-                ) {
-                  return Alert.alert("Caps are too high", "Category caps cannot exceed your total allowance.");
-                }
-                budgetMutation.mutate(budget);
-              }}
-              busy={budgetMutation.isPending}
-            />
-          ) : (
-            <BillForm
-              key={`bill-${Date.now()}`}
-              onSave={(bill) => {
-                const amount = Number(bill.amount);
-                if (!bill.title.trim() || amount <= 0) {
-                  return Alert.alert("Check the bill", "Add a title and valid amount.");
-                }
-                billMutation.mutate({ ...bill, title: bill.title.trim(), amount, paid: false });
-              }}
-              busy={billMutation.isPending}
-            />
-          )}
-        </BottomSheetScrollView>
-      </BottomSheetModal>
+        </View>
+      </ScrollView>
     </AppScreen>
   );
 }
 
+// -----------------------------------------------------------------
+// Educational Swipe-Down Hint Bar
+// -----------------------------------------------------------------
+function SwipeHintBanner({ isDark }: { isDark: boolean }) {
+  const [visible, setVisible] = useState(false);
+  const opacity = useSharedValue(0);
+
+  const dismissBanner = useCallback(() => {
+    setVisible(false);
+    AsyncStorage.setItem("door_swipe_hint_dismissed_v5", "true").catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem("door_swipe_hint_dismissed_v5").then((val) => {
+      if (!val) {
+        setVisible(true);
+        opacity.value = withTiming(1, { duration: 250 });
+        const timer = setTimeout(() => {
+          opacity.value = withTiming(0, { duration: 200 }, (finished) => {
+            if (finished) {
+              runOnJS(dismissBanner)();
+            }
+          });
+        }, 4500);
+        return () => clearTimeout(timer);
+      }
+    });
+  }, [dismissBanner]);
+
+  const handleManualDismiss = () => {
+    opacity.value = withTiming(0, { duration: 200 }, (finished) => {
+      if (finished) {
+        runOnJS(dismissBanner)();
+      }
+    });
+  };
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View
+      style={[
+        styles.swipeHintBar,
+        {
+          backgroundColor: isDark ? "#18181E" : "#f1f5f9",
+          borderColor: isDark ? "#282832" : "#e2e8f0",
+        },
+        animStyle,
+      ]}
+    >
+      <Ionicons name="arrow-down" size={12} color="#38BDF8" />
+      <Text style={[styles.swipeHintBarText, { color: isDark ? "#A1A1AA" : "#64748b" }]}>
+        Swipe down from top anytime to dismiss
+      </Text>
+      <Pressable onPress={handleManualDismiss} hitSlop={8} style={{ padding: 2 }}>
+        <Ionicons name="close" size={13} color={isDark ? "#71717A" : "#94a3b8"} />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// -----------------------------------------------------------------
+// Reusable Full-Height View All Modal with Gesture Arbitration
+// -----------------------------------------------------------------
+function ViewAllModal({
+  visible,
+  onClose,
+  title,
+  subtitle,
+  action,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  children: (props: {
+    scrollHandler: any;
+    contentContainerStyle: any;
+  }) => React.ReactNode;
+}) {
+  const { theme, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const scrollY = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const isDraggingSheet = useSharedValue(false);
+
+  useEffect(() => {
+    if (visible) {
+      scrollY.value = 0;
+      translateY.value = 0;
+      isDraggingSheet.value = false;
+    }
+  }, [visible]);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const contentPanGesture = Gesture.Pan()
+    .activeOffsetY([10, 100000])
+    .failOffsetY([-100000, -1])
+    .onUpdate((event) => {
+      "worklet";
+      if (scrollY.value <= 1 && event.translationY > 0) {
+        isDraggingSheet.value = true;
+        translateY.value = event.translationY;
+      }
+    })
+    .onEnd((event) => {
+      "worklet";
+      if (isDraggingSheet.value) {
+        isDraggingSheet.value = false;
+        if (translateY.value > 130 && event.velocityY > -50) {
+          translateY.value = withTiming(900, { duration: 200 }, (finished) => {
+            if (finished) {
+              runOnJS(onClose)();
+            }
+          });
+        } else {
+          translateY.value = withSpring(0, {
+            damping: 24,
+            stiffness: 260,
+            mass: 0.8,
+          });
+        }
+      }
+    });
+
+  const headerPanGesture = Gesture.Pan()
+    .activeOffsetY([6, 100000])
+    .failOffsetY([-100000, -1])
+    .onUpdate((event) => {
+      "worklet";
+      if (event.translationY > 0) {
+        translateY.value = event.translationY;
+      }
+    })
+    .onEnd((event) => {
+      "worklet";
+      if (translateY.value > 120 && event.velocityY > -50) {
+        translateY.value = withTiming(900, { duration: 200 }, (finished) => {
+          if (finished) {
+            runOnJS(onClose)();
+          }
+        });
+      } else {
+        translateY.value = withSpring(0, {
+          damping: 24,
+          stiffness: 260,
+          mass: 0.8,
+        });
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: Math.max(0, translateY.value) }],
+    };
+  });
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      statusBarTranslucent={true}
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <View style={styles.viewAllBackdrop}>
+        <Animated.View
+          style={[
+            styles.viewAllContainer,
+            {
+              backgroundColor: isDark ? "#08080A" : "#f8fafc",
+            },
+            animatedStyle,
+          ]}
+        >
+          {/* Header with HeaderPanGesture */}
+          <GestureDetector gesture={headerPanGesture}>
+            <View
+              style={[
+                styles.detailHeaderArea,
+                {
+                  paddingTop: Math.max(insets.top, 14),
+                  borderBottomColor: isDark ? "#18181D" : "#e2e8f0",
+                  backgroundColor: isDark ? "#08080A" : "#f8fafc",
+                },
+              ]}
+            >
+              {/* Drag Handle Bar */}
+              <View style={styles.sheetDragHandleWrapper}>
+                <View
+                  style={[
+                    styles.sheetDragHandleBar,
+                    { backgroundColor: isDark ? "#3f3f46" : "#cbd5e1" },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.detailHeaderTop}>
+                <Pressable
+                  onPress={onClose}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.detailBackButton, pressed && { opacity: 0.7 }]}
+                >
+                  <Ionicons name="arrow-back" size={18} color={isDark ? "#F5F5F7" : theme.text} />
+                  <Text style={[styles.detailHeaderTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                    {title}
+                  </Text>
+                </Pressable>
+                {action}
+              </View>
+
+              {subtitle ? (
+                <Text style={[styles.detailHeaderSubtitle, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  {subtitle}
+                </Text>
+              ) : null}
+
+              <SwipeHintBanner isDark={isDark} />
+            </View>
+          </GestureDetector>
+
+          {/* Content with ContentPanGesture (simultaneous with inner scroll) */}
+          <GestureDetector gesture={contentPanGesture}>
+            <View style={{ flex: 1 }}>
+              {children({
+                scrollHandler,
+                contentContainerStyle: [
+                  styles.detailScrollBody,
+                  { paddingBottom: insets.bottom + 40 },
+                ],
+              })}
+            </View>
+          </GestureDetector>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// -----------------------------------------------------------------
+// 1. Dedicated View: All Spending Categories Content
+// -----------------------------------------------------------------
+function AllSpendingContent({
+  allStats,
+  scrollHandler,
+  contentContainerStyle,
+}: {
+  allStats: {
+    category: FinanceCategory;
+    cap: number;
+    total: number;
+    percent: number;
+    isOver: boolean;
+  }[];
+  scrollHandler: any;
+  contentContainerStyle: any;
+}) {
+  const { theme, isDark } = useTheme();
+
+  return (
+    <Animated.ScrollView
+      onScroll={scrollHandler}
+      scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={contentContainerStyle}
+    >
+      <View
+        style={[
+          styles.unifiedCard,
+          {
+            backgroundColor: isDark ? "#111113" : "#ffffff",
+            borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+          },
+        ]}
+      >
+        {allStats.map((item, idx) => {
+          return (
+            <View
+              key={item.category}
+              style={[
+                styles.detailEnvelopeItem,
+                idx > 0 && [
+                  styles.hairlineDivider,
+                  { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                ],
+              ]}
+            >
+              <View style={styles.envelopeTopRow}>
+                <View style={styles.envelopeLeftBlock}>
+                  <CategoryIconBadge category={item.category} isDark={isDark} />
+                  <View style={{ gap: 2 }}>
+                    <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                      {item.category}
+                    </Text>
+                    <Text style={styles.itemSubtext}>
+                      {item.cap > 0 ? (
+                        item.isOver ? (
+                          <Text style={{ color: SEMANTIC.crimson, fontWeight: "600" }}>
+                            {formatINR(item.total - item.cap)} over budget (Cap: {formatINR(item.cap)})
+                          </Text>
+                        ) : (
+                          <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
+                            {formatINR(item.cap - item.total)} left of {formatINR(item.cap)}
+                          </Text>
+                        )
+                      ) : (
+                        <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
+                          No budget set
+                        </Text>
+                      )}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                  {formatINR(item.total)}
+                </Text>
+              </View>
+
+              {item.cap > 0 ? (
+                <ProgressBar
+                  value={item.percent}
+                  height={4.5}
+                  tone={item.isOver ? SEMANTIC.crimson : item.percent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
+                />
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+    </Animated.ScrollView>
+  );
+}
+
+// -----------------------------------------------------------------
+// 2. Dedicated View: All Bills Content
+// -----------------------------------------------------------------
+function AllBillsContent({
+  bills,
+  onPay,
+  onDelete,
+  payingId,
+  scrollHandler,
+  contentContainerStyle,
+}: {
+  bills: Bill[];
+  onPay: (id: string) => void;
+  onDelete: (id: string) => void;
+  payingId: string | null;
+  scrollHandler: any;
+  contentContainerStyle: any;
+}) {
+  const { theme, isDark } = useTheme();
+
+  const unpaid = bills.filter((b) => !b.paid).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const paid = bills.filter((b) => b.paid).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  return (
+    <Animated.ScrollView
+      onScroll={scrollHandler}
+      scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={contentContainerStyle}
+    >
+      <View style={{ gap: 8 }}>
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+          DUE & UPCOMING
+        </Text>
+        <View
+          style={[
+            styles.unifiedCard,
+            {
+              backgroundColor: isDark ? "#111113" : "#ffffff",
+              borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+            },
+          ]}
+        >
+          {unpaid.length > 0 ? (
+            unpaid.map((item, idx) => {
+              return (
+                <Pressable
+                  key={item.id}
+                  onLongPress={() => {
+                    Alert.alert("Delete Bill", item.title, [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Delete", style: "destructive", onPress: () => onDelete(item.id) },
+                    ]);
+                  }}
+                  style={[
+                    styles.unifiedItemRow,
+                    idx > 0 && [
+                      styles.hairlineDivider,
+                      { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                    ],
+                  ]}
+                >
+                  <View style={styles.itemLeftBlock}>
+                    <CategoryIconBadge
+                      category={item.category}
+                      isDark={isDark}
+                      customIcon="calendar-outline"
+                    />
+                    <View style={styles.itemDetails}>
+                      <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        {item.title}
+                      </Text>
+                      <Text style={[styles.itemSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                        {item.date ? `${shortDate(item.date)} · ` : ""}{item.category}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.itemRightActionBlock}>
+                    <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                      {formatINR(item.amount)}
+                    </Text>
+                    <Pressable
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() => onPay(item.id)}
+                      disabled={payingId === item.id}
+                      style={[
+                        styles.payButton,
+                        {
+                          backgroundColor: isDark ? "#1f1f26" : "#0f172a",
+                          borderColor: isDark ? "#353540" : "#0f172a",
+                        },
+                      ]}
+                    >
+                      {payingId === item.id ? (
+                        <ActivityIndicator size="small" color={isDark ? "#fafafa" : "#ffffff"} />
+                      ) : (
+                        <Text style={[styles.payButtonText, { color: isDark ? "#fafafa" : "#ffffff" }]}>
+                          Pay
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </Pressable>
+              );
+            })
+          ) : (
+            <View style={styles.emptyEnvelopesPrompt}>
+              <Text style={[styles.quietStatusText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                No unpaid bills remaining.
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {paid.length > 0 ? (
+        <View style={{ gap: 8, marginTop: 12 }}>
+          <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+            PAID BILLS
+          </Text>
+          <View
+            style={[
+              styles.unifiedCard,
+              {
+                backgroundColor: isDark ? "#111113" : "#ffffff",
+                borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+              },
+            ]}
+          >
+            {paid.map((item, idx) => (
+              <View
+                key={item.id}
+                style={[
+                  styles.unifiedItemRow,
+                  idx > 0 && [
+                    styles.hairlineDivider,
+                    { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                  ],
+                ]}
+              >
+                <View style={styles.itemLeftBlock}>
+                  <Ionicons name="checkmark-circle" size={20} color={SEMANTIC.emerald} />
+                  <View style={styles.itemDetails}>
+                    <Text style={[styles.itemTitle, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.itemSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      Paid · {item.category}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.itemAmount, { color: isDark ? "#71717A" : theme.textMuted }]}>
+                  {formatINR(item.amount)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+    </Animated.ScrollView>
+  );
+}
+
+// -----------------------------------------------------------------
+// 3. Dedicated View: All Activity Content
+// -----------------------------------------------------------------
+function AllActivityContent({
+  expenses,
+  onDelete,
+  scrollHandler,
+  contentContainerStyle,
+}: {
+  expenses: Expense[];
+  onDelete: (id: string) => void;
+  scrollHandler: any;
+  contentContainerStyle: any;
+}) {
+  const { theme, isDark } = useTheme();
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    return expenses.filter((e) => {
+      return search.trim() === "" || e.title.toLowerCase().includes(search.toLowerCase());
+    });
+  }, [expenses, search]);
+
+  const grouped = useMemo(() => {
+    const groups: { dateLabel: string; items: Expense[] }[] = [];
+    filtered.forEach((item) => {
+      const label = getDateLabel(item.date);
+      const existing = groups.find((g) => g.dateLabel === label);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        groups.push({ dateLabel: label, items: [item] });
+      }
+    });
+    return groups;
+  }, [filtered]);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={styles.searchBarContainer}>
+        <Ionicons name="search-outline" size={16} color={isDark ? "#71717A" : theme.textFaint} />
+        <TextInput
+          style={[styles.searchInputText, { color: isDark ? "#F5F5F7" : theme.text }]}
+          placeholder="Search transactions..."
+          placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 ? (
+          <Pressable onPress={() => setSearch("")} hitSlop={8}>
+            <Ionicons name="close-circle" size={16} color={isDark ? "#71717A" : theme.textFaint} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={contentContainerStyle}
+      >
+        <View
+          style={[
+            styles.unifiedCard,
+            {
+              backgroundColor: isDark ? "#111113" : "#ffffff",
+              borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+            },
+          ]}
+        >
+          {grouped.length > 0 ? (
+            grouped.map((group, gIdx) => (
+              <View key={group.dateLabel}>
+                <View
+                  style={[
+                    styles.dateHeaderRow,
+                    {
+                      backgroundColor: isDark ? "#141418" : "#f8fafc",
+                      borderTopColor: isDark ? "#18181D" : "#f1f5f9",
+                      borderTopWidth: gIdx > 0 ? StyleSheet.hairlineWidth : 0,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.dateHeaderText, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                    {group.dateLabel}
+                  </Text>
+                </View>
+
+                {group.items.map((item, idx) => {
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onLongPress={() => {
+                        Alert.alert("Delete Expense", `${item.title} — ${formatINR(item.amount)}`, [
+                          { text: "Cancel", style: "cancel" },
+                          { text: "Delete", style: "destructive", onPress: () => onDelete(item.id) },
+                        ]);
+                      }}
+                      style={[
+                        styles.unifiedItemRow,
+                        idx > 0 && [
+                          styles.hairlineDivider,
+                          { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                        ],
+                      ]}
+                    >
+                      <CategoryIconBadge category={item.category} isDark={isDark} />
+
+                      <View style={styles.itemDetails}>
+                        <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.itemSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                          {item.payment || "UPI"} · {item.category}
+                        </Text>
+                      </View>
+
+                      <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        - {formatINR(item.amount)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyEnvelopesPrompt}>
+              <Text style={[styles.quietStatusText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                No matching transactions found.
+              </Text>
+            </View>
+          )}
+        </View>
+      </Animated.ScrollView>
+    </View>
+  );
+}
+
+// -----------------------------------------------------------------
+// 4. Dedicated View: Plan Budget Content
+// -----------------------------------------------------------------
+function BudgetFormContent({
+  initialBudget,
+  onSave,
+  busy,
+  scrollHandler,
+  contentContainerStyle,
+}: {
+  initialBudget: Budget;
+  onSave: (val: Budget) => void;
+  busy: boolean;
+  scrollHandler: any;
+  contentContainerStyle: any;
+}) {
+  const { theme, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const [allowanceText, setAllowanceText] = useState<string>(
+    initialBudget?.allowance ? String(initialBudget.allowance) : ""
+  );
+
+  const [capsText, setCapsText] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    financeCategories.forEach((cat) => {
+      const val = initialBudget?.caps?.[cat];
+      initial[cat] = typeof val === "number" && val > 0 ? String(val) : "";
+    });
+    return initial;
+  });
+
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const numericAllowance = allowanceText ? parseInt(allowanceText, 10) || 0 : 0;
+
+  const totalAllocated = useMemo(() => {
+    return Object.values(capsText).reduce((sum, str) => {
+      const n = str ? parseInt(str, 10) || 0 : 0;
+      return sum + n;
+    }, 0);
+  }, [capsText]);
+
+  const effectiveAllowance = numericAllowance > 0 ? numericAllowance : totalAllocated;
+  const difference = effectiveAllowance - totalAllocated;
+  const isOverAllocated = difference < 0;
+  const isExact = difference === 0 && effectiveAllowance > 0;
+
+  const allocationPercent = effectiveAllowance > 0
+    ? Math.round((totalAllocated / effectiveAllowance) * 100)
+    : 0;
+
+  const handleCapTextChange = (cat: string, text: string) => {
+    const digitsOnly = text.replace(/[^0-9]/g, "");
+    setCapsText((prev) => ({
+      ...prev,
+      [cat]: digitsOnly,
+    }));
+  };
+
+  const handleAllowanceTextChange = (text: string) => {
+    const digitsOnly = text.replace(/[^0-9]/g, "");
+    setAllowanceText(digitsOnly);
+  };
+
+  const handleSubmit = () => {
+    let finalAllowance = numericAllowance;
+    if (finalAllowance === 0 && totalAllocated > 0) {
+      finalAllowance = totalAllocated;
+    }
+
+    if (totalAllocated > finalAllowance && finalAllowance > 0) {
+      Alert.alert(
+        "Category Caps Exceed Allowance",
+        `Your category caps total ₹${totalAllocated.toLocaleString("en-IN")}, but your monthly allowance is set to ₹${finalAllowance.toLocaleString("en-IN")}.`,
+        [
+          {
+            text: `Update Allowance to ₹${totalAllocated.toLocaleString("en-IN")}`,
+            onPress: () => {
+              const finalCaps: Record<string, number> = {};
+              financeCategories.forEach((cat) => {
+                finalCaps[cat] = capsText[cat] ? parseInt(capsText[cat], 10) || 0 : 0;
+              });
+              onSave({ allowance: totalAllocated, caps: finalCaps as any });
+            },
+          },
+          { text: "Adjust Caps", style: "cancel" },
+        ]
+      );
+      return;
+    }
+
+    const finalCaps: Record<string, number> = {};
+    financeCategories.forEach((cat) => {
+      const num = capsText[cat] ? parseInt(capsText[cat], 10) || 0 : 0;
+      finalCaps[cat] = num;
+    });
+
+    onSave({
+      allowance: finalAllowance,
+      caps: finalCaps as any,
+    });
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[contentContainerStyle, { paddingBottom: insets.bottom + 90 }]}
+      >
+        <View style={styles.budgetSectionGroup}>
+          <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+            MONTHLY ALLOWANCE
+          </Text>
+
+          <View
+            style={[
+              styles.allowanceInputBox,
+              {
+                backgroundColor: isDark ? "#111113" : "#ffffff",
+                borderColor: focusedField === "allowance"
+                  ? SEMANTIC.emerald
+                  : isDark
+                  ? "#24242A"
+                  : "#e2e8f0",
+              },
+            ]}
+          >
+            <Text style={[styles.allowancePrefix, { color: isDark ? "#71717A" : theme.textFaint }]}>
+              ₹
+            </Text>
+            <TextInput
+              style={[styles.allowanceInput, { color: isDark ? "#F5F5F7" : theme.text }]}
+              value={allowanceText}
+              onChangeText={handleAllowanceTextChange}
+              onFocus={() => setFocusedField("allowance")}
+              onBlur={() => setFocusedField(null)}
+              placeholder="0"
+              placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
+              keyboardType="numeric"
+              selectTextOnFocus
+            />
+          </View>
+
+          <View style={styles.allocationStatusBlock}>
+            <View style={styles.allocationStatusRow}>
+              <Text style={[styles.allocationMetaText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                {formatINR(totalAllocated)} allocated
+              </Text>
+              <Text
+                style={[
+                  styles.allocationRemainingText,
+                  {
+                    color: isOverAllocated
+                      ? SEMANTIC.crimson
+                      : isExact
+                      ? SEMANTIC.emerald
+                      : isDark
+                      ? "#A1A1AA"
+                      : theme.textMuted,
+                    fontWeight: isOverAllocated || isExact ? "700" : "500",
+                  },
+                ]}
+              >
+                {isOverAllocated
+                  ? `${formatINR(Math.abs(difference))} over allocated`
+                  : isExact
+                  ? "✓ Fully allocated"
+                  : effectiveAllowance > 0
+                  ? `${formatINR(difference)} remaining`
+                  : "Set allowance to plan"}
+              </Text>
+            </View>
+
+            {effectiveAllowance > 0 ? (
+              <ProgressBar
+                value={isOverAllocated ? 100 : allocationPercent}
+                height={4.5}
+                tone={isOverAllocated ? SEMANTIC.crimson : SEMANTIC.emerald}
+              />
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.budgetSectionGroup}>
+          <View style={{ gap: 2 }}>
+            <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+              CATEGORY BUDGETS
+            </Text>
+            <Text style={[styles.budgetSectionSubhead, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+              Set a monthly limit for each category.
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.budgetUnifiedCard,
+              {
+                backgroundColor: isDark ? "#111113" : "#ffffff",
+                borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+              },
+            ]}
+          >
+            {financeCategories.map((category, idx) => {
+              const valStr = capsText[category] || "";
+              const isFocused = focusedField === category;
+
+              return (
+                <View
+                  key={category}
+                  style={[
+                    styles.categoryRowItem,
+                    idx > 0 && [
+                      styles.categoryRowDivider,
+                      { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                    ],
+                  ]}
+                >
+                  <View style={styles.categoryRowLeft}>
+                    <CategoryIconBadge category={category} isDark={isDark} />
+                    <Text style={[styles.categoryTitleText, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                      {category}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.categoryInputContainer,
+                      {
+                        backgroundColor: isDark ? "#151519" : "#f8fafc",
+                        borderColor: isFocused
+                          ? SEMANTIC.emerald
+                          : isDark
+                          ? "#24242A"
+                          : "#e2e8f0",
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.categoryInputPrefix, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      ₹
+                    </Text>
+                    <TextInput
+                      style={[styles.categoryNumericInput, { color: isDark ? "#F5F5F7" : theme.text }]}
+                      value={valStr}
+                      onChangeText={(text) => handleCapTextChange(category, text)}
+                      onFocus={() => setFocusedField(category)}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="0"
+                      placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
+                      keyboardType="numeric"
+                      selectTextOnFocus
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      </Animated.ScrollView>
+
+      <View
+        style={[
+          styles.budgetStickyBottom,
+          {
+            backgroundColor: isDark ? "#111113" : "#ffffff",
+            borderTopColor: isDark ? "#18181D" : "#e2e8f0",
+            paddingBottom: Math.max(insets.bottom, 12),
+          },
+        ]}
+      >
+        <Pressable
+          onPress={handleSubmit}
+          disabled={busy}
+          style={({ pressed }) => [
+            styles.budgetSaveCta,
+            {
+              backgroundColor: isDark ? "#FAFBFD" : "#0f172a",
+              borderColor: isDark ? "#FAFBFD" : "#0f172a",
+            },
+            pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+            busy && { opacity: 0.5 },
+          ]}
+        >
+          <Text style={[styles.budgetSaveCtaText, { color: isDark ? "#09090b" : "#ffffff" }]}>
+            {busy ? "Saving..." : "Save Budget"}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// Category Picker for Expense & Bill Forms
 function CategoryPicker({
   value,
   onChange,
@@ -272,28 +2113,99 @@ function CategoryPicker({
   value: FinanceCategory;
   onChange: (category: FinanceCategory) => void;
 }) {
+  const { theme, isDark } = useTheme();
+
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.picker}>
-      {financeCategories.map((category) => (
-        <Chip
-          key={category}
-          label={category.replace(" & ", " + ")}
-          active={value === category}
-          onPress={() => onChange(category)}
-          tone={categoryColors[category]}
-        />
-      ))}
-    </ScrollView>
+    <GHScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      nestedScrollEnabled={true}
+      directionalLockEnabled={true}
+      overScrollMode="never"
+      keyboardShouldPersistTaps="always"
+      contentContainerStyle={styles.pickerContent}
+    >
+      {financeCategories.map((category) => {
+        const active = value === category;
+        const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Others;
+        const iconColor = isDark ? meta.darkIcon : meta.lightIcon;
+        const bgColor = active
+          ? isDark
+            ? meta.darkBg
+            : meta.lightBg
+          : isDark
+          ? "#16161A"
+          : "#f8fafc";
+        const borderColor = active
+          ? isDark
+            ? meta.darkIcon
+            : meta.lightIcon
+          : isDark
+          ? "#232329"
+          : "#e2e8f0";
+
+        return (
+          <Pressable
+            key={category}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              onChange(category);
+            }}
+            style={[
+              styles.categoryChip,
+              {
+                backgroundColor: bgColor,
+                borderColor: borderColor,
+              },
+            ]}
+          >
+            <Ionicons
+              name={meta.icon}
+              size={13}
+              color={iconColor}
+            />
+            <Text
+              style={[
+                styles.categoryChipText,
+                {
+                  color: active
+                    ? isDark
+                      ? "#FAFBFD"
+                      : "#0f172a"
+                    : isDark
+                    ? "#A1A1AA"
+                    : theme.textMuted,
+                  fontWeight: active ? "700" : "500",
+                },
+              ]}
+            >
+              {category.replace(" & ", " + ")}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </GHScrollView>
   );
 }
 
+// 1. Log Expense Form
 function ExpenseForm({
   onSave,
+  onClose,
   busy,
 }: {
-  onSave: (val: { title: string; amount: string; category: FinanceCategory; payment: Expense["payment"]; date: string }) => void;
+  onSave: (val: {
+    title: string;
+    amount: string;
+    category: FinanceCategory;
+    payment: Expense["payment"];
+    date: string;
+  }) => void;
+  onClose: () => void;
   busy: boolean;
 }) {
+  const { theme, isDark } = useTheme();
   const [form, setForm] = useState({
     title: "",
     amount: "",
@@ -303,139 +2215,107 @@ function ExpenseForm({
   });
 
   return (
-    <View style={styles.form}>
-      <Text style={styles.sheetTitle}>Log an expense</Text>
-      <Text style={styles.sheetSubtitle}>It updates immediately and syncs with your secure backend.</Text>
-      
+    <View style={styles.formContainer}>
+      <View style={styles.sheetHeaderRow}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          style={({ pressed }) => [styles.sheetBackButton, pressed && { opacity: 0.7 }]}
+        >
+          <Ionicons name="arrow-back" size={18} color={isDark ? "#F5F5F7" : theme.text} />
+          <Text style={[styles.sheetTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>Log Expense</Text>
+        </Pressable>
+      </View>
+      <Text style={[styles.sheetSubtitle, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+        Record a student expense in your ledger.
+      </Text>
+
       <View style={styles.inputGroup}>
-        <Text style={styles.fieldLabel}>WHAT DID YOU PAY FOR?</Text>
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>ITEM / TITLE</Text>
         <BottomSheetTextInput
-          style={styles.sheetTextInput}
+          style={[
+            styles.sheetTextInput,
+            {
+              backgroundColor: isDark ? "#09090b" : "#f8fafc",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
+              color: isDark ? "#F5F5F7" : theme.text,
+            },
+          ]}
           value={form.title}
           onChangeText={(title) => setForm((prev) => ({ ...prev, title }))}
-          placeholder="e.g. Mess top-up"
-          placeholderTextColor={colors.textFaint}
+          placeholder="e.g. Mess lunch, Auto to college, Stationery"
+          placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
           autoCapitalize="sentences"
         />
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.fieldLabel}>AMOUNT (₹)</Text>
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>AMOUNT (₹)</Text>
         <BottomSheetTextInput
-          style={styles.sheetTextInput}
+          style={[
+            styles.sheetTextInput,
+            {
+              backgroundColor: isDark ? "#09090b" : "#f8fafc",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
+              color: isDark ? "#F5F5F7" : theme.text,
+            },
+          ]}
           value={form.amount}
-          onChangeText={(amount) => setForm((prev) => ({ ...prev, amount }))}
+          onChangeText={(amount) =>
+            setForm((prev) => ({ ...prev, amount: amount.replace(/[^0-9]/g, "") }))
+          }
           placeholder="0"
-          placeholderTextColor={colors.textFaint}
-          keyboardType="decimal-pad"
+          placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
+          keyboardType="numeric"
         />
       </View>
-
-      <Text style={styles.fieldLabel}>CATEGORY</Text>
-      <CategoryPicker
-        value={form.category}
-        onChange={(category) => setForm((prev) => ({ ...prev, category }))}
-      />
-
-      <View style={styles.payment}>
-        <Text style={styles.fieldLabel}>PAID WITH</Text>
-        <View style={styles.chipRow}>
-          {(["UPI", "Cash", "Card"] as const).map((payment) => (
-            <Chip
-              key={payment}
-              label={payment}
-              active={form.payment === payment}
-              onPress={() => setForm((prev) => ({ ...prev, payment }))}
-              tone={colors.emerald}
-            />
-          ))}
-        </View>
-      </View>
-
-      <ActionButton
-        label={busy ? "Saving…" : "Add to ledger"}
-        icon="checkmark"
-        tone="emerald"
-        disabled={busy}
-        onPress={() => onSave(form)}
-      />
-    </View>
-  );
-}
-
-function BudgetForm({
-  initialBudget,
-  onSave,
-  busy,
-}: {
-  initialBudget: { allowance: number; caps?: any };
-  onSave: (val: Budget) => void;
-  busy: boolean;
-}) {
-  const [allowance, setAllowance] = useState(initialBudget.allowance ? String(initialBudget.allowance) : "");
-  const [caps, setCaps] = useState<Record<string, number>>(() => {
-    const base: Record<string, number> = {};
-    for (const c of financeCategories) {
-      base[c] = initialBudget.caps?.[c] || 0;
-    }
-    return base;
-  });
-
-  return (
-    <View style={styles.form}>
-      <Text style={styles.sheetTitle}>Set monthly budget</Text>
-      <Text style={styles.sheetSubtitle}>Every rupee gets a job before the month takes it.</Text>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.fieldLabel}>MONTHLY ALLOWANCE (₹)</Text>
-        <BottomSheetTextInput
-          style={styles.sheetTextInput}
-          value={allowance}
-          onChangeText={setAllowance}
-          keyboardType="decimal-pad"
-          placeholder="12000"
-          placeholderTextColor={colors.textFaint}
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>CATEGORY</Text>
+        <CategoryPicker
+          value={form.category}
+          onChange={(category) => setForm((prev) => ({ ...prev, category }))}
         />
       </View>
 
-      {financeCategories.map((category) => (
-        <View key={category} style={styles.capRow}>
-          <Text style={styles.capLabel}>{category}</Text>
-          <BottomSheetTextInput
-            style={styles.capInput}
-            value={caps[category] ? String(caps[category]) : ""}
-            placeholder="₹ 0"
-            placeholderTextColor={colors.textFaint}
-            keyboardType="decimal-pad"
-            onChangeText={(input) =>
-              setCaps((prev) => ({ ...prev, [category]: Number(input) || 0 }))
-            }
-          />
-        </View>
-      ))}
-
-      <ActionButton
-        label={busy ? "Saving…" : "Save budget"}
-        icon="checkmark"
+      <Pressable
+        onPress={() => onSave(form)}
         disabled={busy}
-        onPress={() =>
-          onSave({
-            allowance: Number(allowance) || 0,
-            caps: caps as any,
-          })
-        }
-      />
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={({ pressed }) => [
+          styles.submitSheetButton,
+          {
+            backgroundColor: isDark ? "#fafafa" : "#0f172a",
+            borderColor: isDark ? "#fafafa" : "#0f172a",
+          },
+          pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          busy && { opacity: 0.5 },
+        ]}
+      >
+        <Text style={[styles.submitSheetText, { color: isDark ? "#09090b" : "#ffffff" }]}>
+          {busy ? "Saving..." : "Add to Ledger"}
+        </Text>
+      </Pressable>
     </View>
   );
 }
 
+// 3. Add Bill Form
 function BillForm({
   onSave,
+  onClose,
   busy,
 }: {
-  onSave: (val: { title: string; amount: string; category: FinanceCategory; date: string }) => void;
+  onSave: (val: {
+    title: string;
+    amount: string;
+    category: FinanceCategory;
+    date: string;
+  }) => void;
+  onClose: () => void;
   busy: boolean;
 }) {
+  const { theme, isDark } = useTheme();
   const [form, setForm] = useState({
     title: "",
     amount: "",
@@ -444,157 +2324,694 @@ function BillForm({
   });
 
   return (
-    <View style={styles.form}>
-      <Text style={styles.sheetTitle}>Add a bill</Text>
-      <Text style={styles.sheetSubtitle}>Marking it paid will automatically add it to your ledger.</Text>
+    <View style={styles.formContainer}>
+      <View style={styles.sheetHeaderRow}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          style={({ pressed }) => [styles.sheetBackButton, pressed && { opacity: 0.7 }]}
+        >
+          <Ionicons name="arrow-back" size={18} color={isDark ? "#F5F5F7" : theme.text} />
+          <Text style={[styles.sheetTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>Add Bill</Text>
+        </Pressable>
+      </View>
+      <Text style={[styles.sheetSubtitle, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+        Track upcoming recurring payments.
+      </Text>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.fieldLabel}>BILL NAME</Text>
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>BILL TITLE</Text>
         <BottomSheetTextInput
-          style={styles.sheetTextInput}
+          style={[
+            styles.sheetTextInput,
+            {
+              backgroundColor: isDark ? "#09090b" : "#f8fafc",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
+              color: isDark ? "#F5F5F7" : theme.text,
+            },
+          ]}
           value={form.title}
           onChangeText={(title) => setForm((prev) => ({ ...prev, title }))}
-          placeholder="e.g. Data recharge"
-          placeholderTextColor={colors.textFaint}
+          placeholder="e.g. WiFi Bill, Spotify, Hostel Mess"
+          placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
           autoCapitalize="sentences"
         />
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.fieldLabel}>AMOUNT (₹)</Text>
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>AMOUNT (₹)</Text>
         <BottomSheetTextInput
-          style={styles.sheetTextInput}
+          style={[
+            styles.sheetTextInput,
+            {
+              backgroundColor: isDark ? "#09090b" : "#f8fafc",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
+              color: isDark ? "#F5F5F7" : theme.text,
+            },
+          ]}
           value={form.amount}
-          onChangeText={(amount) => setForm((prev) => ({ ...prev, amount }))}
+          onChangeText={(amount) =>
+            setForm((prev) => ({ ...prev, amount: amount.replace(/[^0-9]/g, "") }))
+          }
           placeholder="0"
-          placeholderTextColor={colors.textFaint}
-          keyboardType="decimal-pad"
+          placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
+          keyboardType="numeric"
         />
       </View>
 
-      <Text style={styles.fieldLabel}>CATEGORY</Text>
-      <CategoryPicker
-        value={form.category}
-        onChange={(category) => setForm((prev) => ({ ...prev, category }))}
-      />
+      <View style={styles.inputGroup}>
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>CATEGORY</Text>
+        <CategoryPicker
+          value={form.category}
+          onChange={(category) => setForm((prev) => ({ ...prev, category }))}
+        />
+      </View>
 
-      <ActionButton
-        label={busy ? "Saving…" : "Add bill"}
-        icon="add"
-        disabled={busy}
+      <Pressable
         onPress={() => onSave(form)}
-      />
+        disabled={busy}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={({ pressed }) => [
+          styles.submitSheetButton,
+          {
+            backgroundColor: isDark ? "#fafafa" : "#0f172a",
+            borderColor: isDark ? "#fafafa" : "#0f172a",
+          },
+          pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          busy && { opacity: 0.5 },
+        ]}
+      >
+        <Text style={[styles.submitSheetText, { color: isDark ? "#09090b" : "#ffffff" }]}>
+          {busy ? "Saving..." : "Add Bill"}
+        </Text>
+      </Pressable>
     </View>
   );
 }
 
-function ExpenseRow({ expense, onDelete }: { expense: Expense; onDelete: () => void }) {
-  const tone = categoryColors[expense.category] || colors.textMuted;
-  return (
-    <Card style={styles.row}>
-      <View style={[styles.rowBadge, { backgroundColor: `${tone}22` }]}>
-        <Ionicons name="receipt-outline" color={tone} size={18} />
-      </View>
-      <View style={styles.rowCopy}>
-        <Text style={styles.rowTitle}>{expense.title}</Text>
-        <Text style={styles.rowMeta}>
-          {shortDate(expense.date)} · {expense.category} · {expense.payment}
-        </Text>
-      </View>
-      <Text style={styles.amount}>{formatINR(expense.amount)}</Text>
-      <IconButton icon="trash-outline" label={`Delete ${expense.title}`} onPress={onDelete} tone={colors.textFaint} />
-    </Card>
-  );
-}
-
-function BillRow({
-  bill,
-  onPay,
-  onDelete,
-  busy,
-}: {
-  bill: Bill;
-  onPay: () => void;
-  onDelete: () => void;
-  busy: boolean;
-}) {
-  return (
-    <Card style={styles.row}>
-      <View style={[styles.rowBadge, { backgroundColor: `${colors.amber}22` }]}>
-        <Ionicons name="calendar-outline" color={colors.amber} size={18} />
-      </View>
-      <View style={styles.rowCopy}>
-        <Text style={styles.rowTitle}>{bill.title}</Text>
-        <Text style={styles.rowMeta}>
-          Due {shortDate(bill.date)} · {bill.category}
-        </Text>
-      </View>
-      <Text style={styles.amount}>{formatINR(bill.amount)}</Text>
-      <ActionButton label="Pay" compact tone="emerald" disabled={busy} onPress={onPay} />
-      <IconButton icon="close" label={`Delete ${bill.title}`} onPress={onDelete} tone={colors.textFaint} />
-    </Card>
-  );
-}
-
 const styles = StyleSheet.create({
-  balance: { backgroundColor: colors.surface, borderColor: colors.border, gap: 9 },
-  balanceLabel: { color: colors.emerald, fontSize: 10, letterSpacing: 1, fontWeight: "900" },
-  balanceValue: { color: colors.text, fontSize: 35, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  balanceNote: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
-  balanceRow: { flexDirection: "row", justifyContent: "space-between" },
-  balanceMeta: { color: colors.textMuted, fontSize: 11, fontWeight: "700" },
-  actions: { flexDirection: "row", gap: 10 },
-  envelope: { gap: 7, paddingVertical: 5 },
-  envelopeLabel: { color: colors.text, fontSize: 13, fontWeight: "700" },
-  envelopeValue: { fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  list: { gap: 8 },
-  row: { flexDirection: "row", alignItems: "center", padding: 10, gap: 9 },
-  rowBadge: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  rowCopy: { flex: 1, gap: 3 },
-  rowTitle: { color: colors.text, fontSize: 13, fontWeight: "800" },
-  rowMeta: { color: colors.textFaint, fontSize: 10, lineHeight: 14 },
-  amount: { color: colors.text, fontSize: 12, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  muted: { color: colors.textMuted, fontSize: 13 },
-  sheet: { backgroundColor: colors.surface },
-  handle: { backgroundColor: colors.border },
-  sheetContent: { padding: 20, paddingBottom: 48 },
-  form: { gap: 14 },
-  sheetTitle: { color: colors.text, fontSize: 23, fontWeight: "900" },
-  sheetSubtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 4 },
-  fieldLabel: { color: colors.textMuted, fontSize: 10, letterSpacing: 0.8, fontWeight: "900" },
-  inputGroup: { gap: 6 },
-  sheetTextInput: {
+  themeIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    backgroundColor: colors.canvas,
-    borderRadius: 12,
-    minHeight: 48,
-    paddingHorizontal: 13,
-    fontSize: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  picker: { gap: 8 },
-  payment: { gap: 8 },
-  chipRow: { flexDirection: "row", gap: 8 },
-  capRow: {
+  screenScrollContent: {
+    gap: 28,
+    paddingBottom: 90,
+  },
+
+  // View All Presentation Layer
+  viewAllBackdrop: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  viewAllContainer: {
+    flex: 1,
+  },
+
+  // Slide Down Grabber Bar
+  sheetDragHandleWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: 8,
+  },
+  sheetDragHandleBar: {
+    width: 40,
+    height: 4.5,
+    borderRadius: 3,
+  },
+
+  // Floating Educational Hint Bar
+  swipeHintBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  swipeHintBarText: {
+    fontSize: 12,
+    fontWeight: "500",
+    flex: 1,
+  },
+
+  // Section 1 — Major: Monthly Runway Hero
+  heroCard: {
+    padding: 20,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 12,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  heroLeftCol: {
+    gap: 2,
+  },
+  heroLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  heroBalanceValue: {
+    fontSize: 44,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -1,
+  },
+  heroRemainingSub: {
+    fontSize: 13.5,
+    fontWeight: "500",
+  },
+  heroMetricRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  heroMetricPrimary: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  heroMetricDot: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  heroMetricSecondary: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  heroCollapsedFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderMuted,
-    paddingVertical: 8,
+    flexWrap: "wrap",
+    gap: 6,
+    paddingTop: 2,
   },
-  capLabel: { color: colors.text, fontSize: 13, fontWeight: "700" },
-  capInput: {
-    color: colors.text,
-    minWidth: 90,
+  heroFooterMeta: {
+    fontSize: 12.5,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+  },
+  heroStatusWarning: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  heroStatusHealthy: {
+    fontSize: 12.5,
+    fontWeight: "600",
+  },
+
+  // Section 2 — Action Row
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: -12,
+  },
+  primaryButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 52,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 9,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    textAlign: "right",
+  },
+  primaryButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  secondaryButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  // Section Headers
+  sectionContainer: {
+    gap: 10,
+  },
+  textActionPill: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  textActionLabel: {
     fontSize: 13,
+    fontWeight: "600",
+  },
+
+  // Single Unified Section Surfaces
+  unifiedCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  hairlineDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  categoryIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemTitle: {
+    fontSize: 15.5,
+    fontWeight: "600",
+  },
+  itemSubtext: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  itemAmount: {
+    fontSize: 15.5,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+
+  // Bold, vibrant category breakdown bar
+  spendingBarContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 15,
+    paddingBottom: 6,
+  },
+  segmentedProgressBar: {
+    flexDirection: "row",
+    height: 5.5,
+    borderRadius: 3,
+    overflow: "hidden",
+    gap: 2,
+  },
+  segmentBarSlice: {
+    height: "100%",
+    borderRadius: 2,
+  },
+
+  // Spending Rows
+  spendingRowItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  spendingRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  spendingRowRight: {
+    alignItems: "flex-end",
+  },
+  emptyEnvelopesPrompt: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  emptyEnvelopesTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  emptyEnvelopesText: {
+    fontSize: 12.5,
+    fontWeight: "500",
+  },
+  collapseBottomButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  collapseBottomText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+
+  // Upcoming Bills & Recent Activity Rows
+  unifiedItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  itemLeftBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  itemDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  itemRightActionBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  payButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 52,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  payButtonText: {
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+
+  compactEmptyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  quietStatusText: {
+    fontSize: 12.5,
+    fontWeight: "500",
+  },
+
+  // Date Group Header inside Recent Activity
+  dateHeaderRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  dateHeaderText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  // Category Picker
+  pickerContent: {
+    flexDirection: "row",
+    gap: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  categoryChipText: {
+    fontSize: 11.5,
+  },
+
+  // Sheet Content for Expense & Bill Forms
+  sheetContent: {
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  formContainer: {
+    gap: 12,
+  },
+  sheetHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sheetBackButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  sheetSubtitle: {
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: -8,
+    lineHeight: 16,
+  },
+  inputGroup: {
+    gap: 6,
+  },
+  fieldLabel: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  sheetTextInput: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 13.5,
+  },
+  submitSheetButton: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+  },
+  submitSheetText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+  },
+
+  // -------------------------------------------------------------
+  // Dedicated Detail Screens (Spending, Bills, Activity, Budget)
+  // -------------------------------------------------------------
+  detailHeaderArea: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+  },
+  detailHeaderTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  detailBackButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  detailHeaderTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  detailHeaderSubtitle: {
+    fontSize: 12.5,
+    fontWeight: "500",
+    paddingLeft: 26,
+  },
+  detailScrollBody: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    gap: 16,
+  },
+  detailEnvelopeItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  envelopeTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  envelopeLeftBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+
+  // Search Bar for Activity History
+  searchBarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#27272a",
+    backgroundColor: "#111113",
+    gap: 8,
+  },
+  searchInputText: {
+    flex: 1,
+    fontSize: 13.5,
+  },
+
+  // Full-Page Budget Plan Styles
+  budgetScrollBody: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    gap: 22,
+  },
+  budgetSectionGroup: {
+    gap: 8,
+  },
+  budgetSectionSubhead: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  allowanceInputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+  },
+  allowancePrefix: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginRight: 8,
+  },
+  allowanceInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  allocationStatusBlock: {
+    gap: 6,
+    paddingTop: 2,
+    paddingHorizontal: 2,
+  },
+  allocationStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  allocationMetaText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  allocationRemainingText: {
+    fontSize: 12.5,
+    fontVariant: ["tabular-nums"],
+  },
+  budgetUnifiedCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  categoryRowItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minHeight: 56,
+  },
+  categoryRowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  categoryRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  categoryTitleText: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  categoryInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: 92,
+    height: 38,
+    borderRadius: 9,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+  },
+  categoryInputPrefix: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginRight: 3,
+  },
+  categoryNumericInput: {
+    flex: 1,
+    fontSize: 14.5,
+    fontWeight: "700",
+    textAlign: "right",
+    fontVariant: ["tabular-nums"],
+  },
+  budgetStickyBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    shadowColor: "#000000",
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  budgetSaveCta: {
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  budgetSaveCtaText: {
+    fontSize: 13.5,
     fontWeight: "800",
   },
 });

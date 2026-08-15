@@ -116,16 +116,37 @@ export function Metric({ label, value, accent }: { label: string; value: string 
   );
 }
 
-export function ProgressBar({ value, tone }: { value: number; tone?: string }) {
-  const { theme } = useTheme();
-  const fillColor = tone || theme.accent;
+export function ProgressBar({
+  value,
+  tone,
+  height = 5,
+}: {
+  value: number;
+  tone?: string;
+  height?: number;
+}) {
+  const { theme, isDark } = useTheme();
+  const fillColor = tone || (isDark ? "#18B887" : "#059669");
 
   return (
-    <View style={[styles.progressTrack, { backgroundColor: theme.raised }]}>
+    <View
+      style={[
+        styles.progressTrack,
+        {
+          height,
+          backgroundColor: isDark ? "#24242C" : "#e2e8f0",
+          borderRadius: height / 2,
+        },
+      ]}
+    >
       <View
         style={[
           styles.progressFill,
-          { width: `${Math.min(Math.max(value, 0), 100)}%`, backgroundColor: fillColor },
+          {
+            width: `${Math.min(Math.max(value, 0), 100)}%`,
+            backgroundColor: fillColor,
+            borderRadius: height / 2,
+          },
         ]}
       />
     </View>
@@ -252,7 +273,7 @@ const styles = StyleSheet.create({
   metric: { flex: 1, gap: 4 },
   metricValue: { fontSize: 20, fontWeight: "900", fontVariant: ["tabular-nums"] },
   metricLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.3 },
-  progressTrack: { height: 7, borderRadius: 99, overflow: "hidden" },
+  progressTrack: { height: 6.5, borderRadius: 99, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 99 },
   chip: {
     paddingHorizontal: 12,

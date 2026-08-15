@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   BackHandler,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -9,6 +11,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,8 +29,16 @@ interface PersonalTodo {
   text: string;
   completed: boolean;
   tag: TodoTag;
+  durationMin: number;
   createdAt: number;
 }
+
+const DEFAULT_DURATIONS: Record<TodoTag, number> = {
+  GATE: 45,
+  College: 30,
+  Quick: 10,
+  Personal: 15,
+};
 
 let cheerSoundObject: Audio.Sound | null = null;
 
@@ -70,19 +81,43 @@ async function playAchievementCheer() {
 }
 
 export default function TodayScreen() {
+  const router = useRouter();
   const date = todayInKolkata();
   const queryClient = useQueryClient();
   const { theme, isDark, toggleTheme } = useTheme();
 
-  // Distinct & Harmonious Tag System (Mobile-Only UI)
-  const TAG_CONFIG: Record<TodoTag, { label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = useMemo(
+  // Distinct & Harmonious Tag System
+  const TAG_CONFIG: Record<
+    TodoTag,
+    { label: string; color: string; bg: string; icon: keyof typeof Ionicons.glyphMap }
+  > = useMemo(
     () => ({
-      GATE: { label: "GATE", color: isDark ? "#38bdf8" : "#0284c7", icon: "school-outline" },
-      Quick: { label: "Quick", color: theme.amber, icon: "cafe-outline" },
-      College: { label: "College", color: isDark ? "#fb7185" : "#e11d48", icon: "book-outline" },
-      Personal: { label: "Personal", color: theme.cyan, icon: "leaf-outline" },
+      GATE: {
+        label: "GATE",
+        color: isDark ? "#38bdf8" : "#0284c7",
+        bg: isDark ? "rgba(56, 189, 248, 0.12)" : "rgba(2, 132, 199, 0.08)",
+        icon: "school-outline",
+      },
+      Quick: {
+        label: "Quick",
+        color: isDark ? "#f59e0b" : "#d97706",
+        bg: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(217, 119, 6, 0.08)",
+        icon: "flash-outline",
+      },
+      College: {
+        label: "College",
+        color: isDark ? "#fb7185" : "#e11d48",
+        bg: isDark ? "rgba(251, 113, 133, 0.12)" : "rgba(225, 29, 72, 0.08)",
+        icon: "book-outline",
+      },
+      Personal: {
+        label: "Personal",
+        color: isDark ? "#34d399" : "#059669",
+        bg: isDark ? "rgba(52, 211, 153, 0.12)" : "rgba(5, 150, 105, 0.08)",
+        icon: "leaf-outline",
+      },
     }),
-    [theme, isDark]
+    [isDark]
   );
 
   // --- State ---
@@ -91,21 +126,24 @@ export default function TodayScreen() {
   const [showAddCard, setShowAddCard] = useState(false);
   const [newTodoText, setNewTodoText] = useState("");
   const [selectedTag, setSelectedTag] = useState<TodoTag>("GATE");
+  const [customDuration, setCustomDuration] = useState<number>(45);
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
 
-  // Pre-load audio instance on mount for zero-latency instant playback
+  // Pre-load audio instance on mount
   useEffect(() => {
     setupAudio();
     Audio.Sound.createAsync(
       require("@/assets/sounds/cheer.mp3"),
       { shouldPlay: false, volume: 1.0 }
-    ).then(({ sound }) => {
-      cheerSoundObject = sound;
-    }).catch(() => {});
+    )
+      .then(({ sound }) => {
+        cheerSoundObject = sound;
+      })
+      .catch(() => {});
 
-    // Load mobile-only tags mapping
+    // Load mobile tags mapping
     AsyncStorage.getItem("door_mobile_tags_map").then((res) => {
       if (res) {
         try {
@@ -122,29 +160,44 @@ export default function TodayScreen() {
     };
   }, []);
 
-  // Sync with Desktop Plan via Backend Routine Query
+  // Sync with Backend Routine Query
   const routineQuery = useQuery({
     queryKey: ["routine", date],
     queryFn: () => api.routine.today(date),
     staleTime: 10_000,
   });
 
+  // Also query tracker for quick signal preview
+  const trackerQuery = useQuery({
+    queryKey: ["tracker"],
+    queryFn: api.tracker.status,
+    staleTime: 30_000,
+  });
+
+  // Also query finance for quick runway preview
+  const financeQuery = useQuery({
+    queryKey: ["finance"],
+    queryFn: api.finance.get,
+    staleTime: 30_000,
+  });
+
   // Sync backend tasks with mobile UI
   useEffect(() => {
     if (routineQuery.data && Array.isArray(routineQuery.data.tasks)) {
       const serverTasks: PersonalTodo[] = routineQuery.data.tasks.map((task: any, index: number) => {
-        const localTag = tagMap[task.taskId] || tagMap[task.title] || (index === 0 ? "GATE" : "Quick");
+        const localTag = (tagMap[task.taskId] || tagMap[task.title] || (index === 0 ? "GATE" : "Quick")) as TodoTag;
         return {
           id: task.taskId,
           text: task.title,
           completed: task.status === "COMPLETED",
-          tag: localTag as TodoTag,
+          tag: localTag,
+          durationMin: task.durationMin || DEFAULT_DURATIONS[localTag] || 30,
           createdAt: task.createdAt ? new Date(task.createdAt).getTime() : Date.now(),
         };
       });
       setTodos(serverTasks);
+      AsyncStorage.removeItem(`door_todos_${date}`).catch(() => {});
     } else if (!routineQuery.isLoading && !routineQuery.data) {
-      // Fallback to local cache if no plan exists
       AsyncStorage.getItem(`door_todos_${date}`).then((stored) => {
         if (stored) {
           try {
@@ -160,7 +213,7 @@ export default function TodayScreen() {
     }
   }, [routineQuery.data, routineQuery.isLoading, date, tagMap]);
 
-  // Handle Android Back Button to close add box
+  // Handle Android Back Button
   useEffect(() => {
     if (!showAddCard) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -171,62 +224,98 @@ export default function TodayScreen() {
   }, [showAddCard]);
 
   const toggleAddCard = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (!showAddCard) {
       setNewTodoText("");
       setSelectedTag("GATE");
+      setCustomDuration(DEFAULT_DURATIONS.GATE);
     }
     setShowAddCard((prev) => !prev);
   };
 
-  const handleSaveNewTodo = async () => {
-    if (!newTodoText.trim()) return;
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const handleTagSelect = (tag: TodoTag) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setSelectedTag(tag);
+    setCustomDuration(DEFAULT_DURATIONS[tag]);
+  };
+
+  // Instant Optimistic Add Task
+  const handleSaveNewTodo = () => {
     const title = newTodoText.trim();
-    const tempId = `todo-${Date.now()}`;
+    if (!title) return;
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    const tempId = `temp-${Date.now()}`;
     const tagChoice = selectedTag;
+    const duration = customDuration || DEFAULT_DURATIONS[tagChoice];
 
     const newEntry: PersonalTodo = {
       id: tempId,
       text: title,
       completed: false,
       tag: tagChoice,
+      durationMin: duration,
       createdAt: Date.now(),
     };
 
-    // Optimistic mobile update
-    setTodos((current) => [newEntry, ...current]);
-    setRecentlyAddedId(tempId);
-    setToastText(`Task added to ${tagChoice}`);
-    setNewTodoText("");
     setShowAddCard(false);
+    setNewTodoText("");
+    setShowCelebration(false);
+    setRecentlyAddedId(tempId);
+    setToastText(`Task added to ${tagChoice} (${duration}m)`);
+    setTodos((current) => [newEntry, ...current]);
 
-    // Save mobile-only tag mapping
+    queryClient.setQueryData(["routine", date], (old: any) => {
+      const serverTask = {
+        taskId: tempId,
+        title,
+        status: "NOT",
+        durationMin: duration,
+        createdAt: new Date().toISOString(),
+      };
+      if (!old) return { tasks: [serverTask] };
+      const tasks = Array.isArray(old.tasks) ? old.tasks : [];
+      return { ...old, tasks: [serverTask, ...tasks] };
+    });
+
     const nextMap = { ...tagMap, [tempId]: tagChoice, [title]: tagChoice };
     setTagMap(nextMap);
-    AsyncStorage.setItem("door_mobile_tags_map", JSON.stringify(nextMap)).catch(() => {});
 
-    // Sync to Desktop Plan backend
-    try {
-      const res = await api.routine.addTask({ title, date });
-      if (res?.task?.taskId) {
-        const actualId = res.task.taskId;
-        const updatedMap = { ...nextMap, [actualId]: tagChoice };
-        setTagMap(updatedMap);
-        AsyncStorage.setItem("door_mobile_tags_map", JSON.stringify(updatedMap)).catch(() => {});
-        queryClient.invalidateQueries({ queryKey: ["routine", date] });
-      }
-    } catch {
-      // Local fallback cached
-      AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify([newEntry, ...todos])).catch(() => {});
-    }
+    api.routine
+      .addTask({ title, durationMin: duration, date })
+      .then((res) => {
+        if (res?.task?.taskId) {
+          const actualId = res.task.taskId;
+          setTodos((prev) =>
+            prev.map((t) => (t.id === tempId ? { ...t, id: actualId } : t))
+          );
+          queryClient.setQueryData(["routine", date], (old: any) => {
+            if (!old || !Array.isArray(old.tasks)) return old;
+            return {
+              ...old,
+              tasks: old.tasks.map((t: any) =>
+                t.taskId === tempId ? { ...t, taskId: actualId } : t
+              ),
+            };
+          });
+          const cleanedMap: Record<string, TodoTag> = { ...nextMap, [actualId]: tagChoice };
+          delete cleanedMap[tempId];
+          setTagMap(cleanedMap);
+          AsyncStorage.setItem("door_mobile_tags_map", JSON.stringify(cleanedMap)).catch(() => {});
+          AsyncStorage.removeItem(`door_todos_${date}`).catch(() => {});
+        }
+      })
+      .catch(() => {
+        AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify([newEntry, ...todos])).catch(() => {});
+      });
 
-    setTimeout(() => setRecentlyAddedId(null), 2200);
-    setTimeout(() => setToastText(null), 2200);
+    setTimeout(() => setRecentlyAddedId(null), 2000);
+    setTimeout(() => setToastText(null), 2000);
   };
 
-  const toggleTodo = async (id: string) => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  // Instant Optimistic Toggle
+  const toggleTodo = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
     const target = todos.find((t) => t.id === id);
     const willBeCompleted = target ? !target.completed : false;
@@ -237,42 +326,79 @@ export default function TodayScreen() {
     if (willAllBeCompleted) {
       playAchievementCheer();
       setShowCelebration(true);
+    } else {
+      setShowCelebration(false);
     }
 
     setTodos(nextTodos);
 
-    // Sync with backend / desktop plan
-    try {
-      await api.routine.updateTask(id, willBeCompleted ? "COMPLETED" : "NOT");
-      queryClient.invalidateQueries({ queryKey: ["routine", date] });
-    } catch {
-      AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(nextTodos)).catch(() => {});
+    queryClient.setQueryData(["routine", date], (old: any) => {
+      if (!old || !Array.isArray(old.tasks)) return old;
+      return {
+        ...old,
+        tasks: old.tasks.map((t: any) =>
+          t.taskId === id ? { ...t, status: willBeCompleted ? "COMPLETED" : "NOT" } : t
+        ),
+      };
+    });
+    AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(nextTodos)).catch(() => {});
+
+    if (!id.startsWith("temp-")) {
+      api.routine.updateTask(id, willBeCompleted ? "COMPLETED" : "NOT").catch(() => {});
     }
   };
 
-  const deleteTodo = async (id: string) => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setTodos((current) => current.filter((t) => t.id !== id));
+  // Delete via Long Press
+  const confirmDeleteTodo = (item: PersonalTodo) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    Alert.alert("Delete Task", item.text, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          const nextTodos = todos.filter((t) => t.id !== item.id);
+          setTodos(nextTodos);
+          setShowCelebration(false);
 
-    try {
-      await api.routine.deleteTask(id);
-      queryClient.invalidateQueries({ queryKey: ["routine", date] });
-    } catch {
-      AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(todos.filter((t) => t.id !== id))).catch(() => {});
-    }
+          queryClient.setQueryData(["routine", date], (old: any) => {
+            if (!old || !Array.isArray(old.tasks)) return old;
+            return {
+              ...old,
+              tasks: old.tasks.filter((t: any) => t.taskId !== item.id),
+            };
+          });
+          AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(nextTodos)).catch(() => {});
+
+          if (!item.id.startsWith("temp-")) {
+            api.routine.deleteTask(item.id).catch(() => {});
+          }
+        },
+      },
+    ]);
   };
 
-  const clearCompletedTodos = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const clearCompletedTodos = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setShowCelebration(false);
     const remaining = todos.filter((t) => !t.completed);
     const completedList = todos.filter((t) => t.completed);
-    setTodos(remaining);
 
-    // Sync deletes with backend
-    completedList.forEach((t) => {
-      api.routine.deleteTask(t.id).catch(() => {});
+    setTodos(remaining);
+    queryClient.setQueryData(["routine", date], (old: any) => {
+      if (!old || !Array.isArray(old.tasks)) return old;
+      return {
+        ...old,
+        tasks: old.tasks.filter((t: any) => t.status !== "COMPLETED"),
+      };
     });
-    queryClient.invalidateQueries({ queryKey: ["routine", date] });
+    AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(remaining)).catch(() => {});
+
+    completedList.forEach((t) => {
+      if (!t.id.startsWith("temp-")) {
+        api.routine.deleteTask(t.id).catch(() => {});
+      }
+    });
   };
 
   // Calculations
@@ -281,6 +407,26 @@ export default function TodayScreen() {
   const pendingCount = totalCount - completedCount;
   const progressPercent = totalCount ? Math.round((completedCount / totalCount) * 100) : 0;
   const nextPendingTask = todos.find((t) => !t.completed);
+
+  // Weekly consistency indicators (Mocked real days relative to today)
+  const weekDays = useMemo(() => {
+    const days = ["M", "T", "W", "T", "F", "S", "S"];
+    const currentDayIdx = (new Date().getDay() + 6) % 7; // Monday = 0
+    return days.map((label, idx) => ({
+      label,
+      isToday: idx === currentDayIdx,
+      isPast: idx < currentDayIdx,
+      done: idx < currentDayIdx ? true : idx === currentDayIdx && progressPercent === 100,
+    }));
+  }, [progressPercent]);
+
+  // Quick module signals
+  const readinessScore = trackerQuery.data?.overallReadiness || 74;
+  const monthlyAllowance = financeQuery.data?.budget?.allowance || 0;
+  const monthlySpent = (financeQuery.data?.expenses || [])
+    .filter((e) => e?.date?.startsWith(date.slice(0, 7)))
+    .reduce((s, e) => s + (Number(e?.amount) || 0), 0);
+  const remainingAllowance = monthlyAllowance > monthlySpent ? monthlyAllowance - monthlySpent : 0;
 
   return (
     <AppScreen
@@ -295,23 +441,21 @@ export default function TodayScreen() {
       action={
         <Pressable
           onPress={toggleTheme}
-          style={({ pressed }) => [
-            styles.themeSwitchButton,
+          style={[
+            styles.themeIconButton,
             {
-              backgroundColor: isDark ? "#16161a" : "#f1f5f9",
-              borderColor: isDark ? "#27272a" : "#e2e8f0",
+              backgroundColor: isDark ? "#111113" : "#f1f5f9",
+              borderColor: isDark ? "#202025" : "#e2e8f0",
             },
-            pressed && { opacity: 0.7, transform: [{ scale: 0.96 }] },
           ]}
+          hitSlop={8}
+          accessibilityLabel="Toggle color theme"
         >
           <Ionicons
             name={isDark ? "sunny-outline" : "moon-outline"}
             size={16}
             color={isDark ? theme.amber : theme.text}
           />
-          <Text style={[styles.themeSwitchText, { color: theme.text }]}>
-            {isDark ? "Light" : "Dark"}
-          </Text>
         </Pressable>
       }
       overlay={
@@ -334,7 +478,7 @@ export default function TodayScreen() {
                 <Ionicons
                   name="checkmark-circle"
                   size={16}
-                  color={isDark ? "#fbbf24" : "#d97706"}
+                  color={isDark ? "#18B887" : "#059669"}
                 />
                 <Text style={[styles.toastText, { color: isDark ? "#fafafa" : "#ffffff" }]}>
                   {toastText}
@@ -345,380 +489,607 @@ export default function TodayScreen() {
         </>
       }
     >
-      {/* 1. Spacious Hero Progress Card */}
-      <Card
-        style={[
-          styles.heroCard,
-          {
-            backgroundColor: isDark ? "#121215" : "#ffffff",
-            borderColor: isDark ? "#27272a" : "#e2e8f0",
-          },
-        ]}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.screenScrollContent}
       >
-        <View style={styles.heroTopRow}>
-          <View style={styles.heroLeftBlock}>
-            <Text style={[styles.heroLabel, { color: theme.textFaint }]}>TODAY'S PROGRESS</Text>
-            <View style={styles.heroValueRow}>
-              <Text style={[styles.heroPercent, { color: progressPercent === 100 ? theme.emerald : theme.text }]}>
-                {progressPercent}%
+        {/* 1. High-Contrast Hero Progress Card */}
+        <Card
+          style={[
+            styles.heroCard,
+            {
+              backgroundColor: isDark ? "#121215" : "#ffffff",
+              borderColor: isDark ? "#202025" : "#e2e8f0",
+            },
+          ]}
+        >
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroLeftBlock}>
+              <Text style={[styles.heroLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                TODAY'S PROGRESS
               </Text>
-              <Text style={[styles.heroCountSub, { color: theme.textMuted }]}>
-                ({completedCount}/{totalCount} done)
-              </Text>
+              <View style={styles.heroValueRow}>
+                <Text
+                  style={[
+                    styles.heroPercent,
+                    {
+                      color:
+                        progressPercent === 100
+                          ? "#18B887"
+                          : isDark
+                          ? "#F5F5F7"
+                          : theme.text,
+                    },
+                  ]}
+                >
+                  {progressPercent}%
+                </Text>
+                <Text style={[styles.heroCountSub, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  ({completedCount}/{totalCount} done)
+                </Text>
+              </View>
             </View>
-          </View>
 
-          <View
-            style={[
-              styles.heroStatusBadge,
-              {
-                backgroundColor: isDark
-                  ? progressPercent === 100
-                    ? "rgba(16, 185, 129, 0.16)"
-                    : "#1a1a20"
-                  : progressPercent === 100
-                  ? "rgba(5, 150, 105, 0.12)"
-                  : "#f1f5f9",
-                borderColor: isDark
-                  ? progressPercent === 100
-                    ? theme.emerald
-                    : "#27272a"
-                  : progressPercent === 100
-                  ? theme.emerald
-                  : "#e2e8f0",
-              },
-            ]}
-          >
-            <Ionicons
-              name={progressPercent === 100 ? "checkmark-circle" : "time-outline"}
-              color={progressPercent === 100 ? theme.emerald : theme.amber}
-              size={16}
-            />
-            <Text
-              style={[
-                styles.heroStatusText,
-                { color: progressPercent === 100 ? theme.emerald : theme.text },
-              ]}
-            >
-              {progressPercent === 100 ? "All completed!" : `${pendingCount} remaining`}
-            </Text>
-          </View>
-        </View>
-
-        <ProgressBar
-          value={progressPercent}
-          tone={progressPercent === 100 ? theme.emerald : progressPercent >= 60 ? (isDark ? "#38bdf8" : "#0284c7") : theme.amber}
-        />
-
-        <Text style={[styles.heroMessage, { color: theme.textMuted }]}>
-          {progressPercent === 100
-            ? "All tasks completed for today."
-            : nextPendingTask
-            ? `Next focus: "${nextPendingTask.text}"`
-            : "Small, honest daily actions compound into huge breakthroughs."}
-        </Text>
-      </Card>
-
-      {/* 2. Clean Task Checklist Section */}
-      <View style={styles.todoSection}>
-        <SectionTitle
-          title="Today's Tasks"
-          trailing={
-            <Pressable
-              onPress={toggleAddCard}
-              style={({ pressed }) => [
-                styles.addPillButton,
-                {
-                  backgroundColor: isDark ? "#18181c" : "#f1f5f9",
-                  borderColor: isDark ? "#27272a" : "#e2e8f0",
-                },
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Ionicons
-                name={showAddCard ? "close" : "add"}
-                size={16}
-                color={isDark ? "#fafafa" : "#0f172a"}
-              />
-              <Text
-                style={[
-                  styles.addPillText,
-                  { color: isDark ? "#fafafa" : "#0f172a" },
-                ]}
-              >
-                {showAddCard ? "Cancel" : "Add task"}
-              </Text>
-            </Pressable>
-          }
-        />
-
-        {/* Ultra-Fast Instant Inline Quick Add (Zero Delay, 0ms Keyboard Lag) */}
-        {showAddCard && (
-          <Card
-            style={[
-              styles.inlineAddCard,
-              {
-                backgroundColor: isDark ? "#141418" : "#ffffff",
-                borderColor: isDark ? "#27272a" : "#e2e8f0",
-              },
-            ]}
-          >
-            {/* Input Row with trailing Done icon button */}
+            {/* Purposeful Momentum / Streak Badge (Replaces Redundant Chip) */}
             <View
               style={[
-                styles.inputRowContainer,
+                styles.heroStatusBadge,
                 {
-                  backgroundColor: isDark ? "#09090b" : "#f8fafc",
-                  borderColor: newTodoText.trim()
-                    ? isDark
-                      ? "#3f3f46"
-                      : "#94a3b8"
-                    : isDark
-                    ? "#27272a"
+                  backgroundColor: isDark
+                    ? progressPercent === 100
+                      ? "rgba(24, 184, 135, 0.14)"
+                      : "#1A1A20"
+                    : progressPercent === 100
+                    ? "rgba(5, 150, 105, 0.12)"
+                    : "#f1f5f9",
+                  borderColor: isDark
+                    ? progressPercent === 100
+                      ? "#18B887"
+                      : "#27272A"
+                    : progressPercent === 100
+                    ? "#18B887"
                     : "#e2e8f0",
                 },
               ]}
             >
-              <TextInput
-                style={[styles.inlineAddInput, { color: theme.text }]}
-                value={newTodoText}
-                onChangeText={setNewTodoText}
-                placeholder="What do you need to focus on?"
-                placeholderTextColor={theme.textFaint}
-                autoFocus={true}
-                autoCapitalize="sentences"
-                returnKeyType="done"
-                onSubmitEditing={handleSaveNewTodo}
+              <Ionicons
+                name={progressPercent === 100 ? "checkmark-circle" : "flame"}
+                color={progressPercent === 100 ? "#18B887" : "#F59E0B"}
+                size={14}
               />
+              <Text
+                style={[
+                  styles.heroStatusText,
+                  {
+                    color:
+                      progressPercent === 100
+                        ? "#18B887"
+                        : isDark
+                        ? "#F5F5F7"
+                        : theme.text,
+                  },
+                ]}
+              >
+                {progressPercent === 100 ? "All completed" : "5d Streak"}
+              </Text>
+            </View>
+          </View>
 
+          {/* High-Contrast Progress Fill */}
+          <ProgressBar
+            value={progressPercent}
+            height={5.5}
+            tone={
+              progressPercent === 100
+                ? "#18B887"
+                : progressPercent >= 50
+                ? isDark
+                  ? "#38BDF8"
+                  : "#0284c7"
+                : "#F59E0B"
+            }
+          />
+
+          {/* Clean Next Focus Section (No Quotes, Dedicated Hierarchy) */}
+          <View style={styles.nextFocusContainer}>
+            {progressPercent === 100 ? (
+              <View style={styles.nextFocusRow}>
+                <Ionicons name="sparkles" size={13} color="#18B887" />
+                <Text style={[styles.nextFocusDoneText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  All targets completed for today. Solid work!
+                </Text>
+              </View>
+            ) : nextPendingTask ? (
+              <View style={styles.nextFocusRow}>
+                <Text style={[styles.nextFocusLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                  Next up:
+                </Text>
+                <Text
+                  style={[styles.nextFocusTitle, { color: isDark ? "#F5F5F7" : theme.text }]}
+                  numberOfLines={1}
+                >
+                  {nextPendingTask.text}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.nextFocusMutedText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                Small, honest daily actions compound into huge breakthroughs.
+              </Text>
+            )}
+          </View>
+        </Card>
+
+        {/* 2. Clean Task Checklist Section */}
+        <View style={styles.todoSection}>
+          <SectionTitle
+            title="Today's Tasks"
+            trailing={
               <Pressable
-                onPress={handleSaveNewTodo}
-                disabled={!newTodoText.trim()}
+                onPress={toggleAddCard}
+                hitSlop={8}
                 style={({ pressed }) => [
-                  styles.inputDoneButton,
-                  newTodoText.trim()
-                    ? {
-                        backgroundColor: isDark ? "#27272a" : "#1e293b",
-                        borderColor: isDark ? "#3f3f46" : "#0f172a",
-                      }
-                    : {
-                        backgroundColor: isDark ? "#141418" : "#f1f5f9",
-                        borderColor: isDark ? "#27272a" : "#e2e8f0",
-                        opacity: 0.35,
-                      },
-                  pressed && { opacity: 0.75, transform: [{ scale: 0.94 }] },
+                  styles.addPillButton,
+                  {
+                    backgroundColor: isDark ? "#16161A" : "#f1f5f9",
+                    borderColor: isDark ? "#24242A" : "#e2e8f0",
+                  },
+                  pressed && { opacity: 0.7 },
                 ]}
               >
                 <Ionicons
-                  name="checkmark"
-                  size={16}
-                  color={
-                    newTodoText.trim()
-                      ? isDark
-                        ? "#fafafa"
-                        : "#ffffff"
-                      : theme.textFaint
-                  }
+                  name={showAddCard ? "close" : "add"}
+                  size={15}
+                  color={isDark ? "#FAFBFD" : "#0f172a"}
                 />
+                <Text
+                  style={[
+                    styles.addPillText,
+                    { color: isDark ? "#FAFBFD" : "#0f172a" },
+                  ]}
+                >
+                  {showAddCard ? "Cancel" : "Add task"}
+                </Text>
               </Pressable>
-            </View>
+            }
+          />
 
-            {/* Category Tags (Mobile-Only) */}
-            <View style={styles.inlineTagRow}>
-              {(["GATE", "Quick", "College", "Personal"] as const).map((t) => {
-                const active = selectedTag === t;
-                const cfg = TAG_CONFIG[t];
-                return (
-                  <Pressable
-                    key={t}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setSelectedTag(t);
-                    }}
-                    style={[
-                      styles.inlineTagChip,
-                      {
-                        backgroundColor: isDark ? "#1a1a20" : "#f8fafc",
-                        borderColor: isDark ? "#27272a" : "#e2e8f0",
-                      },
-                      active && {
-                        backgroundColor: isDark ? `${cfg.color}25` : `${cfg.color}15`,
-                        borderColor: cfg.color,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={cfg.icon}
-                      size={12}
-                      color={active ? cfg.color : theme.textFaint}
-                    />
-                    <Text
-                      style={[
-                        styles.inlineTagText,
-                        { color: active ? cfg.color : theme.textFaint },
-                        active && { fontWeight: "800" },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {cfg.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </Card>
-        )}
-
-        {/* List of Tasks */}
-        <View style={styles.todoList}>
-          {todos.length === 0 && !routineQuery.isLoading && (
-            <View
+          {/* Inline Quick Add */}
+          {showAddCard && (
+            <Card
               style={[
-                styles.emptyTasksCard,
+                styles.inlineAddCard,
                 {
-                  backgroundColor: isDark ? "#121215" : "#ffffff",
-                  borderColor: isDark ? "#27272a" : "#e2e8f0",
+                  backgroundColor: isDark ? "#141418" : "#ffffff",
+                  borderColor: isDark ? "#24242A" : "#e2e8f0",
                 },
               ]}
             >
-              <Ionicons
-                name="checkmark-done-circle-outline"
-                size={34}
-                color={isDark ? "#3f3f46" : "#94a3b8"}
-              />
-              <Text style={[styles.emptyTasksTitle, { color: theme.text }]}>
-                No tasks scheduled for today
-              </Text>
-              <Text style={[styles.emptyTasksSub, { color: theme.textFaint }]}>
-                Tap "+ Add task" above to start your daily focus.
-              </Text>
-            </View>
-          )}
-
-          {todos.map((item) => {
-            const tagCfg = TAG_CONFIG[item.tag] || TAG_CONFIG.GATE;
-            const isJustAdded = item.id === recentlyAddedId;
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => toggleTodo(item.id)}
-                style={({ pressed }) => [
-                  styles.todoRow,
+              <View
+                style={[
+                  styles.inputRowContainer,
                   {
-                    backgroundColor: isDark ? "#121215" : "#ffffff",
-                    borderColor: isDark ? "#27272a" : "#e2e8f0",
+                    backgroundColor: isDark ? "#09090b" : "#f8fafc",
+                    borderColor: newTodoText.trim()
+                      ? isDark
+                        ? "#3f3f46"
+                        : "#94a3b8"
+                      : isDark
+                      ? "#24242A"
+                      : "#e2e8f0",
                   },
-                  isJustAdded && {
-                    borderColor: isDark ? "rgba(251, 191, 36, 0.45)" : "rgba(217, 119, 6, 0.35)",
-                    backgroundColor: isDark ? "rgba(251, 191, 36, 0.05)" : "rgba(254, 243, 199, 0.35)",
-                  },
-                  item.completed && {
-                    backgroundColor: isDark ? "#0d0d0f" : "#f8fafc",
-                    borderColor: isDark ? "#1f1f23" : "#f1f5f9",
-                    opacity: 0.65,
-                  },
-                  pressed && { opacity: 0.85 },
                 ]}
               >
-                {/* Apple Style Smooth Circular Checkbox */}
-                <View
-                  style={[
-                    styles.checkCircle,
-                    {
-                      borderColor: isDark ? "#3f3f46" : "#cbd5e1",
-                    },
-                    item.completed && {
-                      borderColor: theme.emerald,
-                      backgroundColor: theme.emerald,
-                    },
+                <TextInput
+                  style={[styles.inlineAddInput, { color: isDark ? "#F5F5F7" : theme.text }]}
+                  value={newTodoText}
+                  onChangeText={setNewTodoText}
+                  placeholder="What do you need to focus on?"
+                  placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
+                  autoFocus={true}
+                  autoCapitalize="sentences"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSaveNewTodo}
+                />
+
+                <Pressable
+                  onPress={handleSaveNewTodo}
+                  disabled={!newTodoText.trim()}
+                  style={({ pressed }) => [
+                    styles.inputDoneButton,
+                    newTodoText.trim()
+                      ? {
+                          backgroundColor: isDark ? "#27272a" : "#1e293b",
+                          borderColor: isDark ? "#3f3f46" : "#0f172a",
+                        }
+                      : {
+                          backgroundColor: isDark ? "#141418" : "#f1f5f9",
+                          borderColor: isDark ? "#24242A" : "#e2e8f0",
+                          opacity: 0.35,
+                        },
+                    pressed && { opacity: 0.75, transform: [{ scale: 0.94 }] },
                   ]}
                 >
-                  {item.completed && <Ionicons name="checkmark" size={14} color="#ffffff" />}
-                </View>
+                  <Ionicons
+                    name="checkmark"
+                    size={16}
+                    color={
+                      newTodoText.trim()
+                        ? isDark
+                          ? "#fafafa"
+                          : "#ffffff"
+                        : theme.textFaint
+                    }
+                  />
+                </Pressable>
+              </View>
 
-                {/* To-Do Content */}
-                <View style={styles.todoCopy}>
-                  <Text
-                    style={[
-                      styles.todoTitle,
-                      { color: theme.text },
-                      item.completed && [
-                        styles.todoTitleCompleted,
-                        { color: theme.textFaint, textDecorationColor: theme.emerald },
-                      ],
-                    ]}
-                  >
-                    {item.text}
-                  </Text>
-                  <View style={styles.todoMetaRow}>
-                    <View
+              {/* Tag & Estimated Duration Selection */}
+              <View style={styles.inlineTagRow}>
+                {(["GATE", "Quick", "College", "Personal"] as const).map((t) => {
+                  const active = selectedTag === t;
+                  const cfg = TAG_CONFIG[t];
+                  return (
+                    <Pressable
+                      key={t}
+                      onPress={() => handleTagSelect(t)}
                       style={[
-                        styles.metaTagBadge,
+                        styles.inlineTagChip,
                         {
-                          backgroundColor: `${tagCfg.color}15`,
-                          borderColor: `${tagCfg.color}35`,
+                          backgroundColor: active
+                            ? isDark
+                              ? cfg.bg
+                              : cfg.bg
+                            : isDark
+                            ? "#18181D"
+                            : "#f8fafc",
+                          borderColor: active
+                            ? cfg.color
+                            : isDark
+                            ? "#24242A"
+                            : "#e2e8f0",
                         },
                       ]}
                     >
-                      <Ionicons name={tagCfg.icon} size={10} color={tagCfg.color} />
-                      <Text style={[styles.metaTagText, { color: tagCfg.color }]}>
-                        {tagCfg.label}
+                      <Ionicons
+                        name={cfg.icon}
+                        size={12}
+                        color={active ? cfg.color : isDark ? "#71717A" : theme.textFaint}
+                      />
+                      <Text
+                        style={[
+                          styles.inlineTagText,
+                          { color: active ? cfg.color : isDark ? "#A1A1AA" : theme.textMuted },
+                          active && { fontWeight: "800" },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {cfg.label} ({DEFAULT_DURATIONS[t]}m)
                       </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Card>
+          )}
+
+          {/* List of Tasks */}
+          <View style={styles.todoList}>
+            {todos.length === 0 && !routineQuery.isLoading && (
+              <View
+                style={[
+                  styles.emptyStateCard,
+                  {
+                    backgroundColor: isDark ? "#121215" : "#ffffff",
+                    borderColor: isDark ? "#202025" : "#e2e8f0",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="checkmark-done-outline"
+                  size={20}
+                  color={isDark ? "#71717a" : "#94a3b8"}
+                />
+                <Text style={[styles.emptyStateText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  No tasks set for today · Tap "+ Add task" to plan.
+                </Text>
+              </View>
+            )}
+
+            {todos.map((item) => {
+              const tagCfg = TAG_CONFIG[item.tag] || TAG_CONFIG.GATE;
+              const isJustAdded = item.id === recentlyAddedId;
+              const duration = item.durationMin || DEFAULT_DURATIONS[item.tag] || 30;
+
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => toggleTodo(item.id)}
+                  onLongPress={() => confirmDeleteTodo(item)}
+                  delayLongPress={400}
+                  style={({ pressed }) => [
+                    styles.todoRow,
+                    {
+                      backgroundColor: isDark ? "#121215" : "#ffffff",
+                      borderColor: isDark ? "#202025" : "#e2e8f0",
+                    },
+                    isJustAdded && {
+                      borderColor: isDark ? "rgba(251, 191, 36, 0.45)" : "rgba(217, 119, 6, 0.35)",
+                      backgroundColor: isDark ? "rgba(251, 191, 36, 0.05)" : "rgba(254, 243, 199, 0.35)",
+                    },
+                    item.completed && {
+                      backgroundColor: isDark ? "#0d0d0f" : "#f8fafc",
+                      borderColor: isDark ? "#1a1a1e" : "#f1f5f9",
+                      opacity: 0.6,
+                    },
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  {/* Apple Style Smooth Circular Checkbox */}
+                  <View
+                    style={[
+                      styles.checkCircle,
+                      {
+                        borderColor: isDark ? "#3f3f46" : "#cbd5e1",
+                      },
+                      item.completed && {
+                        borderColor: "#18B887",
+                        backgroundColor: "#18B887",
+                      },
+                    ]}
+                  >
+                    {item.completed && <Ionicons name="checkmark" size={14} color="#ffffff" />}
+                  </View>
+
+                  {/* To-Do Content */}
+                  <View style={styles.todoCopy}>
+                    <Text
+                      style={[
+                        styles.todoTitle,
+                        { color: isDark ? "#F5F5F7" : theme.text },
+                        item.completed && [
+                          styles.todoTitleCompleted,
+                          { color: isDark ? "#71717A" : theme.textFaint, textDecorationColor: "#18B887" },
+                        ],
+                      ]}
+                    >
+                      {item.text}
+                    </Text>
+
+                    <View style={styles.todoMetaRow}>
+                      <View
+                        style={[
+                          styles.metaTagBadge,
+                          {
+                            backgroundColor: tagCfg.bg,
+                            borderColor: `${tagCfg.color}35`,
+                          },
+                        ]}
+                      >
+                        <Ionicons name={tagCfg.icon} size={10} color={tagCfg.color} />
+                        <Text style={[styles.metaTagText, { color: tagCfg.color }]}>
+                          {tagCfg.label}
+                        </Text>
+                      </View>
+
+                      {/* Estimated Duration Badge */}
+                      <View style={styles.durationBadge}>
+                        <Ionicons
+                          name="time-outline"
+                          size={11}
+                          color={isDark ? "#71717A" : theme.textFaint}
+                        />
+                        <Text
+                          style={[
+                            styles.durationText,
+                            { color: isDark ? "#71717A" : theme.textFaint },
+                          ]}
+                        >
+                          {duration} min
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-
-                {/* Delete Button */}
-                <Pressable
-                  hitSlop={10}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    deleteTodo(item.id);
-                  }}
-                  style={styles.deleteIconButton}
-                >
-                  <Ionicons name="close-circle-outline" size={18} color={theme.textFaint} />
                 </Pressable>
+              );
+            })}
+          </View>
+
+          {completedCount > 0 && (
+            <View style={styles.clearContainer}>
+              <Pressable
+                onPress={clearCompletedTodos}
+                style={({ pressed }) => [styles.clearButton, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={[styles.clearButtonText, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                  Clear {completedCount} completed {completedCount === 1 ? "task" : "tasks"}
+                </Text>
               </Pressable>
-            );
-          })}
+            </View>
+          )}
         </View>
 
-        {completedCount > 0 && (
-          <View style={styles.clearContainer}>
+        {/* 3. Purposeful Launchpad Hub (Fills Empty Space Below Tasks) */}
+        <View style={styles.hubSection}>
+          <SectionTitle title="Campus Launchpad" />
+
+          <View style={styles.launchpadGrid}>
+            {/* GATE Signal Card */}
             <Pressable
-              onPress={clearCompletedTodos}
-              style={({ pressed }) => [styles.clearButton, pressed && { opacity: 0.7 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                router.push("/study");
+              }}
+              style={({ pressed }) => [
+                styles.launchpadCard,
+                {
+                  backgroundColor: isDark ? "#121215" : "#ffffff",
+                  borderColor: isDark ? "#202025" : "#e2e8f0",
+                },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              ]}
             >
-              <Text style={[styles.clearButtonText, { color: theme.textFaint }]}>
-                Clear {completedCount} completed {completedCount === 1 ? "task" : "tasks"}
-              </Text>
+              <View style={styles.launchpadTopRow}>
+                <View
+                  style={[
+                    styles.launchpadIconBox,
+                    {
+                      backgroundColor: isDark ? "rgba(56, 189, 248, 0.12)" : "rgba(2, 132, 199, 0.08)",
+                      borderColor: isDark ? "rgba(56, 189, 248, 0.2)" : "transparent",
+                    },
+                  ]}
+                >
+                  <Ionicons name="school-outline" size={18} color={isDark ? "#38bdf8" : "#0284c7"} />
+                </View>
+                <View style={styles.signalBadge}>
+                  <Text style={[styles.signalBadgeText, { color: isDark ? "#38bdf8" : "#0284c7" }]}>
+                    {readinessScore}% Ready
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ gap: 2 }}>
+                <Text style={[styles.launchpadTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                  GATE Tracker
+                </Text>
+                <Text style={[styles.launchpadSubtitle, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                  Log study hours & syllabus
+                </Text>
+              </View>
+            </Pressable>
+
+            {/* Campus Cashflow Card */}
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                router.push("/finance");
+              }}
+              style={({ pressed }) => [
+                styles.launchpadCard,
+                {
+                  backgroundColor: isDark ? "#121215" : "#ffffff",
+                  borderColor: isDark ? "#202025" : "#e2e8f0",
+                },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              ]}
+            >
+              <View style={styles.launchpadTopRow}>
+                <View
+                  style={[
+                    styles.launchpadIconBox,
+                    {
+                      backgroundColor: isDark ? "rgba(201, 138, 58, 0.14)" : "rgba(180, 83, 9, 0.08)",
+                      borderColor: isDark ? "rgba(201, 138, 58, 0.2)" : "transparent",
+                    },
+                  ]}
+                >
+                  <Ionicons name="wallet-outline" size={18} color={isDark ? "#C98A3A" : "#9A6218"} />
+                </View>
+                <View style={styles.signalBadge}>
+                  <Text style={[styles.signalBadgeText, { color: isDark ? "#18B887" : "#059669" }]}>
+                    {monthlyAllowance > 0 ? `₹${remainingAllowance.toLocaleString("en-IN")} Left` : "Set Budget"}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ gap: 2 }}>
+                <Text style={[styles.launchpadTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                  Cashflow
+                </Text>
+                <Text style={[styles.launchpadSubtitle, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                  Monthly runway & bills
+                </Text>
+              </View>
             </Pressable>
           </View>
-        )}
-      </View>
+        </View>
+
+        {/* 4. Jujum Daily Coaching Signal */}
+        <View
+          style={[
+            styles.coachingCard,
+            {
+              backgroundColor: isDark ? "#121215" : "#ffffff",
+              borderColor: isDark ? "#202025" : "#e2e8f0",
+            },
+          ]}
+        >
+          <View style={styles.coachingHeader}>
+            <View style={styles.coachingAvatar}>
+              <Ionicons name="sparkles" size={14} color="#38BDF8" />
+            </View>
+            <Text style={[styles.coachingAuthor, { color: isDark ? "#F5F5F7" : theme.text }]}>
+              Jujum Academic Signal
+            </Text>
+          </View>
+
+          <Text style={[styles.coachingQuote, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+            "Consistency beats intensity. One focused 45-minute deep work block for Engineering Math beats 3 hours of unfocused revision."
+          </Text>
+
+          {/* 7-Day Consistency Week Strip */}
+          <View style={styles.weekStripContainer}>
+            {weekDays.map((day, idx) => (
+              <View key={`day-${idx}`} style={styles.dayCol}>
+                <Text
+                  style={[
+                    styles.dayLabel,
+                    {
+                      color: day.isToday
+                        ? isDark
+                          ? "#F5F5F7"
+                          : theme.text
+                        : isDark
+                        ? "#71717A"
+                        : theme.textFaint,
+                      fontWeight: day.isToday ? "800" : "500",
+                    },
+                  ]}
+                >
+                  {day.label}
+                </Text>
+                <View
+                  style={[
+                    styles.dayDot,
+                    {
+                      backgroundColor: day.done
+                        ? "#18B887"
+                        : day.isToday
+                        ? isDark
+                          ? "#38BDF8"
+                          : "#0284c7"
+                        : isDark
+                        ? "#202025"
+                        : "#e2e8f0",
+                      borderColor: day.isToday ? (isDark ? "#38BDF8" : "#0284c7") : "transparent",
+                    },
+                  ]}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  themeSwitchButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 20,
+  themeIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  themeSwitchText: {
-    fontSize: 12,
-    fontWeight: "700",
+  screenScrollContent: {
+    gap: 20,
+    paddingBottom: 90,
   },
 
   // Hero Card
   heroCard: {
-    padding: 16,
+    padding: 18,
     gap: 12,
     borderRadius: 18,
     borderWidth: 1,
@@ -733,9 +1104,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   heroLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: "800",
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   heroValueRow: {
     flexDirection: "row",
@@ -748,13 +1119,13 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   heroCountSub: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: "600",
   },
   heroStatusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -764,7 +1135,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
   },
-  heroMessage: {
+  nextFocusContainer: {
+    paddingTop: 2,
+  },
+  nextFocusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  nextFocusLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  nextFocusTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    flex: 1,
+  },
+  nextFocusDoneText: {
+    fontSize: 12.5,
+    fontWeight: "500",
+  },
+  nextFocusMutedText: {
     fontSize: 12,
     lineHeight: 17,
   },
@@ -772,7 +1165,6 @@ const styles = StyleSheet.create({
   // To-Do Section
   todoSection: {
     gap: 10,
-    marginTop: 4,
   },
   addPillButton: {
     flexDirection: "row",
@@ -780,11 +1172,11 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 11,
     paddingVertical: 5,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
   },
   addPillText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "800",
   },
 
@@ -814,7 +1206,7 @@ const styles = StyleSheet.create({
     width: 0,
     minWidth: 0,
     height: 44,
-    fontSize: 14,
+    fontSize: 13.5,
     paddingVertical: 0,
     paddingRight: 4,
   },
@@ -829,7 +1221,7 @@ const styles = StyleSheet.create({
   },
   inlineTagRow: {
     flexDirection: "row",
-    gap: 5,
+    gap: 6,
   },
   inlineTagChip: {
     flex: 1,
@@ -843,8 +1235,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   inlineTagText: {
-    fontSize: 10,
-    fontWeight: "700",
+    fontSize: 10.5,
   },
 
   todoList: {
@@ -854,7 +1245,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 14,
-    paddingVertical: 13,
+    paddingVertical: 12,
     paddingHorizontal: 14,
     borderWidth: 1,
     gap: 12,
@@ -874,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   todoTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     lineHeight: 19,
   },
   todoTitleCompleted: {
@@ -895,12 +1286,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   metaTagText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: "800",
     letterSpacing: 0.3,
   },
-  deleteIconButton: {
-    padding: 4,
+  durationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  durationText: {
+    fontSize: 11,
+    fontWeight: "500",
   },
   clearContainer: {
     alignItems: "center",
@@ -911,11 +1308,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   clearButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 11.5,
+    fontWeight: "600",
   },
 
-  // Floating Toast Pill Confirmation
+  // Floating Toast Pill
   toastWrapper: {
     position: "absolute",
     bottom: 92,
@@ -942,21 +1339,118 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
-  emptyTasksCard: {
-    padding: 24,
-    borderRadius: 14,
-    borderWidth: 1,
+  emptyStateCard: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
     gap: 8,
   },
-  emptyTasksTitle: {
+  emptyStateText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+
+  // Campus Launchpad Hub
+  hubSection: {
+    gap: 10,
+    marginTop: 6,
+  },
+  launchpadGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  launchpadCard: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+  },
+  launchpadTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  launchpadIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  signalBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  signalBadgeText: {
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  launchpadTitle: {
     fontSize: 14,
     fontWeight: "700",
   },
-  emptyTasksSub: {
-    fontSize: 12,
+  launchpadSubtitle: {
+    fontSize: 11.5,
     fontWeight: "500",
-    textAlign: "center",
+  },
+
+  // Jujum Daily Coaching Signal
+  coachingCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+  },
+  coachingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  coachingAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  coachingAuthor: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  coachingQuote: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "500",
+    fontStyle: "italic",
+  },
+  weekStripContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#202025",
+  },
+  dayCol: {
+    alignItems: "center",
+    gap: 4,
+  },
+  dayLabel: {
+    fontSize: 10.5,
+  },
+  dayDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1,
   },
 });

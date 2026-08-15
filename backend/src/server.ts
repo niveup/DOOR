@@ -2505,7 +2505,7 @@ app.post("/api/finance/expense", async (req: Request, res: Response) => {
           title: String(title).trim(),
           category: String(category || "Others"),
           amount: Number(amount),
-          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          date: String(date || getKolkataDateString()),
           payment: String(payment || "UPI"),
         },
         create: {
@@ -2513,7 +2513,7 @@ app.post("/api/finance/expense", async (req: Request, res: Response) => {
           title: String(title).trim(),
           category: String(category || "Others"),
           amount: Number(amount),
-          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          date: String(date || getKolkataDateString()),
           payment: String(payment || "UPI"),
         },
       });
@@ -2524,7 +2524,7 @@ app.post("/api/finance/expense", async (req: Request, res: Response) => {
           title: String(title).trim(),
           category: String(category || "Others"),
           amount: Number(amount),
-          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          date: String(date || getKolkataDateString()),
           payment: String(payment || "UPI"),
         },
       });
@@ -2609,7 +2609,7 @@ app.post("/api/finance/bill", async (req: Request, res: Response) => {
         where: { id },
         update: {
           title: String(title).trim(),
-          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          date: String(date || getKolkataDateString()),
           amount: Number(amount),
           category: String(category || "Subscriptions"),
           paid: Boolean(paid),
@@ -2617,7 +2617,7 @@ app.post("/api/finance/bill", async (req: Request, res: Response) => {
         create: {
           id,
           title: String(title).trim(),
-          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          date: String(date || getKolkataDateString()),
           amount: Number(amount),
           category: String(category || "Subscriptions"),
           paid: Boolean(paid),
@@ -2628,7 +2628,7 @@ app.post("/api/finance/bill", async (req: Request, res: Response) => {
       const created = await bill.create({
         data: {
           title: String(title).trim(),
-          date: String(date || getKolkataDate().toISOString().split("T")[0]),
+          date: String(date || getKolkataDateString()),
           amount: Number(amount),
           category: String(category || "Subscriptions"),
           paid: Boolean(paid),
@@ -2651,35 +2651,58 @@ app.post("/api/finance/bill/pay", async (req: Request, res: Response) => {
       return res.json({ success: true });
     }
 
-    const targetBill = await bill.findUnique({
+    let targetBill = await bill.findUnique({
       where: { id },
     });
+
+    if (!targetBill) {
+      targetBill = await bill.findFirst({
+        where: { OR: [{ id }, { paid: false }] },
+        orderBy: { createdAt: "desc" },
+      });
+    }
+
     if (!targetBill) return res.status(404).json({ error: "Bill not found." });
 
     const updatedBill = await bill.update({
-      where: { id },
+      where: { id: targetBill.id },
       data: { paid: true },
     });
 
     const expenseId = `bill-${targetBill.id}`;
-    const createdExpense = await expense.upsert({
-      where: { id: expenseId },
-      update: {
-        title: targetBill.title,
-        category: targetBill.category,
-        amount: targetBill.amount,
-        date: getKolkataDate().toISOString().split("T")[0],
-        payment: "UPI",
-      },
-      create: {
-        id: expenseId,
-        title: targetBill.title,
-        category: targetBill.category,
-        amount: targetBill.amount,
-        date: getKolkataDate().toISOString().split("T")[0],
-        payment: "UPI",
-      },
-    });
+    const todayDate = getKolkataDateString();
+
+    let createdExpense = null;
+    try {
+      createdExpense = await expense.upsert({
+        where: { id: expenseId },
+        update: {
+          title: targetBill.title,
+          category: targetBill.category,
+          amount: targetBill.amount,
+          date: todayDate,
+          payment: "UPI",
+        },
+        create: {
+          id: expenseId,
+          title: targetBill.title,
+          category: targetBill.category,
+          amount: targetBill.amount,
+          date: todayDate,
+          payment: "UPI",
+        },
+      });
+    } catch {
+      createdExpense = await expense.create({
+        data: {
+          title: targetBill.title,
+          category: targetBill.category,
+          amount: targetBill.amount,
+          date: todayDate,
+          payment: "UPI",
+        },
+      });
+    }
 
     res.json({ success: true, bill: updatedBill, expense: createdExpense });
   } catch (error: any) {
