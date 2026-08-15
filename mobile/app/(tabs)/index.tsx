@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   BackHandler,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -38,6 +39,8 @@ const DEFAULT_DURATIONS: Record<TodoTag, number> = {
   Quick: 10,
   Personal: 15,
 };
+
+const DURATION_PRESETS = [10, 20, 30, 40, 50, 60, 90, 120];
 
 let cheerSoundObject: Audio.Sound | null = null;
 
@@ -125,6 +128,12 @@ export default function TodayScreen() {
   const [newTodoText, setNewTodoText] = useState("");
   const [selectedTag, setSelectedTag] = useState<TodoTag>("GATE");
   const [customDuration, setCustomDuration] = useState<number>(45);
+  const [showAddDurationDropdown, setShowAddDurationDropdown] = useState(false);
+  
+  // Time Dialer / Slider Modal State
+  const [editingTask, setEditingTask] = useState<PersonalTodo | null>(null);
+  const [dialerMinutes, setDialerMinutes] = useState<number>(45);
+
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -199,13 +208,20 @@ export default function TodayScreen() {
 
   // Handle Android Back Button
   useEffect(() => {
-    if (!showAddCard) return;
+    if (!showAddCard && !editingTask) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      setShowAddCard(false);
-      return true;
+      if (editingTask) {
+        setEditingTask(null);
+        return true;
+      }
+      if (showAddCard) {
+        setShowAddCard(false);
+        return true;
+      }
+      return false;
     });
     return () => sub.remove();
-  }, [showAddCard]);
+  }, [showAddCard, editingTask]);
 
   const toggleAddCard = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -213,6 +229,7 @@ export default function TodayScreen() {
       setNewTodoText("");
       setSelectedTag("GATE");
       setCustomDuration(DEFAULT_DURATIONS.GATE);
+      setShowAddDurationDropdown(false);
     }
     setShowAddCard((prev) => !prev);
   };
@@ -243,10 +260,11 @@ export default function TodayScreen() {
     };
 
     setShowAddCard(false);
+    setShowAddDurationDropdown(false);
     setNewTodoText("");
     setShowCelebration(false);
     setRecentlyAddedId(tempId);
-    setToastText(`Task added to ${tagChoice} (${duration}m)`);
+    setToastText(`Task added · Tap time to change (${duration}m)`);
     setTodos((current) => [newEntry, ...current]);
 
     queryClient.setQueryData(["routine", date], (old: any) => {
@@ -293,8 +311,50 @@ export default function TodayScreen() {
         AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify([newEntry, ...todos])).catch(() => {});
       });
 
-    setTimeout(() => setRecentlyAddedId(null), 2000);
+    setTimeout(() => setRecentlyAddedId(null), 4000);
+    setTimeout(() => setToastText(null), 3000);
+  };
+
+  // Open Dialer for a Task
+  const openDurationPicker = (task: PersonalTodo) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setEditingTask(task);
+    setDialerMinutes(task.durationMin || 30);
+  };
+
+  // Adjust dialer time by step (10 minutes)
+  const adjustDialerMinutes = (delta: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setDialerMinutes((prev) => Math.max(10, Math.min(240, prev + delta)));
+  };
+
+  // Save Duration Change
+  const handleSaveDuration = () => {
+    if (!editingTask) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    const targetId = editingTask.id;
+    const newMinutes = dialerMinutes;
+
+    setTodos((prev) =>
+      prev.map((t) => (t.id === targetId ? { ...t, durationMin: newMinutes } : t))
+    );
+    setEditingTask(null);
+    setToastText(`Updated time to ${newMinutes} mins`);
     setTimeout(() => setToastText(null), 2000);
+
+    queryClient.setQueryData(["routine", date], (old: any) => {
+      if (!old || !Array.isArray(old.tasks)) return old;
+      return {
+        ...old,
+        tasks: old.tasks.map((t: any) =>
+          t.taskId === targetId ? { ...t, durationMin: newMinutes } : t
+        ),
+      };
+    });
+
+    if (!targetId.startsWith("temp-")) {
+      api.routine.updateTask(targetId, { durationMin: newMinutes }).catch(() => {});
+    }
   };
 
   // Instant Optimistic Toggle
@@ -454,6 +514,170 @@ export default function TodayScreen() {
               </View>
             </View>
           ) : null}
+
+          {/* 10-Minute Step Time Dialer Modal */}
+          {editingTask && (
+            <Modal
+              transparent={true}
+              animationType="fade"
+              visible={!!editingTask}
+              onRequestClose={() => setEditingTask(null)}
+            >
+              <View style={styles.modalOverlay}>
+                <Pressable
+                  style={StyleSheet.absoluteFill}
+                  onPress={() => setEditingTask(null)}
+                />
+                <Card
+                  style={[
+                    styles.dialerCard,
+                    {
+                      backgroundColor: isDark ? "#141418" : "#ffffff",
+                      borderColor: isDark ? "#24242A" : "#e2e8f0",
+                    },
+                  ]}
+                >
+                  <View style={styles.dialerHeader}>
+                    <View style={{ gap: 3, flex: 1 }}>
+                      <Text style={[styles.dialerTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        Target Duration
+                      </Text>
+                      <Text
+                        style={[styles.dialerTaskName, { color: isDark ? "#A1A1AA" : theme.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {editingTask.text}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => setEditingTask(null)}
+                      hitSlop={8}
+                      style={styles.dialerCloseBtn}
+                    >
+                      <Ionicons name="close" size={20} color={isDark ? "#71717A" : theme.textFaint} />
+                    </Pressable>
+                  </View>
+
+                  {/* Big Number & 10m Stepper */}
+                  <View style={styles.dialerDisplayRow}>
+                    <Pressable
+                      onPress={() => adjustDialerMinutes(-10)}
+                      disabled={dialerMinutes <= 10}
+                      style={({ pressed }) => [
+                        styles.dialerStepBtn,
+                        {
+                          backgroundColor: isDark ? "#1E1E24" : "#f1f5f9",
+                          borderColor: isDark ? "#2A2A32" : "#e2e8f0",
+                          opacity: dialerMinutes <= 10 ? 0.35 : 1,
+                        },
+                        pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] },
+                      ]}
+                    >
+                      <Text style={[styles.dialerStepBtnText, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        −10m
+                      </Text>
+                    </Pressable>
+
+                    <View style={styles.dialerCenterValue}>
+                      <Text style={[styles.dialerBigNumber, { color: isDark ? "#38BDF8" : "#0284c7" }]}>
+                        {dialerMinutes}
+                      </Text>
+                      <Text style={[styles.dialerUnitText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                        minutes
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      onPress={() => adjustDialerMinutes(10)}
+                      disabled={dialerMinutes >= 240}
+                      style={({ pressed }) => [
+                        styles.dialerStepBtn,
+                        {
+                          backgroundColor: isDark ? "#1E1E24" : "#f1f5f9",
+                          borderColor: isDark ? "#2A2A32" : "#e2e8f0",
+                          opacity: dialerMinutes >= 240 ? 0.35 : 1,
+                        },
+                        pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] },
+                      ]}
+                    >
+                      <Text style={[styles.dialerStepBtnText, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        +10m
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  {/* 10-Minute Presets Dial Strip */}
+                  <View style={styles.presetStripRow}>
+                    {DURATION_PRESETS.map((mins) => {
+                      const active = dialerMinutes === mins;
+                      return (
+                        <Pressable
+                          key={mins}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                            setDialerMinutes(mins);
+                          }}
+                          style={[
+                            styles.presetPill,
+                            {
+                              backgroundColor: active
+                                ? isDark
+                                  ? "rgba(56, 189, 248, 0.16)"
+                                  : "rgba(2, 132, 199, 0.1)"
+                                : isDark
+                                ? "#1A1A20"
+                                : "#f8fafc",
+                              borderColor: active
+                                ? isDark
+                                  ? "#38BDF8"
+                                  : "#0284c7"
+                                : isDark
+                                ? "#24242A"
+                                : "#e2e8f0",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.presetPillText,
+                              {
+                                color: active
+                                  ? isDark
+                                    ? "#38BDF8"
+                                    : "#0284c7"
+                                  : isDark
+                                  ? "#71717A"
+                                  : theme.textFaint,
+                                fontWeight: active ? "800" : "600",
+                              },
+                            ]}
+                          >
+                            {mins}m
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Save Button */}
+                  <Pressable
+                    onPress={handleSaveDuration}
+                    style={({ pressed }) => [
+                      styles.dialerSaveBtn,
+                      {
+                        backgroundColor: isDark ? "#38BDF8" : "#0284c7",
+                      },
+                      pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                    ]}
+                  >
+                    <Text style={styles.dialerSaveBtnText}>
+                      Set Duration ({dialerMinutes} mins)
+                    </Text>
+                  </Pressable>
+                </Card>
+              </View>
+            </Modal>
+          )}
         </>
       }
     >
@@ -691,7 +915,7 @@ export default function TodayScreen() {
                 </Pressable>
               </View>
 
-              {/* Tag & Estimated Duration Selection */}
+              {/* Tag Selection (Clean, NO parentheses or hardcoded min) */}
               <View style={styles.inlineTagRow}>
                 {(["GATE", "Quick", "College", "Personal"] as const).map((t) => {
                   const active = selectedTag === t;
@@ -731,11 +955,97 @@ export default function TodayScreen() {
                         ]}
                         numberOfLines={1}
                       >
-                        {cfg.label} ({DEFAULT_DURATIONS[t]}m)
+                        {cfg.label}
                       </Text>
                     </Pressable>
                   );
                 })}
+              </View>
+
+              {/* Quick Duration Dropdown / Selector for Add Form */}
+              <View style={styles.addDurationRow}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    setShowAddDurationDropdown((prev) => !prev);
+                  }}
+                  style={[
+                    styles.addDurationTrigger,
+                    {
+                      backgroundColor: isDark ? "#18181D" : "#f8fafc",
+                      borderColor: isDark ? "#2A2A32" : "#e2e8f0",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="time-outline"
+                    size={12}
+                    color={isDark ? "#38BDF8" : "#0284c7"}
+                  />
+                  <Text style={[styles.addDurationTriggerText, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                    Duration: {customDuration} min
+                  </Text>
+                  <Ionicons
+                    name={showAddDurationDropdown ? "chevron-up" : "chevron-down"}
+                    size={12}
+                    color={isDark ? "#71717A" : theme.textFaint}
+                  />
+                </Pressable>
+
+                {showAddDurationDropdown && (
+                  <View style={styles.addDurationOptionsStrip}>
+                    {DURATION_PRESETS.map((m) => {
+                      const active = customDuration === m;
+                      return (
+                        <Pressable
+                          key={m}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                            setCustomDuration(m);
+                            setShowAddDurationDropdown(false);
+                          }}
+                          style={[
+                            styles.durationOptionPill,
+                            {
+                              backgroundColor: active
+                                ? isDark
+                                  ? "rgba(56, 189, 248, 0.18)"
+                                  : "rgba(2, 132, 199, 0.12)"
+                                : isDark
+                                ? "#1A1A20"
+                                : "#f1f5f9",
+                              borderColor: active
+                                ? isDark
+                                  ? "#38BDF8"
+                                  : "#0284c7"
+                                : isDark
+                                ? "#24242A"
+                                : "#e2e8f0",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.durationOptionText,
+                              {
+                                color: active
+                                  ? isDark
+                                    ? "#38BDF8"
+                                    : "#0284c7"
+                                  : isDark
+                                  ? "#A1A1AA"
+                                  : theme.textMuted,
+                                fontWeight: active ? "800" : "600",
+                              },
+                            ]}
+                          >
+                            {m}m
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             </Card>
           )}
@@ -781,8 +1091,8 @@ export default function TodayScreen() {
                       borderColor: isDark ? "#202025" : "#e2e8f0",
                     },
                     isJustAdded && {
-                      borderColor: isDark ? "rgba(251, 191, 36, 0.45)" : "rgba(217, 119, 6, 0.35)",
-                      backgroundColor: isDark ? "rgba(251, 191, 36, 0.05)" : "rgba(254, 243, 199, 0.35)",
+                      borderColor: isDark ? "rgba(56, 189, 248, 0.5)" : "rgba(2, 132, 199, 0.4)",
+                      backgroundColor: isDark ? "rgba(56, 189, 248, 0.06)" : "rgba(238, 242, 255, 0.4)",
                     },
                     item.completed && {
                       backgroundColor: isDark ? "#0d0d0f" : "#f8fafc",
@@ -839,22 +1149,57 @@ export default function TodayScreen() {
                         </Text>
                       </View>
 
-                      {/* Estimated Duration Badge */}
-                      <View style={styles.durationBadge}>
+                      {/* Interactive Time Badge (Opens 10m Step Dialer — Does NOT toggle task) */}
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          openDurationPicker(item);
+                        }}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        style={({ pressed }) => [
+                          styles.durationInteractiveBadge,
+                          {
+                            backgroundColor: isDark ? "#18181D" : "#f1f5f9",
+                            borderColor: isJustAdded
+                              ? isDark
+                                ? "#38BDF8"
+                                : "#0284c7"
+                              : isDark
+                              ? "#2A2A32"
+                              : "#e2e8f0",
+                          },
+                          pressed && { opacity: 0.7, transform: [{ scale: 0.96 }] },
+                        ]}
+                      >
                         <Ionicons
                           name="time-outline"
                           size={11}
-                          color={isDark ? "#71717A" : theme.textFaint}
+                          color={isDark ? "#38BDF8" : "#0284c7"}
                         />
                         <Text
                           style={[
-                            styles.durationText,
-                            { color: isDark ? "#71717A" : theme.textFaint },
+                            styles.durationInteractiveText,
+                            { color: isDark ? "#F5F5F7" : theme.text },
                           ]}
                         >
-                          {duration} min
+                          {duration}m
                         </Text>
-                      </View>
+                        <Ionicons
+                          name="chevron-down"
+                          size={9}
+                          color={isDark ? "#71717A" : theme.textFaint}
+                        />
+                      </Pressable>
+
+                      {/* Helpful Hint on Recently Added Task */}
+                      {isJustAdded && (
+                        <View style={styles.hintPointingBadge}>
+                          <Ionicons name="arrow-back" size={10} color={isDark ? "#38BDF8" : "#0284c7"} />
+                          <Text style={[styles.hintPointingText, { color: isDark ? "#38BDF8" : "#0284c7" }]}>
+                            Tap time to change
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </Pressable>
@@ -1041,14 +1386,47 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
+    gap: 4,
     paddingHorizontal: 4,
     paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
   },
   inlineTagText: {
-    fontSize: 10.5,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  addDurationRow: {
+    gap: 6,
+  },
+  addDurationTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  addDurationTriggerText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+  addDurationOptionsStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingTop: 2,
+  },
+  durationOptionPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  durationOptionText: {
+    fontSize: 11,
   },
 
   todoList: {
@@ -1103,15 +1481,33 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.3,
   },
-  durationBadge: {
+  durationInteractiveBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
   },
-  durationText: {
+  durationInteractiveText: {
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: "700",
   },
+  hintPointingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  hintPointingText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
   clearContainer: {
     alignItems: "center",
     paddingVertical: 4,
@@ -1166,5 +1562,105 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 13,
     fontWeight: "500",
+  },
+
+  // Modal Overlay & Time Dialer
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    zIndex: 10000,
+  },
+  dialerCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    gap: 18,
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  dialerHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  dialerTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  dialerTaskName: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  dialerCloseBtn: {
+    padding: 2,
+  },
+  dialerDisplayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+  dialerStepBtn: {
+    width: 60,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dialerStepBtnText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+  },
+  dialerCenterValue: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  dialerBigNumber: {
+    fontSize: 46,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+  },
+  dialerUnitText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  presetStripRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "center",
+  },
+  presetPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  presetPillText: {
+    fontSize: 12,
+  },
+  dialerSaveBtn: {
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  dialerSaveBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });

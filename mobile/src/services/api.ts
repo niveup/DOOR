@@ -61,10 +61,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
-    updateTask: (taskId: string, status: RoutineStatus) => request<{ task: unknown }>(`/api/routine/tasks/${taskId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status: status === "COMPLETED" ? "completed" : status === "PARTIAL" ? "partial" : "not_completed" }),
-    }),
+    updateTask: (taskId: string, input: RoutineStatus | { status?: RoutineStatus; durationMin?: number }) => {
+      const body: Record<string, any> = {};
+      if (typeof input === "string") {
+        body.status = input === "COMPLETED" ? "completed" : input === "PARTIAL" ? "partial" : "not_completed";
+      } else {
+        if (input.status) {
+          body.status = input.status === "COMPLETED" ? "completed" : input.status === "PARTIAL" ? "partial" : "not_completed";
+        }
+        if (typeof input.durationMin === "number") {
+          body.durationMin = input.durationMin;
+        }
+      }
+      return request<{ task: unknown }>(`/api/routine/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+    },
     deleteTask: (taskId: string) => request<{ success: true }>(`/api/routine/tasks/${taskId}`, { method: "DELETE" }),
     clear: (date: string) => request<{ success: true }>(`/api/routine/today?date=${encodeURIComponent(date)}`, { method: "DELETE" }),
   },

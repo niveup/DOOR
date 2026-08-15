@@ -1227,7 +1227,7 @@ app.post("/api/tasks/:taskId/status", async (req: Request, res: Response) => {
 
 // Mobile compatibility route. Keep the original web route above so older
 // clients continue working, while accepting the lower-case status contract
-// Mobile compatibility route for task status update
+// Mobile compatibility route for task status & duration update
 app.patch("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
   const statusMap: Record<string, "COMPLETED" | "PARTIAL" | "NOT"> = {
     completed: "COMPLETED",
@@ -1236,12 +1236,25 @@ app.patch("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
   };
   const requested = typeof req.body?.status === "string" ? req.body.status.toLowerCase() : "";
   const status = statusMap[requested];
-  if (!status) return res.status(400).json({ error: "status must be completed, partial, or not_completed." });
+  const durationMin = typeof req.body?.durationMin === "number" ? Math.max(5, Math.min(480, Math.round(req.body.durationMin))) : undefined;
+
+  const dataToUpdate: any = {};
+  if (status) {
+    dataToUpdate.status = status;
+    dataToUpdate.finalizedAt = status === "NOT" ? null : new Date();
+  }
+  if (durationMin !== undefined) {
+    dataToUpdate.durationMin = durationMin;
+  }
+
+  if (Object.keys(dataToUpdate).length === 0) {
+    return res.status(400).json({ error: "Provide a valid status or durationMin to update." });
+  }
 
   try {
     const task = await prisma.task.update({
       where: { taskId: req.params.taskId },
-      data: { status, finalizedAt: status === "NOT" ? null : new Date() },
+      data: dataToUpdate,
     });
     res.set("Cache-Control", "no-store").json({ task });
   } catch (error: any) {
