@@ -42,11 +42,12 @@ const DEFAULT_DURATIONS: Record<TodoTag, number> = {
 };
 
 const DIALER_OPTIONS = [
-  5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240
+  5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60,
+  75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240
 ];
 
 const ITEM_HEIGHT = 44;
-const VISIBLE_COUNT = 3; // 1 above, 1 selected in center, 1 below
+const VISIBLE_COUNT = 5; // 2 above, 1 selected in center, 2 below
 
 let cheerSoundObject: Audio.Sound | null = null;
 
@@ -89,7 +90,7 @@ async function playAchievementCheer() {
 }
 
 // -------------------------------------------------------------
-// Compact, Silky-Smooth Pure Black & White Scroll Wheel Picker
+// Large, Silky-Smooth Pure Black & White Scroll Wheel Picker
 // -------------------------------------------------------------
 function CompactDurationDialerModal({
   visible,
@@ -187,7 +188,7 @@ function CompactDurationDialerModal({
             </Pressable>
 
             <Text style={styles.compactHeaderTitle} numberOfLines={1}>
-              {taskTitle ? taskTitle : "Duration"}
+              {taskTitle ? taskTitle : "Target Duration"}
             </Text>
 
             <Pressable
@@ -199,13 +200,15 @@ function CompactDurationDialerModal({
             </Pressable>
           </View>
 
-          {/* Value Preview */}
+          {/* Small Subtle Current Selection Pill */}
           <View style={styles.compactValueRow}>
-            <Text style={styles.compactBigNumber}>{selectedMins}</Text>
-            <Text style={styles.compactUnitText}>minutes</Text>
+            <View style={styles.compactSelectedPill}>
+              <Ionicons name="time-outline" size={13} color="#38BDF8" />
+              <Text style={styles.compactSelectedPillText}>{selectedMins} min</Text>
+            </View>
           </View>
 
-          {/* Silky Smooth 3-Slot Wheel */}
+          {/* Large Spacious 5-Slot Wheel Frame (Up to 240 min) */}
           <View style={styles.compactWheelFrame}>
             {/* Center Selection Lens */}
             <View style={styles.compactCenterLens} pointerEvents="none" />
@@ -224,7 +227,7 @@ function CompactDurationDialerModal({
               onScrollEndDrag={handleMomentumScrollEnd}
               scrollEventThrottle={32}
               contentContainerStyle={{
-                paddingVertical: ITEM_HEIGHT, // Exactly 1 item offset top & bottom for 3-slot center alignment
+                paddingVertical: ITEM_HEIGHT * 2, // 2 items offset top & bottom for 5-slot center alignment
               }}
             >
               {DIALER_OPTIONS.map((mins, idx) => {
@@ -1496,27 +1499,27 @@ const styles = StyleSheet.create({
   },
 
   // -------------------------------------------------------------
-  // Compact, Minimal Pure Black & White Wheel Modal
+  // Large & Clean Pure Black & White Wheel Modal
   // -------------------------------------------------------------
   compactModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0,0,0,0.72)",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     zIndex: 10000,
   },
   compactCardContainer: {
     width: "100%",
-    maxWidth: 290,
+    maxWidth: 320,
     backgroundColor: "#0C0C0F",
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#222228",
     paddingTop: 14,
     paddingBottom: 16,
     paddingHorizontal: 16,
-    gap: 10,
+    gap: 12,
     shadowColor: "#000000",
     shadowOpacity: 0.6,
     shadowRadius: 20,
@@ -1531,8 +1534,8 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   compactBarBtn: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
   },
   compactCancelText: {
     fontSize: 13.5,
@@ -1540,7 +1543,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   compactHeaderTitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: "700",
     color: "#FFFFFF",
     flex: 1,
@@ -1555,35 +1558,36 @@ const styles = StyleSheet.create({
   compactValueRow: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 2,
-    gap: 1,
+    paddingVertical: 1,
   },
-  compactBigNumber: {
-    fontSize: 36,
-    fontWeight: "900",
+  compactSelectedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#16161C",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#25252E",
+  },
+  compactSelectedPillText: {
+    fontSize: 13,
+    fontWeight: "700",
     color: "#FFFFFF",
-    fontVariant: ["tabular-nums"],
-    letterSpacing: -0.5,
-  },
-  compactUnitText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#8E8E93",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
   },
   compactWheelFrame: {
-    height: ITEM_HEIGHT * VISIBLE_COUNT, // 132px
+    height: ITEM_HEIGHT * VISIBLE_COUNT, // 220px
     position: "relative",
     overflow: "hidden",
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: "#070709",
     borderWidth: 1,
     borderColor: "#18181F",
   },
   compactCenterLens: {
     position: "absolute",
-    top: ITEM_HEIGHT, // Center slot (index 1 out of 0..2)
+    top: ITEM_HEIGHT * 2, // Center slot (index 2 out of 0..4)
     left: 6,
     right: 6,
     height: ITEM_HEIGHT,
@@ -1600,13 +1604,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   compactItemText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "500",
     color: "#4B4B52",
     fontVariant: ["tabular-nums"],
   },
   compactItemTextSelected: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "800",
     color: "#FFFFFF",
   },
