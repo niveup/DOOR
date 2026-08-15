@@ -398,12 +398,25 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
     };
     const requested = typeof parsedBody?.status === "string" ? parsedBody.status.toLowerCase() : "";
     const status = statusMap[requested];
-    if (!status) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    const durationMin = typeof parsedBody?.durationMin === "number" ? Math.max(5, Math.min(480, Math.round(parsedBody.durationMin))) : undefined;
+
+    const dataToUpdate: any = {};
+    if (status) {
+      dataToUpdate.status = status;
+      dataToUpdate.finalizedAt = status === "NOT" ? null : new Date();
+    }
+    if (durationMin !== undefined) {
+      dataToUpdate.durationMin = durationMin;
+    }
+
+    if (Object.keys(dataToUpdate).length === 0) {
+      return NextResponse.json({ error: "Provide a valid status or durationMin to update." }, { status: 400 });
+    }
 
     const taskModel = (prisma as any).task || (prisma as any).Task;
     const updated = await taskModel.update({
       where: { taskId },
-      data: { status, finalizedAt: status === "NOT" ? null : new Date() },
+      data: dataToUpdate,
     });
 
     return NextResponse.json({ task: updated }, { headers: { "Cache-Control": "no-store" } });

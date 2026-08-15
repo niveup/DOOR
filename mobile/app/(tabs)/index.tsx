@@ -24,7 +24,7 @@ import { todayInKolkata } from "@/src/lib/format";
 import { api } from "@/src/services/api";
 import { useTheme } from "@/src/providers/theme-provider";
 
-type TodoTag = "GATE" | "Quick" | "College" | "Personal";
+type TodoTag = "GATE" | "College" | "Personal";
 
 interface PersonalTodo {
   id: string;
@@ -38,25 +38,15 @@ interface PersonalTodo {
 const DEFAULT_DURATIONS: Record<TodoTag, number> = {
   GATE: 45,
   College: 30,
-  Quick: 10,
   Personal: 15,
 };
 
 const DIALER_OPTIONS = [
-  5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60,
-  75, 90, 105, 120, 150, 180, 210, 240
+  5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90, 120, 150, 180, 240
 ];
 
-const DIALER_ITEM_HEIGHT = 46;
-const DIALER_VISIBLE_COUNT = 5; // 2 above, 1 selected, 2 below
-
-function formatDurationLabel(mins: number): string {
-  if (mins < 60) return `${mins} min`;
-  const hrs = Math.floor(mins / 60);
-  const rem = mins % 60;
-  if (rem === 0) return `${hrs} hr${hrs > 1 ? "s" : ""}`;
-  return `${hrs} hr ${rem} min`;
-}
+const ITEM_HEIGHT = 44;
+const VISIBLE_COUNT = 3; // 1 above, 1 selected in center, 1 below
 
 let cheerSoundObject: Audio.Sound | null = null;
 
@@ -99,9 +89,9 @@ async function playAchievementCheer() {
 }
 
 // -------------------------------------------------------------
-// Industry-Standard Black Scroll Wheel Dialer Component
+// Compact, Silky-Smooth Pure Black & White Scroll Wheel Picker
 // -------------------------------------------------------------
-function DurationWheelDialerModal({
+function CompactDurationDialerModal({
   visible,
   initialMinutes,
   taskTitle,
@@ -116,9 +106,10 @@ function DurationWheelDialerModal({
 }) {
   const [selectedMins, setSelectedMins] = useState(initialMinutes);
   const scrollRef = useRef<ScrollView>(null);
+  const isUserScrolling = useRef(false);
   const lastIndex = useRef<number>(-1);
 
-  // Find initial nearest index
+  // Compute nearest index
   const initialIndex = useMemo(() => {
     const exact = DIALER_OPTIONS.indexOf(initialMinutes);
     if (exact !== -1) return exact;
@@ -138,18 +129,18 @@ function DurationWheelDialerModal({
     if (visible) {
       setSelectedMins(initialMinutes);
       lastIndex.current = initialIndex;
-      setTimeout(() => {
+      const t = setTimeout(() => {
         scrollRef.current?.scrollTo({
-          y: initialIndex * DIALER_ITEM_HEIGHT,
+          y: initialIndex * ITEM_HEIGHT,
           animated: false,
         });
-      }, 50);
+      }, 40);
+      return () => clearTimeout(t);
     }
   }, [visible, initialMinutes, initialIndex]);
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const rawIdx = Math.round(y / DIALER_ITEM_HEIGHT);
+  const updateSelectionFromOffset = (offsetY: number) => {
+    const rawIdx = Math.round(offsetY / ITEM_HEIGHT);
     const clampedIdx = Math.max(0, Math.min(DIALER_OPTIONS.length - 1, rawIdx));
     if (clampedIdx !== lastIndex.current) {
       lastIndex.current = clampedIdx;
@@ -158,10 +149,22 @@ function DurationWheelDialerModal({
     }
   };
 
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!isUserScrolling.current) return;
+    updateSelectionFromOffset(e.nativeEvent.contentOffset.y);
+  };
+
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    isUserScrolling.current = false;
+    updateSelectionFromOffset(e.nativeEvent.contentOffset.y);
+  };
+
   const handleItemPress = (index: number) => {
     Haptics.selectionAsync().catch(() => {});
+    lastIndex.current = index;
+    setSelectedMins(DIALER_OPTIONS[index]);
     scrollRef.current?.scrollTo({
-      y: index * DIALER_ITEM_HEIGHT,
+      y: index * ITEM_HEIGHT,
       animated: true,
     });
   };
@@ -173,70 +176,72 @@ function DurationWheelDialerModal({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={styles.wheelModalOverlay}>
+      <View style={styles.compactModalOverlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View style={styles.wheelCardContainer}>
-          {/* Top Bar with Cancel / Done */}
-          <View style={styles.wheelTopBar}>
-            <Pressable onPress={onClose} hitSlop={10} style={styles.wheelBarBtn}>
-              <Text style={styles.wheelCancelText}>Cancel</Text>
+        <View style={styles.compactCardContainer}>
+          {/* Header Bar */}
+          <View style={styles.compactTopBar}>
+            <Pressable onPress={onClose} hitSlop={10} style={styles.compactBarBtn}>
+              <Text style={styles.compactCancelText}>Cancel</Text>
             </Pressable>
 
-            <View style={styles.wheelTitleBlock}>
-              <Text style={styles.wheelHeaderTitle} numberOfLines={1}>
-                {taskTitle ? taskTitle : "Target Duration"}
-              </Text>
-            </View>
+            <Text style={styles.compactHeaderTitle} numberOfLines={1}>
+              {taskTitle ? taskTitle : "Duration"}
+            </Text>
 
             <Pressable
               onPress={() => onSave(selectedMins)}
               hitSlop={10}
-              style={styles.wheelBarBtn}
+              style={styles.compactBarBtn}
             >
-              <Text style={styles.wheelDoneText}>Done</Text>
+              <Text style={styles.compactDoneText}>Done</Text>
             </Pressable>
           </View>
 
-          {/* Big Selected Time Readout */}
-          <View style={styles.wheelValuePreviewRow}>
-            <Text style={styles.wheelPreviewBigNumber}>{selectedMins}</Text>
-            <Text style={styles.wheelPreviewUnit}>
-              {selectedMins >= 60 ? `mins · (${formatDurationLabel(selectedMins)})` : "mins"}
-            </Text>
+          {/* Value Preview */}
+          <View style={styles.compactValueRow}>
+            <Text style={styles.compactBigNumber}>{selectedMins}</Text>
+            <Text style={styles.compactUnitText}>minutes</Text>
           </View>
 
-          {/* Scrolling Wheel Container */}
-          <View style={styles.wheelPickerFrame}>
+          {/* Silky Smooth 3-Slot Wheel */}
+          <View style={styles.compactWheelFrame}>
             {/* Center Selection Lens */}
-            <View style={styles.wheelSelectionLens} pointerEvents="none" />
+            <View style={styles.compactCenterLens} pointerEvents="none" />
 
             <ScrollView
               ref={scrollRef}
               showsVerticalScrollIndicator={false}
-              snapToInterval={DIALER_ITEM_HEIGHT}
+              snapToInterval={ITEM_HEIGHT}
+              snapToAlignment="start"
               decelerationRate="fast"
+              onScrollBeginDrag={() => {
+                isUserScrolling.current = true;
+              }}
               onScroll={handleScroll}
-              scrollEventThrottle={16}
+              onMomentumScrollEnd={handleMomentumScrollEnd}
+              onScrollEndDrag={handleMomentumScrollEnd}
+              scrollEventThrottle={32}
               contentContainerStyle={{
-                paddingVertical: DIALER_ITEM_HEIGHT * 2, // 2 blank spaces top and bottom so every item can reach center
+                paddingVertical: ITEM_HEIGHT, // Exactly 1 item offset top & bottom for 3-slot center alignment
               }}
             >
-              {DIALER_OPTIONS.map((item, idx) => {
-                const isSelected = item === selectedMins;
+              {DIALER_OPTIONS.map((mins, idx) => {
+                const isSelected = mins === selectedMins;
                 return (
                   <Pressable
-                    key={item}
+                    key={mins}
                     onPress={() => handleItemPress(idx)}
-                    style={styles.wheelItemRow}
+                    style={styles.compactItemRow}
                   >
                     <Text
                       style={[
-                        styles.wheelItemText,
-                        isSelected && styles.wheelItemTextSelected,
+                        styles.compactItemText,
+                        isSelected && styles.compactItemTextSelected,
                       ]}
                     >
-                      {item} min {item >= 60 ? `(${formatDurationLabel(item)})` : ""}
+                      {mins} min
                     </Text>
                   </Pressable>
                 );
@@ -254,7 +259,7 @@ export default function TodayScreen() {
   const queryClient = useQueryClient();
   const { theme, isDark, toggleTheme } = useTheme();
 
-  // Distinct & Harmonious Tag System
+  // 3 Distinct & Harmonious Tag System (Spacious Layout)
   const TAG_CONFIG: Record<
     TodoTag,
     { label: string; color: string; bg: string; icon: keyof typeof Ionicons.glyphMap }
@@ -265,12 +270,6 @@ export default function TodayScreen() {
         color: isDark ? "#38bdf8" : "#0284c7",
         bg: isDark ? "rgba(56, 189, 248, 0.12)" : "rgba(2, 132, 199, 0.08)",
         icon: "school-outline",
-      },
-      Quick: {
-        label: "Quick",
-        color: isDark ? "#f59e0b" : "#d97706",
-        bg: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(217, 119, 6, 0.08)",
-        icon: "flash-outline",
       },
       College: {
         label: "College",
@@ -344,7 +343,8 @@ export default function TodayScreen() {
   useEffect(() => {
     if (routineQuery.data && Array.isArray(routineQuery.data.tasks)) {
       const serverTasks: PersonalTodo[] = routineQuery.data.tasks.map((task: any, index: number) => {
-        const localTag = (tagMap[task.taskId] || tagMap[task.title] || (index === 0 ? "GATE" : "Quick")) as TodoTag;
+        const rawTag = (tagMap[task.taskId] || tagMap[task.title] || (index === 0 ? "GATE" : "College")) as string;
+        const localTag: TodoTag = rawTag === "College" ? "College" : rawTag === "Personal" ? "Personal" : "GATE";
         return {
           id: task.taskId,
           text: task.title,
@@ -432,7 +432,7 @@ export default function TodayScreen() {
     setNewTodoText("");
     setShowCelebration(false);
     setRecentlyAddedId(tempId);
-    setToastText(`Task added · Tap time to change (${duration}m)`);
+    setToastText(`Task added (${duration} min)`);
     setTodos((current) => [newEntry, ...current]);
 
     queryClient.setQueryData(["routine", date], (old: any) => {
@@ -479,8 +479,8 @@ export default function TodayScreen() {
         AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify([newEntry, ...todos])).catch(() => {});
       });
 
-    setTimeout(() => setRecentlyAddedId(null), 4000);
-    setTimeout(() => setToastText(null), 3000);
+    setTimeout(() => setRecentlyAddedId(null), 3000);
+    setTimeout(() => setToastText(null), 2500);
   };
 
   // Open Dialer for a Task in list
@@ -499,8 +499,8 @@ export default function TodayScreen() {
       prev.map((t) => (t.id === targetId ? { ...t, durationMin: newMinutes } : t))
     );
     setEditingTask(null);
-    setToastText(`Updated target time to ${formatDurationLabel(newMinutes)}`);
-    setTimeout(() => setToastText(null), 2500);
+    setToastText(`Target set to ${newMinutes} min`);
+    setTimeout(() => setToastText(null), 2000);
 
     queryClient.setQueryData(["routine", date], (old: any) => {
       if (!old || !Array.isArray(old.tasks)) return old;
@@ -675,9 +675,9 @@ export default function TodayScreen() {
             </View>
           ) : null}
 
-          {/* Industry-Standard Scroll Wheel Duration Modal for Task Rows */}
+          {/* Compact Scroll Wheel Duration Modal for Task Rows */}
           {editingTask && (
-            <DurationWheelDialerModal
+            <CompactDurationDialerModal
               visible={!!editingTask}
               initialMinutes={editingTask.durationMin || 30}
               taskTitle={editingTask.text}
@@ -686,12 +686,12 @@ export default function TodayScreen() {
             />
           )}
 
-          {/* Industry-Standard Scroll Wheel Duration Modal for Add Task Form */}
+          {/* Compact Scroll Wheel Duration Modal for Add Task Form */}
           {isAddingDurationDialerOpen && (
-            <DurationWheelDialerModal
+            <CompactDurationDialerModal
               visible={isAddingDurationDialerOpen}
               initialMinutes={customDuration}
-              taskTitle="Set New Task Duration"
+              taskTitle="Set Target Duration"
               onClose={() => setIsAddingDurationDialerOpen(false)}
               onSave={(mins) => {
                 setCustomDuration(mins);
@@ -936,11 +936,11 @@ export default function TodayScreen() {
                 </Pressable>
               </View>
 
-              {/* Tag Selection Row with Target Time Trigger */}
+              {/* Tag Selection Row (3 Tags: GATE, College, Personal + Duration Button) */}
               <View style={styles.inlineTagAndDurationRow}>
-                {/* 4 Clean Category Chips */}
+                {/* 3 Spacious Category Chips */}
                 <View style={styles.inlineTagRow}>
-                  {(["GATE", "Quick", "College", "Personal"] as const).map((t) => {
+                  {(["GATE", "College", "Personal"] as const).map((t) => {
                     const active = selectedTag === t;
                     const cfg = TAG_CONFIG[t];
                     return (
@@ -967,7 +967,7 @@ export default function TodayScreen() {
                       >
                         <Ionicons
                           name={cfg.icon}
-                          size={12}
+                          size={13}
                           color={active ? cfg.color : isDark ? "#71717A" : theme.textFaint}
                         />
                         <Text
@@ -985,7 +985,7 @@ export default function TodayScreen() {
                   })}
                 </View>
 
-                {/* Duration Picker Button (Opens Scroll Wheel Modal) */}
+                {/* Duration Picker Trigger */}
                 <Pressable
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -1005,7 +1005,7 @@ export default function TodayScreen() {
                     color={isDark ? "#38BDF8" : "#0284c7"}
                   />
                   <Text style={[styles.addDurationTriggerText, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                    {customDuration} min
+                    {customDuration}m
                   </Text>
                   <Ionicons
                     name="chevron-down"
@@ -1116,7 +1116,7 @@ export default function TodayScreen() {
                         </Text>
                       </View>
 
-                      {/* Interactive Time Badge (Opens Scroll Wheel Dialer — Does NOT toggle task) */}
+                      {/* Interactive Time Badge (Opens Compact Scroll Wheel Dialer) */}
                       <Pressable
                         onPress={(e) => {
                           e.stopPropagation();
@@ -1157,16 +1157,6 @@ export default function TodayScreen() {
                           color={isDark ? "#71717A" : theme.textFaint}
                         />
                       </Pressable>
-
-                      {/* Subtle pointer hint on recently added task */}
-                      {isJustAdded && (
-                        <View style={styles.hintPointingBadge}>
-                          <Ionicons name="arrow-back" size={10} color={isDark ? "#38BDF8" : "#0284c7"} />
-                          <Text style={[styles.hintPointingText, { color: isDark ? "#38BDF8" : "#0284c7" }]}>
-                            Tap time to change
-                          </Text>
-                        </View>
-                      )}
                     </View>
                   </View>
                 </Pressable>
@@ -1352,30 +1342,30 @@ const styles = StyleSheet.create({
   inlineTagRow: {
     flex: 1,
     flexDirection: "row",
-    gap: 5,
+    gap: 6,
   },
   inlineTagChip: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
-    paddingHorizontal: 3,
-    paddingVertical: 7,
-    borderRadius: 8,
+    gap: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    borderRadius: 9,
     borderWidth: 1,
   },
   inlineTagText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: "700",
   },
   addDurationTrigger: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 9,
     borderWidth: 1,
   },
   addDurationTriggerText: {
@@ -1448,19 +1438,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
-  hintPointingBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  hintPointingText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
 
   clearContainer: {
     alignItems: "center",
@@ -1519,119 +1496,117 @@ const styles = StyleSheet.create({
   },
 
   // -------------------------------------------------------------
-  // Industry Standard Scroll Wheel Modal Styling (Pure Black & White)
+  // Compact, Minimal Pure Black & White Wheel Modal
   // -------------------------------------------------------------
-  wheelModalOverlay: {
+  compactModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.72)",
+    backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     zIndex: 10000,
   },
-  wheelCardContainer: {
+  compactCardContainer: {
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 290,
     backgroundColor: "#0C0C0F",
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#222228",
-    paddingTop: 16,
-    paddingBottom: 18,
+    paddingTop: 14,
+    paddingBottom: 16,
     paddingHorizontal: 16,
-    gap: 12,
+    gap: 10,
     shadowColor: "#000000",
     shadowOpacity: 0.6,
     shadowRadius: 20,
     elevation: 16,
   },
-  wheelTopBar: {
+  compactTopBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#1F1F26",
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
-  wheelBarBtn: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+  compactBarBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
-  wheelCancelText: {
-    fontSize: 14,
+  compactCancelText: {
+    fontSize: 13.5,
     color: "#8E8E93",
     fontWeight: "600",
   },
-  wheelTitleBlock: {
-    flex: 1,
-    alignItems: "center",
-    paddingHorizontal: 8,
-  },
-  wheelHeaderTitle: {
-    fontSize: 14,
+  compactHeaderTitle: {
+    fontSize: 13.5,
     fontWeight: "700",
     color: "#FFFFFF",
+    flex: 1,
+    textAlign: "center",
+    paddingHorizontal: 6,
   },
-  wheelDoneText: {
-    fontSize: 14,
+  compactDoneText: {
+    fontSize: 13.5,
     color: "#38BDF8",
     fontWeight: "800",
   },
-  wheelValuePreviewRow: {
+  compactValueRow: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
-    paddingVertical: 4,
+    paddingVertical: 2,
+    gap: 1,
   },
-  wheelPreviewBigNumber: {
-    fontSize: 44,
+  compactBigNumber: {
+    fontSize: 36,
     fontWeight: "900",
     color: "#FFFFFF",
     fontVariant: ["tabular-nums"],
-    letterSpacing: -1,
+    letterSpacing: -0.5,
   },
-  wheelPreviewUnit: {
-    fontSize: 12,
+  compactUnitText: {
+    fontSize: 11,
     fontWeight: "600",
     color: "#8E8E93",
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
-  wheelPickerFrame: {
-    height: DIALER_ITEM_HEIGHT * DIALER_VISIBLE_COUNT, // 230px
+  compactWheelFrame: {
+    height: ITEM_HEIGHT * VISIBLE_COUNT, // 132px
     position: "relative",
     overflow: "hidden",
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: "#070709",
     borderWidth: 1,
     borderColor: "#18181F",
   },
-  wheelSelectionLens: {
+  compactCenterLens: {
     position: "absolute",
-    top: DIALER_ITEM_HEIGHT * 2, // Center slot (index 2 out of 0..4)
-    left: 8,
-    right: 8,
-    height: DIALER_ITEM_HEIGHT,
+    top: ITEM_HEIGHT, // Center slot (index 1 out of 0..2)
+    left: 6,
+    right: 6,
+    height: ITEM_HEIGHT,
     backgroundColor: "rgba(56, 189, 248, 0.08)",
-    borderRadius: 10,
+    borderRadius: 8,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: "rgba(56, 189, 248, 0.28)",
     zIndex: 1,
   },
-  wheelItemRow: {
-    height: DIALER_ITEM_HEIGHT,
+  compactItemRow: {
+    height: ITEM_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
   },
-  wheelItemText: {
-    fontSize: 16,
+  compactItemText: {
+    fontSize: 15,
     fontWeight: "500",
     color: "#4B4B52",
     fontVariant: ["tabular-nums"],
   },
-  wheelItemTextSelected: {
-    fontSize: 18,
+  compactItemTextSelected: {
+    fontSize: 17,
     fontWeight: "800",
     color: "#FFFFFF",
   },
