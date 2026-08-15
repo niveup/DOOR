@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   BackHandler,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -40,7 +42,21 @@ const DEFAULT_DURATIONS: Record<TodoTag, number> = {
   Personal: 15,
 };
 
-const DURATION_PRESETS = [10, 20, 30, 40, 50, 60, 90, 120];
+const DIALER_OPTIONS = [
+  5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60,
+  75, 90, 105, 120, 150, 180, 210, 240
+];
+
+const DIALER_ITEM_HEIGHT = 46;
+const DIALER_VISIBLE_COUNT = 5; // 2 above, 1 selected, 2 below
+
+function formatDurationLabel(mins: number): string {
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  if (rem === 0) return `${hrs} hr${hrs > 1 ? "s" : ""}`;
+  return `${hrs} hr ${rem} min`;
+}
 
 let cheerSoundObject: Audio.Sound | null = null;
 
@@ -80,6 +96,157 @@ async function playAchievementCheer() {
       });
     } catch {}
   }
+}
+
+// -------------------------------------------------------------
+// Industry-Standard Black Scroll Wheel Dialer Component
+// -------------------------------------------------------------
+function DurationWheelDialerModal({
+  visible,
+  initialMinutes,
+  taskTitle,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  initialMinutes: number;
+  taskTitle?: string;
+  onClose: () => void;
+  onSave: (mins: number) => void;
+}) {
+  const [selectedMins, setSelectedMins] = useState(initialMinutes);
+  const scrollRef = useRef<ScrollView>(null);
+  const lastIndex = useRef<number>(-1);
+
+  // Find initial nearest index
+  const initialIndex = useMemo(() => {
+    const exact = DIALER_OPTIONS.indexOf(initialMinutes);
+    if (exact !== -1) return exact;
+    let closest = 0;
+    let minDiff = 9999;
+    DIALER_OPTIONS.forEach((val, idx) => {
+      const diff = Math.abs(val - initialMinutes);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = idx;
+      }
+    });
+    return closest;
+  }, [initialMinutes]);
+
+  useEffect(() => {
+    if (visible) {
+      setSelectedMins(initialMinutes);
+      lastIndex.current = initialIndex;
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          y: initialIndex * DIALER_ITEM_HEIGHT,
+          animated: false,
+        });
+      }, 50);
+    }
+  }, [visible, initialMinutes, initialIndex]);
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const rawIdx = Math.round(y / DIALER_ITEM_HEIGHT);
+    const clampedIdx = Math.max(0, Math.min(DIALER_OPTIONS.length - 1, rawIdx));
+    if (clampedIdx !== lastIndex.current) {
+      lastIndex.current = clampedIdx;
+      setSelectedMins(DIALER_OPTIONS[clampedIdx]);
+      Haptics.selectionAsync().catch(() => {});
+    }
+  };
+
+  const handleItemPress = (index: number) => {
+    Haptics.selectionAsync().catch(() => {});
+    scrollRef.current?.scrollTo({
+      y: index * DIALER_ITEM_HEIGHT,
+      animated: true,
+    });
+  };
+
+  return (
+    <Modal
+      transparent={true}
+      animationType="fade"
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.wheelModalOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+        <View style={styles.wheelCardContainer}>
+          {/* Top Bar with Cancel / Done */}
+          <View style={styles.wheelTopBar}>
+            <Pressable onPress={onClose} hitSlop={10} style={styles.wheelBarBtn}>
+              <Text style={styles.wheelCancelText}>Cancel</Text>
+            </Pressable>
+
+            <View style={styles.wheelTitleBlock}>
+              <Text style={styles.wheelHeaderTitle} numberOfLines={1}>
+                {taskTitle ? taskTitle : "Target Duration"}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => onSave(selectedMins)}
+              hitSlop={10}
+              style={styles.wheelBarBtn}
+            >
+              <Text style={styles.wheelDoneText}>Done</Text>
+            </Pressable>
+          </View>
+
+          {/* Big Selected Time Readout */}
+          <View style={styles.wheelValuePreviewRow}>
+            <Text style={styles.wheelPreviewBigNumber}>{selectedMins}</Text>
+            <Text style={styles.wheelPreviewUnit}>
+              {selectedMins >= 60 ? `mins · (${formatDurationLabel(selectedMins)})` : "mins"}
+            </Text>
+          </View>
+
+          {/* Scrolling Wheel Container */}
+          <View style={styles.wheelPickerFrame}>
+            {/* Center Selection Lens */}
+            <View style={styles.wheelSelectionLens} pointerEvents="none" />
+
+            <ScrollView
+              ref={scrollRef}
+              showsVerticalScrollIndicator={false}
+              snapToInterval={DIALER_ITEM_HEIGHT}
+              decelerationRate="fast"
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+              contentContainerStyle={{
+                paddingVertical: DIALER_ITEM_HEIGHT * 2, // 2 blank spaces top and bottom so every item can reach center
+              }}
+            >
+              {DIALER_OPTIONS.map((item, idx) => {
+                const isSelected = item === selectedMins;
+                return (
+                  <Pressable
+                    key={item}
+                    onPress={() => handleItemPress(idx)}
+                    style={styles.wheelItemRow}
+                  >
+                    <Text
+                      style={[
+                        styles.wheelItemText,
+                        isSelected && styles.wheelItemTextSelected,
+                      ]}
+                    >
+                      {item} min {item >= 60 ? `(${formatDurationLabel(item)})` : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 export default function TodayScreen() {
@@ -128,11 +295,10 @@ export default function TodayScreen() {
   const [newTodoText, setNewTodoText] = useState("");
   const [selectedTag, setSelectedTag] = useState<TodoTag>("GATE");
   const [customDuration, setCustomDuration] = useState<number>(45);
-  const [showAddDurationDropdown, setShowAddDurationDropdown] = useState(false);
   
-  // Time Dialer / Slider Modal State
+  // Wheel Dialer State
   const [editingTask, setEditingTask] = useState<PersonalTodo | null>(null);
-  const [dialerMinutes, setDialerMinutes] = useState<number>(45);
+  const [isAddingDurationDialerOpen, setIsAddingDurationDialerOpen] = useState(false);
 
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);
@@ -208,10 +374,14 @@ export default function TodayScreen() {
 
   // Handle Android Back Button
   useEffect(() => {
-    if (!showAddCard && !editingTask) return;
+    if (!showAddCard && !editingTask && !isAddingDurationDialerOpen) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (editingTask) {
         setEditingTask(null);
+        return true;
+      }
+      if (isAddingDurationDialerOpen) {
+        setIsAddingDurationDialerOpen(false);
         return true;
       }
       if (showAddCard) {
@@ -221,7 +391,7 @@ export default function TodayScreen() {
       return false;
     });
     return () => sub.remove();
-  }, [showAddCard, editingTask]);
+  }, [showAddCard, editingTask, isAddingDurationDialerOpen]);
 
   const toggleAddCard = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -229,7 +399,6 @@ export default function TodayScreen() {
       setNewTodoText("");
       setSelectedTag("GATE");
       setCustomDuration(DEFAULT_DURATIONS.GATE);
-      setShowAddDurationDropdown(false);
     }
     setShowAddCard((prev) => !prev);
   };
@@ -260,7 +429,6 @@ export default function TodayScreen() {
     };
 
     setShowAddCard(false);
-    setShowAddDurationDropdown(false);
     setNewTodoText("");
     setShowCelebration(false);
     setRecentlyAddedId(tempId);
@@ -315,32 +483,24 @@ export default function TodayScreen() {
     setTimeout(() => setToastText(null), 3000);
   };
 
-  // Open Dialer for a Task
+  // Open Dialer for a Task in list
   const openDurationPicker = (task: PersonalTodo) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setEditingTask(task);
-    setDialerMinutes(task.durationMin || 30);
   };
 
-  // Adjust dialer time by step (10 minutes)
-  const adjustDialerMinutes = (delta: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setDialerMinutes((prev) => Math.max(10, Math.min(240, prev + delta)));
-  };
-
-  // Save Duration Change
-  const handleSaveDuration = () => {
+  // Save Duration Change from Wheel Dialer
+  const handleSaveDuration = (newMinutes: number) => {
     if (!editingTask) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     const targetId = editingTask.id;
-    const newMinutes = dialerMinutes;
 
     setTodos((prev) =>
       prev.map((t) => (t.id === targetId ? { ...t, durationMin: newMinutes } : t))
     );
     setEditingTask(null);
-    setToastText(`Updated time to ${newMinutes} mins`);
-    setTimeout(() => setToastText(null), 2000);
+    setToastText(`Updated target time to ${formatDurationLabel(newMinutes)}`);
+    setTimeout(() => setToastText(null), 2500);
 
     queryClient.setQueryData(["routine", date], (old: any) => {
       if (!old || !Array.isArray(old.tasks)) return old;
@@ -515,168 +675,29 @@ export default function TodayScreen() {
             </View>
           ) : null}
 
-          {/* 10-Minute Step Time Dialer Modal */}
+          {/* Industry-Standard Scroll Wheel Duration Modal for Task Rows */}
           {editingTask && (
-            <Modal
-              transparent={true}
-              animationType="fade"
+            <DurationWheelDialerModal
               visible={!!editingTask}
-              onRequestClose={() => setEditingTask(null)}
-            >
-              <View style={styles.modalOverlay}>
-                <Pressable
-                  style={StyleSheet.absoluteFill}
-                  onPress={() => setEditingTask(null)}
-                />
-                <Card
-                  style={[
-                    styles.dialerCard,
-                    {
-                      backgroundColor: isDark ? "#141418" : "#ffffff",
-                      borderColor: isDark ? "#24242A" : "#e2e8f0",
-                    },
-                  ]}
-                >
-                  <View style={styles.dialerHeader}>
-                    <View style={{ gap: 3, flex: 1 }}>
-                      <Text style={[styles.dialerTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                        Target Duration
-                      </Text>
-                      <Text
-                        style={[styles.dialerTaskName, { color: isDark ? "#A1A1AA" : theme.textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {editingTask.text}
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => setEditingTask(null)}
-                      hitSlop={8}
-                      style={styles.dialerCloseBtn}
-                    >
-                      <Ionicons name="close" size={20} color={isDark ? "#71717A" : theme.textFaint} />
-                    </Pressable>
-                  </View>
+              initialMinutes={editingTask.durationMin || 30}
+              taskTitle={editingTask.text}
+              onClose={() => setEditingTask(null)}
+              onSave={handleSaveDuration}
+            />
+          )}
 
-                  {/* Big Number & 10m Stepper */}
-                  <View style={styles.dialerDisplayRow}>
-                    <Pressable
-                      onPress={() => adjustDialerMinutes(-10)}
-                      disabled={dialerMinutes <= 10}
-                      style={({ pressed }) => [
-                        styles.dialerStepBtn,
-                        {
-                          backgroundColor: isDark ? "#1E1E24" : "#f1f5f9",
-                          borderColor: isDark ? "#2A2A32" : "#e2e8f0",
-                          opacity: dialerMinutes <= 10 ? 0.35 : 1,
-                        },
-                        pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] },
-                      ]}
-                    >
-                      <Text style={[styles.dialerStepBtnText, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                        −10m
-                      </Text>
-                    </Pressable>
-
-                    <View style={styles.dialerCenterValue}>
-                      <Text style={[styles.dialerBigNumber, { color: isDark ? "#38BDF8" : "#0284c7" }]}>
-                        {dialerMinutes}
-                      </Text>
-                      <Text style={[styles.dialerUnitText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                        minutes
-                      </Text>
-                    </View>
-
-                    <Pressable
-                      onPress={() => adjustDialerMinutes(10)}
-                      disabled={dialerMinutes >= 240}
-                      style={({ pressed }) => [
-                        styles.dialerStepBtn,
-                        {
-                          backgroundColor: isDark ? "#1E1E24" : "#f1f5f9",
-                          borderColor: isDark ? "#2A2A32" : "#e2e8f0",
-                          opacity: dialerMinutes >= 240 ? 0.35 : 1,
-                        },
-                        pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] },
-                      ]}
-                    >
-                      <Text style={[styles.dialerStepBtnText, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                        +10m
-                      </Text>
-                    </Pressable>
-                  </View>
-
-                  {/* 10-Minute Presets Dial Strip */}
-                  <View style={styles.presetStripRow}>
-                    {DURATION_PRESETS.map((mins) => {
-                      const active = dialerMinutes === mins;
-                      return (
-                        <Pressable
-                          key={mins}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                            setDialerMinutes(mins);
-                          }}
-                          style={[
-                            styles.presetPill,
-                            {
-                              backgroundColor: active
-                                ? isDark
-                                  ? "rgba(56, 189, 248, 0.16)"
-                                  : "rgba(2, 132, 199, 0.1)"
-                                : isDark
-                                ? "#1A1A20"
-                                : "#f8fafc",
-                              borderColor: active
-                                ? isDark
-                                  ? "#38BDF8"
-                                  : "#0284c7"
-                                : isDark
-                                ? "#24242A"
-                                : "#e2e8f0",
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.presetPillText,
-                              {
-                                color: active
-                                  ? isDark
-                                    ? "#38BDF8"
-                                    : "#0284c7"
-                                  : isDark
-                                  ? "#71717A"
-                                  : theme.textFaint,
-                                fontWeight: active ? "800" : "600",
-                              },
-                            ]}
-                          >
-                            {mins}m
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  {/* Save Button */}
-                  <Pressable
-                    onPress={handleSaveDuration}
-                    style={({ pressed }) => [
-                      styles.dialerSaveBtn,
-                      {
-                        backgroundColor: isDark ? "#38BDF8" : "#0284c7",
-                      },
-                      pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-                    ]}
-                  >
-                    <Text style={styles.dialerSaveBtnText}>
-                      Set Duration ({dialerMinutes} mins)
-                    </Text>
-                  </Pressable>
-                </Card>
-              </View>
-            </Modal>
+          {/* Industry-Standard Scroll Wheel Duration Modal for Add Task Form */}
+          {isAddingDurationDialerOpen && (
+            <DurationWheelDialerModal
+              visible={isAddingDurationDialerOpen}
+              initialMinutes={customDuration}
+              taskTitle="Set New Task Duration"
+              onClose={() => setIsAddingDurationDialerOpen(false)}
+              onSave={(mins) => {
+                setCustomDuration(mins);
+                setIsAddingDurationDialerOpen(false);
+              }}
+            />
           )}
         </>
       }
@@ -915,137 +936,83 @@ export default function TodayScreen() {
                 </Pressable>
               </View>
 
-              {/* Tag Selection (Clean, NO parentheses or hardcoded min) */}
-              <View style={styles.inlineTagRow}>
-                {(["GATE", "Quick", "College", "Personal"] as const).map((t) => {
-                  const active = selectedTag === t;
-                  const cfg = TAG_CONFIG[t];
-                  return (
-                    <Pressable
-                      key={t}
-                      onPress={() => handleTagSelect(t)}
-                      style={[
-                        styles.inlineTagChip,
-                        {
-                          backgroundColor: active
-                            ? isDark
-                              ? cfg.bg
-                              : cfg.bg
-                            : isDark
-                            ? "#18181D"
-                            : "#f8fafc",
-                          borderColor: active
-                            ? cfg.color
-                            : isDark
-                            ? "#24242A"
-                            : "#e2e8f0",
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={cfg.icon}
-                        size={12}
-                        color={active ? cfg.color : isDark ? "#71717A" : theme.textFaint}
-                      />
-                      <Text
+              {/* Tag Selection Row with Target Time Trigger */}
+              <View style={styles.inlineTagAndDurationRow}>
+                {/* 4 Clean Category Chips */}
+                <View style={styles.inlineTagRow}>
+                  {(["GATE", "Quick", "College", "Personal"] as const).map((t) => {
+                    const active = selectedTag === t;
+                    const cfg = TAG_CONFIG[t];
+                    return (
+                      <Pressable
+                        key={t}
+                        onPress={() => handleTagSelect(t)}
                         style={[
-                          styles.inlineTagText,
-                          { color: active ? cfg.color : isDark ? "#A1A1AA" : theme.textMuted },
-                          active && { fontWeight: "800" },
+                          styles.inlineTagChip,
+                          {
+                            backgroundColor: active
+                              ? isDark
+                                ? cfg.bg
+                                : cfg.bg
+                              : isDark
+                              ? "#18181D"
+                              : "#f8fafc",
+                            borderColor: active
+                              ? cfg.color
+                              : isDark
+                              ? "#24242A"
+                              : "#e2e8f0",
+                          },
                         ]}
-                        numberOfLines={1}
                       >
-                        {cfg.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                        <Ionicons
+                          name={cfg.icon}
+                          size={12}
+                          color={active ? cfg.color : isDark ? "#71717A" : theme.textFaint}
+                        />
+                        <Text
+                          style={[
+                            styles.inlineTagText,
+                            { color: active ? cfg.color : isDark ? "#A1A1AA" : theme.textMuted },
+                            active && { fontWeight: "800" },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {cfg.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
 
-              {/* Quick Duration Dropdown / Selector for Add Form */}
-              <View style={styles.addDurationRow}>
+                {/* Duration Picker Button (Opens Scroll Wheel Modal) */}
                 <Pressable
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                    setShowAddDurationDropdown((prev) => !prev);
+                    setIsAddingDurationDialerOpen(true);
                   }}
                   style={[
                     styles.addDurationTrigger,
                     {
-                      backgroundColor: isDark ? "#18181D" : "#f8fafc",
+                      backgroundColor: isDark ? "#18181D" : "#f1f5f9",
                       borderColor: isDark ? "#2A2A32" : "#e2e8f0",
                     },
                   ]}
                 >
                   <Ionicons
                     name="time-outline"
-                    size={12}
+                    size={13}
                     color={isDark ? "#38BDF8" : "#0284c7"}
                   />
                   <Text style={[styles.addDurationTriggerText, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                    Duration: {customDuration} min
+                    {customDuration} min
                   </Text>
                   <Ionicons
-                    name={showAddDurationDropdown ? "chevron-up" : "chevron-down"}
-                    size={12}
+                    name="chevron-down"
+                    size={11}
                     color={isDark ? "#71717A" : theme.textFaint}
                   />
                 </Pressable>
-
-                {showAddDurationDropdown && (
-                  <View style={styles.addDurationOptionsStrip}>
-                    {DURATION_PRESETS.map((m) => {
-                      const active = customDuration === m;
-                      return (
-                        <Pressable
-                          key={m}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                            setCustomDuration(m);
-                            setShowAddDurationDropdown(false);
-                          }}
-                          style={[
-                            styles.durationOptionPill,
-                            {
-                              backgroundColor: active
-                                ? isDark
-                                  ? "rgba(56, 189, 248, 0.18)"
-                                  : "rgba(2, 132, 199, 0.12)"
-                                : isDark
-                                ? "#1A1A20"
-                                : "#f1f5f9",
-                              borderColor: active
-                                ? isDark
-                                  ? "#38BDF8"
-                                  : "#0284c7"
-                                : isDark
-                                ? "#24242A"
-                                : "#e2e8f0",
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.durationOptionText,
-                              {
-                                color: active
-                                  ? isDark
-                                    ? "#38BDF8"
-                                    : "#0284c7"
-                                  : isDark
-                                  ? "#A1A1AA"
-                                  : theme.textMuted,
-                                fontWeight: active ? "800" : "600",
-                              },
-                            ]}
-                          >
-                            {m}m
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
               </View>
             </Card>
           )}
@@ -1149,7 +1116,7 @@ export default function TodayScreen() {
                         </Text>
                       </View>
 
-                      {/* Interactive Time Badge (Opens 10m Step Dialer — Does NOT toggle task) */}
+                      {/* Interactive Time Badge (Opens Scroll Wheel Dialer — Does NOT toggle task) */}
                       <Pressable
                         onPress={(e) => {
                           e.stopPropagation();
@@ -1191,7 +1158,7 @@ export default function TodayScreen() {
                         />
                       </Pressable>
 
-                      {/* Helpful Hint on Recently Added Task */}
+                      {/* Subtle pointer hint on recently added task */}
                       {isJustAdded && (
                         <View style={styles.hintPointingBadge}>
                           <Ionicons name="arrow-back" size={10} color={isDark ? "#38BDF8" : "#0284c7"} />
@@ -1377,34 +1344,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  inlineTagRow: {
+  inlineTagAndDurationRow: {
     flexDirection: "row",
-    gap: 6,
+    alignItems: "center",
+    gap: 8,
+  },
+  inlineTagRow: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 5,
   },
   inlineTagChip: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 4,
+    gap: 3,
+    paddingHorizontal: 3,
     paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
   },
   inlineTagText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  addDurationRow: {
-    gap: 6,
+    fontSize: 10.5,
+    fontWeight: "700",
   },
   addDurationTrigger: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 6,
-    paddingHorizontal: 10,
+    gap: 4,
+    paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
@@ -1412,21 +1381,6 @@ const styles = StyleSheet.create({
   addDurationTriggerText: {
     fontSize: 11.5,
     fontWeight: "700",
-  },
-  addDurationOptionsStrip: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    paddingTop: 2,
-  },
-  durationOptionPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  durationOptionText: {
-    fontSize: 11,
   },
 
   todoList: {
@@ -1564,103 +1518,121 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // Modal Overlay & Time Dialer
-  modalOverlay: {
+  // -------------------------------------------------------------
+  // Industry Standard Scroll Wheel Modal Styling (Pure Black & White)
+  // -------------------------------------------------------------
+  wheelModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.65)",
+    backgroundColor: "rgba(0,0,0,0.72)",
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
     zIndex: 10000,
   },
-  dialerCard: {
+  wheelCardContainer: {
     width: "100%",
-    maxWidth: 360,
-    borderRadius: 20,
-    padding: 20,
+    maxWidth: 340,
+    backgroundColor: "#0C0C0F",
+    borderRadius: 22,
     borderWidth: 1,
-    gap: 18,
-    shadowColor: "#000",
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
+    borderColor: "#222228",
+    paddingTop: 16,
+    paddingBottom: 18,
+    paddingHorizontal: 16,
+    gap: 12,
+    shadowColor: "#000000",
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 16,
   },
-  dialerHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  dialerTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  dialerTaskName: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  dialerCloseBtn: {
-    padding: 2,
-  },
-  dialerDisplayRow: {
+  wheelTopBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#1F1F26",
+    paddingBottom: 12,
   },
-  dialerStepBtn: {
-    width: 60,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
+  wheelBarBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  wheelCancelText: {
+    fontSize: 14,
+    color: "#8E8E93",
+    fontWeight: "600",
+  },
+  wheelTitleBlock: {
+    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 8,
   },
-  dialerStepBtnText: {
-    fontSize: 13.5,
+  wheelHeaderTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  wheelDoneText: {
+    fontSize: 14,
+    color: "#38BDF8",
     fontWeight: "800",
   },
-  dialerCenterValue: {
+  wheelValuePreviewRow: {
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
+    paddingVertical: 4,
   },
-  dialerBigNumber: {
-    fontSize: 46,
+  wheelPreviewBigNumber: {
+    fontSize: 44,
     fontWeight: "900",
+    color: "#FFFFFF",
     fontVariant: ["tabular-nums"],
+    letterSpacing: -1,
   },
-  dialerUnitText: {
+  wheelPreviewUnit: {
     fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.5,
+    fontWeight: "600",
+    color: "#8E8E93",
     textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
-  presetStripRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    justifyContent: "center",
-  },
-  presetPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+  wheelPickerFrame: {
+    height: DIALER_ITEM_HEIGHT * DIALER_VISIBLE_COUNT, // 230px
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: 14,
+    backgroundColor: "#070709",
     borderWidth: 1,
+    borderColor: "#18181F",
   },
-  presetPillText: {
-    fontSize: 12,
+  wheelSelectionLens: {
+    position: "absolute",
+    top: DIALER_ITEM_HEIGHT * 2, // Center slot (index 2 out of 0..4)
+    left: 8,
+    right: 8,
+    height: DIALER_ITEM_HEIGHT,
+    backgroundColor: "rgba(56, 189, 248, 0.08)",
+    borderRadius: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "rgba(56, 189, 248, 0.28)",
+    zIndex: 1,
   },
-  dialerSaveBtn: {
-    height: 44,
-    borderRadius: 12,
+  wheelItemRow: {
+    height: DIALER_ITEM_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
   },
-  dialerSaveBtnText: {
-    color: "#ffffff",
-    fontSize: 14,
+  wheelItemText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#4B4B52",
+    fontVariant: ["tabular-nums"],
+  },
+  wheelItemTextSelected: {
+    fontSize: 18,
     fontWeight: "800",
+    color: "#FFFFFF",
   },
 });
