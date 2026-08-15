@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
@@ -81,7 +80,6 @@ async function playAchievementCheer() {
 }
 
 export default function TodayScreen() {
-  const router = useRouter();
   const date = todayInKolkata();
   const queryClient = useQueryClient();
   const { theme, isDark, toggleTheme } = useTheme();
@@ -165,20 +163,6 @@ export default function TodayScreen() {
     queryKey: ["routine", date],
     queryFn: () => api.routine.today(date),
     staleTime: 10_000,
-  });
-
-  // Also query tracker for quick signal preview
-  const trackerQuery = useQuery({
-    queryKey: ["tracker"],
-    queryFn: api.tracker.status,
-    staleTime: 30_000,
-  });
-
-  // Also query finance for quick runway preview
-  const financeQuery = useQuery({
-    queryKey: ["finance"],
-    queryFn: api.finance.get,
-    staleTime: 30_000,
   });
 
   // Sync backend tasks with mobile UI
@@ -408,26 +392,6 @@ export default function TodayScreen() {
   const progressPercent = totalCount ? Math.round((completedCount / totalCount) * 100) : 0;
   const nextPendingTask = todos.find((t) => !t.completed);
 
-  // Weekly consistency indicators (Mocked real days relative to today)
-  const weekDays = useMemo(() => {
-    const days = ["M", "T", "W", "T", "F", "S", "S"];
-    const currentDayIdx = (new Date().getDay() + 6) % 7; // Monday = 0
-    return days.map((label, idx) => ({
-      label,
-      isToday: idx === currentDayIdx,
-      isPast: idx < currentDayIdx,
-      done: idx < currentDayIdx ? true : idx === currentDayIdx && progressPercent === 100,
-    }));
-  }, [progressPercent]);
-
-  // Quick module signals
-  const readinessScore = trackerQuery.data?.overallReadiness || 74;
-  const monthlyAllowance = financeQuery.data?.budget?.allowance || 0;
-  const monthlySpent = (financeQuery.data?.expenses || [])
-    .filter((e) => e?.date?.startsWith(date.slice(0, 7)))
-    .reduce((s, e) => s + (Number(e?.amount) || 0), 0);
-  const remainingAllowance = monthlyAllowance > monthlySpent ? monthlyAllowance - monthlySpent : 0;
-
   return (
     <AppScreen
       title="Daily Focus"
@@ -441,21 +405,25 @@ export default function TodayScreen() {
       action={
         <Pressable
           onPress={toggleTheme}
-          style={[
-            styles.themeIconButton,
+          style={({ pressed }) => [
+            styles.themeSwitchButton,
             {
-              backgroundColor: isDark ? "#111113" : "#f1f5f9",
-              borderColor: isDark ? "#202025" : "#e2e8f0",
+              backgroundColor: isDark ? "#16161a" : "#f1f5f9",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
             },
+            pressed && { opacity: 0.7, transform: [{ scale: 0.96 }] },
           ]}
           hitSlop={8}
           accessibilityLabel="Toggle color theme"
         >
           <Ionicons
             name={isDark ? "sunny-outline" : "moon-outline"}
-            size={16}
+            size={14}
             color={isDark ? theme.amber : theme.text}
           />
+          <Text style={[styles.themeSwitchText, { color: theme.text }]}>
+            {isDark ? "Light" : "Dark"}
+          </Text>
         </Pressable>
       }
       overlay={
@@ -530,7 +498,7 @@ export default function TodayScreen() {
               </View>
             </View>
 
-            {/* Purposeful Momentum / Streak Badge (Replaces Redundant Chip) */}
+            {/* Real Status Badge (No Mock Data) */}
             <View
               style={[
                 styles.heroStatusBadge,
@@ -553,8 +521,8 @@ export default function TodayScreen() {
               ]}
             >
               <Ionicons
-                name={progressPercent === 100 ? "checkmark-circle" : "flame"}
-                color={progressPercent === 100 ? "#18B887" : "#F59E0B"}
+                name={progressPercent === 100 ? "checkmark-circle" : "time-outline"}
+                color={progressPercent === 100 ? "#18B887" : theme.amber}
                 size={14}
               />
               <Text
@@ -570,7 +538,7 @@ export default function TodayScreen() {
                   },
                 ]}
               >
-                {progressPercent === 100 ? "All completed" : "5d Streak"}
+                {progressPercent === 100 ? "All completed" : `${pendingCount} remaining`}
               </Text>
             </View>
           </View>
@@ -907,189 +875,33 @@ export default function TodayScreen() {
             </View>
           )}
         </View>
-
-        {/* 3. Purposeful Launchpad Hub (Fills Empty Space Below Tasks) */}
-        <View style={styles.hubSection}>
-          <SectionTitle title="Campus Launchpad" />
-
-          <View style={styles.launchpadGrid}>
-            {/* GATE Signal Card */}
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                router.push("/study");
-              }}
-              style={({ pressed }) => [
-                styles.launchpadCard,
-                {
-                  backgroundColor: isDark ? "#121215" : "#ffffff",
-                  borderColor: isDark ? "#202025" : "#e2e8f0",
-                },
-                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
-              ]}
-            >
-              <View style={styles.launchpadTopRow}>
-                <View
-                  style={[
-                    styles.launchpadIconBox,
-                    {
-                      backgroundColor: isDark ? "rgba(56, 189, 248, 0.12)" : "rgba(2, 132, 199, 0.08)",
-                      borderColor: isDark ? "rgba(56, 189, 248, 0.2)" : "transparent",
-                    },
-                  ]}
-                >
-                  <Ionicons name="school-outline" size={18} color={isDark ? "#38bdf8" : "#0284c7"} />
-                </View>
-                <View style={styles.signalBadge}>
-                  <Text style={[styles.signalBadgeText, { color: isDark ? "#38bdf8" : "#0284c7" }]}>
-                    {readinessScore}% Ready
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{ gap: 2 }}>
-                <Text style={[styles.launchpadTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                  GATE Tracker
-                </Text>
-                <Text style={[styles.launchpadSubtitle, { color: isDark ? "#71717A" : theme.textFaint }]}>
-                  Log study hours & syllabus
-                </Text>
-              </View>
-            </Pressable>
-
-            {/* Campus Cashflow Card */}
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                router.push("/finance");
-              }}
-              style={({ pressed }) => [
-                styles.launchpadCard,
-                {
-                  backgroundColor: isDark ? "#121215" : "#ffffff",
-                  borderColor: isDark ? "#202025" : "#e2e8f0",
-                },
-                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
-              ]}
-            >
-              <View style={styles.launchpadTopRow}>
-                <View
-                  style={[
-                    styles.launchpadIconBox,
-                    {
-                      backgroundColor: isDark ? "rgba(201, 138, 58, 0.14)" : "rgba(180, 83, 9, 0.08)",
-                      borderColor: isDark ? "rgba(201, 138, 58, 0.2)" : "transparent",
-                    },
-                  ]}
-                >
-                  <Ionicons name="wallet-outline" size={18} color={isDark ? "#C98A3A" : "#9A6218"} />
-                </View>
-                <View style={styles.signalBadge}>
-                  <Text style={[styles.signalBadgeText, { color: isDark ? "#18B887" : "#059669" }]}>
-                    {monthlyAllowance > 0 ? `₹${remainingAllowance.toLocaleString("en-IN")} Left` : "Set Budget"}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{ gap: 2 }}>
-                <Text style={[styles.launchpadTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                  Cashflow
-                </Text>
-                <Text style={[styles.launchpadSubtitle, { color: isDark ? "#71717A" : theme.textFaint }]}>
-                  Monthly runway & bills
-                </Text>
-              </View>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* 4. Jujum Daily Coaching Signal */}
-        <View
-          style={[
-            styles.coachingCard,
-            {
-              backgroundColor: isDark ? "#121215" : "#ffffff",
-              borderColor: isDark ? "#202025" : "#e2e8f0",
-            },
-          ]}
-        >
-          <View style={styles.coachingHeader}>
-            <View style={styles.coachingAvatar}>
-              <Ionicons name="sparkles" size={14} color="#38BDF8" />
-            </View>
-            <Text style={[styles.coachingAuthor, { color: isDark ? "#F5F5F7" : theme.text }]}>
-              Jujum Academic Signal
-            </Text>
-          </View>
-
-          <Text style={[styles.coachingQuote, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-            "Consistency beats intensity. One focused 45-minute deep work block for Engineering Math beats 3 hours of unfocused revision."
-          </Text>
-
-          {/* 7-Day Consistency Week Strip */}
-          <View style={styles.weekStripContainer}>
-            {weekDays.map((day, idx) => (
-              <View key={`day-${idx}`} style={styles.dayCol}>
-                <Text
-                  style={[
-                    styles.dayLabel,
-                    {
-                      color: day.isToday
-                        ? isDark
-                          ? "#F5F5F7"
-                          : theme.text
-                        : isDark
-                        ? "#71717A"
-                        : theme.textFaint,
-                      fontWeight: day.isToday ? "800" : "500",
-                    },
-                  ]}
-                >
-                  {day.label}
-                </Text>
-                <View
-                  style={[
-                    styles.dayDot,
-                    {
-                      backgroundColor: day.done
-                        ? "#18B887"
-                        : day.isToday
-                        ? isDark
-                          ? "#38BDF8"
-                          : "#0284c7"
-                        : isDark
-                        ? "#202025"
-                        : "#e2e8f0",
-                      borderColor: day.isToday ? (isDark ? "#38BDF8" : "#0284c7") : "transparent",
-                    },
-                  ]}
-                />
-              </View>
-            ))}
-          </View>
-        </View>
       </ScrollView>
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  themeIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
+  themeSwitchButton: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  themeSwitchText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   screenScrollContent: {
-    gap: 20,
+    gap: 16,
     paddingBottom: 90,
   },
 
   // Hero Card
   heroCard: {
-    padding: 18,
+    padding: 16,
     gap: 12,
     borderRadius: 18,
     borderWidth: 1,
@@ -1104,7 +916,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   heroLabel: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: "800",
     letterSpacing: 0.8,
   },
@@ -1119,7 +931,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   heroCountSub: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: "600",
   },
   heroStatusBadge: {
@@ -1165,6 +977,7 @@ const styles = StyleSheet.create({
   // To-Do Section
   todoSection: {
     gap: 10,
+    marginTop: 2,
   },
   addPillButton: {
     flexDirection: "row",
@@ -1348,109 +1161,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     gap: 8,
+    marginTop: 10,
   },
   emptyStateText: {
     fontSize: 13,
     fontWeight: "500",
-  },
-
-  // Campus Launchpad Hub
-  hubSection: {
-    gap: 10,
-    marginTop: 6,
-  },
-  launchpadGrid: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  launchpadCard: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 10,
-  },
-  launchpadTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  launchpadIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  signalBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  signalBadgeText: {
-    fontSize: 10.5,
-    fontWeight: "800",
-  },
-  launchpadTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  launchpadSubtitle: {
-    fontSize: 11.5,
-    fontWeight: "500",
-  },
-
-  // Jujum Daily Coaching Signal
-  coachingCard: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
-  },
-  coachingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  coachingAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(56, 189, 248, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  coachingAuthor: {
-    fontSize: 12.5,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
-  coachingQuote: {
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: "500",
-    fontStyle: "italic",
-  },
-  weekStripContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#202025",
-  },
-  dayCol: {
-    alignItems: "center",
-    gap: 4,
-  },
-  dayLabel: {
-    fontSize: 10.5,
-  },
-  dayDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1,
   },
 });
