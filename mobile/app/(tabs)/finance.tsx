@@ -167,16 +167,36 @@ function CategoryIconBadge({
   category,
   isDark,
   customIcon,
+  monochrome = false,
 }: {
   category: FinanceCategory;
   isDark: boolean;
   customIcon?: keyof typeof Ionicons.glyphMap;
+  monochrome?: boolean;
 }) {
   const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Others;
   const iconName = customIcon || meta.icon;
-  const iconColor = isDark ? meta.darkIcon : meta.lightIcon;
-  const bgColor = isDark ? meta.darkBg : meta.lightBg;
-  const borderColor = isDark ? meta.darkBorder : meta.lightBorder;
+  const iconColor = monochrome
+    ? isDark
+      ? "#A1A1AA"
+      : "#64748b"
+    : isDark
+    ? meta.darkIcon
+    : meta.lightIcon;
+  const bgColor = monochrome
+    ? isDark
+      ? "#16161A"
+      : "#f1f5f9"
+    : isDark
+    ? meta.darkBg
+    : meta.lightBg;
+  const borderColor = monochrome
+    ? isDark
+      ? "#24242A"
+      : "#e2e8f0"
+    : isDark
+    ? meta.darkBorder
+    : meta.lightBorder;
 
   return (
     <View
@@ -852,6 +872,7 @@ export default function FinanceScreen() {
 
             {top3Spending.length > 0 ? (
               top3Spending.map((item, idx) => {
+                const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
                 return (
                   <Pressable
                     key={item.category}
@@ -866,9 +887,9 @@ export default function FinanceScreen() {
                     ]}
                   >
                     <View style={styles.spendingRowLeft}>
-                      <CategoryIconBadge category={item.category} isDark={isDark} />
+                      <CategoryIconBadge category={item.category} isDark={isDark} monochrome={true} />
                       <View style={{ gap: 2 }}>
-                        <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        <Text style={[styles.itemTitle, { color: isDark ? meta.darkIcon : meta.lightIcon }]}>
                           {item.category}
                         </Text>
                         {item.isOver ? (
@@ -1450,6 +1471,7 @@ function AllSpendingContent({
         ]}
       >
         {allStats.map((item, idx) => {
+          const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
           return (
             <View
               key={item.category}
@@ -1463,9 +1485,9 @@ function AllSpendingContent({
             >
               <View style={styles.envelopeTopRow}>
                 <View style={styles.envelopeLeftBlock}>
-                  <CategoryIconBadge category={item.category} isDark={isDark} />
+                  <CategoryIconBadge category={item.category} isDark={isDark} monochrome={true} />
                   <View style={{ gap: 2 }}>
-                    <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                    <Text style={[styles.itemTitle, { color: isDark ? meta.darkIcon : meta.lightIcon }]}>
                       {item.category}
                     </Text>
                     <Text style={styles.itemSubtext}>
