@@ -69,7 +69,9 @@ export default function RootLayout() {
           persister: queryPersister,
           maxAge: 1000 * 60 * 60 * 24,
           dehydrateOptions: {
-            shouldDehydrateQuery: (query) => !String(query.queryKey[0]).startsWith("journal"),
+            shouldDehydrateQuery: (query) =>
+              query.state.status === "success" &&
+              !String(query.queryKey[0]).startsWith("journal"),
           },
         }}
       >

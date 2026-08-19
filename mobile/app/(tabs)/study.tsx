@@ -27,6 +27,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/src/providers/theme-provider";
 import { useNotify } from "@/src/providers/notification-provider";
+import { useAuth } from "@/src/providers/auth-provider";
 import { AppScreen } from "@/src/components/screen";
 import {
   ActionButton,
@@ -72,6 +73,7 @@ function formatDateShort(dateStr: string): string {
 
 export default function StudyScreen() {
   const { theme, isDark } = useTheme();
+  const { unlocked } = useAuth();
   const notify = useNotify();
   const client = useQueryClient();
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -81,6 +83,7 @@ export default function StudyScreen() {
   const tracker = useQuery({
     queryKey: ["tracker"],
     queryFn: api.tracker.status,
+    enabled: unlocked,
     staleTime: 5_000,
   });
 

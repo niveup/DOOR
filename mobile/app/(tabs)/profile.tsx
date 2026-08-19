@@ -23,7 +23,7 @@ import { api } from "@/src/services/api";
 const backendUrl = process.env.EXPO_PUBLIC_API_URL || "https://api.door.app";
 
 export default function ProfileScreen() {
-  const { lock } = useAuth();
+  const { lock, unlocked } = useAuth();
   const client = useQueryClient();
   const notify = useNotify();
   const { theme, isDark } = useTheme();
@@ -34,6 +34,7 @@ export default function ProfileScreen() {
   const trackerQuery = useQuery({
     queryKey: ["tracker"],
     queryFn: api.tracker.status,
+    enabled: unlocked,
     staleTime: 10_000,
   });
 

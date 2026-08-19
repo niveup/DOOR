@@ -9,16 +9,18 @@ import { api } from "@/src/services/api";
 import { todayInKolkata } from "@/src/lib/format";
 import { JournalEntry } from "@/src/types/domain";
 import { colors } from "@/src/theme/tokens";
+import { useAuth } from "@/src/providers/auth-provider";
 
 type MentorMode = "journal" | "explain" | "interview";
 const moods = ["1", "2", "3", "4", "5"];
 
 export default function MentorScreen() {
   const client = useQueryClient();
+  const { unlocked } = useAuth();
   const [mode, setMode] = useState<MentorMode>("journal");
   const date = todayInKolkata();
-  const entry = useQuery({ queryKey: ["journal", date], queryFn: () => api.journal.entry(date), enabled: mode === "journal" });
-  const history = useQuery({ queryKey: ["journal-history"], queryFn: api.journal.history, enabled: mode === "journal" });
+  const entry = useQuery({ queryKey: ["journal", date], queryFn: () => api.journal.entry(date), enabled: unlocked && mode === "journal" });
+  const history = useQuery({ queryKey: ["journal-history"], queryFn: api.journal.history, enabled: unlocked && mode === "journal" });
   const refresh = async () => { await Promise.all([entry.refetch(), history.refetch()]); };
   return <AppScreen title="Jujum Mentor" subtitle="Reflect, learn, then practice under pressure." refreshing={entry.isRefetching || history.isRefetching} onRefresh={refresh}>
     <View style={styles.tabs}>{(["journal", "explain", "interview"] as MentorMode[]).map((item) => <Chip key={item} label={item === "journal" ? "Journal" : item === "explain" ? "Explainer" : "Interview"} active={mode === item} tone={item === "journal" ? colors.violet : item === "explain" ? colors.cyan : colors.amber} onPress={() => setMode(item)} />)}</View>

@@ -39,6 +39,7 @@ import { formatINR, shortDate, todayInKolkata } from "@/src/lib/format";
 import { Bill, Budget, Expense, FinanceCategory, financeCategories } from "@/src/types/domain";
 import { useTheme } from "@/src/providers/theme-provider";
 import { useNotify } from "@/src/providers/notification-provider";
+import { useAuth } from "@/src/providers/auth-provider";
 
 // -------------------------------------------------------------
 // Centralized Fintech Design & Category Color Tokens
@@ -236,9 +237,11 @@ export default function FinanceScreen() {
     [isDark]
   );
 
+  const { unlocked } = useAuth();
   const finance = useQuery({
     queryKey: ["finance"],
     queryFn: api.finance.get,
+    enabled: unlocked,
     staleTime: 5_000,
   });
   const data = finance.data;

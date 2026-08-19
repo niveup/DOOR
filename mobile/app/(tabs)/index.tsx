@@ -23,6 +23,7 @@ import { todayInKolkata } from "@/src/lib/format";
 import { api } from "@/src/services/api";
 import { useTheme } from "@/src/providers/theme-provider";
 import { useNotify } from "@/src/providers/notification-provider";
+import { useAuth } from "@/src/providers/auth-provider";
 
 type TodoTag = "GATE" | "College" | "Personal";
 
@@ -231,6 +232,7 @@ function CompactDurationDialerModal({
 export default function TodayScreen() {
   const date = todayInKolkata();
   const queryClient = useQueryClient();
+  const { unlocked } = useAuth();
   const notify = useNotify();
   const { theme, isDark, toggleTheme } = useTheme();
   const cheerPlayer = useAudioPlayer(require("@/assets/sounds/cheer.mp3"));
@@ -313,6 +315,7 @@ export default function TodayScreen() {
   const routineQuery = useQuery({
     queryKey: ["routine", date],
     queryFn: () => api.routine.today(date),
+    enabled: unlocked,
     staleTime: 10_000,
   });
 
