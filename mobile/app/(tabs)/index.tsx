@@ -15,7 +15,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { Audio } from "expo-av";
+import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import { Ionicons } from "@expo/vector-icons";
 import { AppScreen } from "@/src/components/screen";
 import { Card, ProgressBar, SectionTitle } from "@/src/components/ui";
@@ -49,44 +49,15 @@ const DIALER_OPTIONS = [
 const ITEM_HEIGHT = 44;
 const VISIBLE_COUNT = 5; // 2 above, 1 selected in center, 2 below
 
-let cheerSoundObject: Audio.Sound | null = null;
-
 async function setupAudio() {
   try {
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      interruptionMode: "duckOthers",
+      shouldRouteThroughEarpiece: false,
     });
   } catch {}
-}
-
-async function playAchievementCheer() {
-  try {
-    await setupAudio();
-    if (!cheerSoundObject) {
-      const { sound } = await Audio.Sound.createAsync(
-        require("@/assets/sounds/cheer.mp3"),
-        { shouldPlay: true, volume: 1.0 }
-      );
-      cheerSoundObject = sound;
-    } else {
-      await cheerSoundObject.replayAsync();
-    }
-  } catch {
-    try {
-      const { sound } = await Audio.Sound.createAsync(
-        require("@/assets/sounds/cheer.mp3"),
-        { shouldPlay: true, volume: 1.0 }
-      );
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync();
-        }
-      });
-    } catch {}
-  }
 }
 
 // -------------------------------------------------------------
@@ -261,6 +232,7 @@ export default function TodayScreen() {
   const date = todayInKolkata();
   const queryClient = useQueryClient();
   const { theme, isDark, toggleTheme } = useTheme();
+  const cheerPlayer = useAudioPlayer(require("@/assets/sounds/cheer.mp3"));
 
   // 3 Distinct & Harmonious Tag System (Spacious Layout)
   const TAG_CONFIG: Record<
@@ -306,17 +278,9 @@ export default function TodayScreen() {
   const [toastText, setToastText] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
 
-  // Pre-load audio instance on mount
+  // The player is preloaded by useAudioPlayer and automatically released on unmount.
   useEffect(() => {
-    setupAudio();
-    Audio.Sound.createAsync(
-      require("@/assets/sounds/cheer.mp3"),
-      { shouldPlay: false, volume: 1.0 }
-    )
-      .then(({ sound }) => {
-        cheerSoundObject = sound;
-      })
-      .catch(() => {});
+    void setupAudio();
 
     // Load mobile tags mapping
     AsyncStorage.getItem("door_mobile_tags_map").then((res) => {
@@ -327,13 +291,22 @@ export default function TodayScreen() {
       }
     });
 
-    return () => {
-      if (cheerSoundObject) {
-        cheerSoundObject.unloadAsync().catch(() => {});
-        cheerSoundObject = null;
-      }
-    };
   }, []);
+
+  const playAchievementCheer = () => {
+    void (async () => {
+      try {
+        await setupAudio();
+        cheerPlayer.volume = 1;
+        await cheerPlayer.seekTo(0);
+        cheerPlayer.play();
+      } catch {
+        try {
+          cheerPlayer.play();
+        } catch {}
+      }
+    })();
+  };
 
   // Sync with Backend Routine Query
   const routineQuery = useQuery({
@@ -1022,25 +995,40 @@ export default function TodayScreen() {
 
           {/* List of Tasks */}
           <View style={styles.todoList}>
-            {todos.length === 0 && !routineQuery.isLoading && (
-              <View
-                style={[
-                  styles.emptyStateCard,
+            {todos.length === 0 && !routineQuery.isLoading && !showAddCard && (
+              <Pressable
+                onPress={toggleAddCard}
+                style={({ pressed }) => [
+                  styles.emptyTasksBlock,
                   {
-                    backgroundColor: isDark ? "#121215" : "#ffffff",
-                    borderColor: isDark ? "#202025" : "#e2e8f0",
+                    backgroundColor: isDark ? "#151518" : "#ffffff",
+                    borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
                   },
+                  pressed && { opacity: 0.82, transform: [{ scale: 0.99 }] },
                 ]}
               >
-                <Ionicons
-                  name="checkmark-done-outline"
-                  size={20}
-                  color={isDark ? "#71717a" : "#94a3b8"}
-                />
-                <Text style={[styles.emptyStateText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                  No tasks set for today · Tap "+ Add task" to plan.
+                <View
+                  style={[
+                    styles.emptyTasksIconBadge,
+                    {
+                      backgroundColor: isDark ? "rgba(59, 130, 246, 0.12)" : "rgba(37, 99, 235, 0.08)",
+                      borderColor: isDark ? "rgba(59, 130, 246, 0.22)" : "rgba(37, 99, 235, 0.15)",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="checkbox-outline"
+                    size={20}
+                    color={isDark ? "#60A5FA" : "#2563EB"}
+                  />
+                </View>
+                <Text style={[styles.emptyTasksHeadline, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                  No tasks set for today
                 </Text>
-              </View>
+                <Text style={[styles.emptyTasksSubtext, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                  Tap to plan your focus blocks or daily goals
+                </Text>
+              </Pressable>
             )}
 
             {todos.map((item) => {
@@ -1482,20 +1470,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
-  emptyStateCard: {
-    flexDirection: "row",
+  emptyTasksBlock: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
-    marginTop: 10,
+    gap: 6,
+    marginTop: 4,
   },
-  emptyStateText: {
-    fontSize: 13,
+  emptyTasksIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  emptyTasksHeadline: {
+    fontSize: 14.5,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: -0.2,
+  },
+  emptyTasksSubtext: {
+    fontSize: 12.5,
     fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 17,
+    maxWidth: 280,
   },
 
   // -------------------------------------------------------------

@@ -1499,9 +1499,11 @@ function FinanceOverviewPanel({
       <div className="surface p-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">Top expenses this month</p>
-          <Link href="/finance" className="text-[10px] font-semibold text-[var(--accent)] hover:underline">
-            View all
-          </Link>
+          {highestExpenses.length > 0 && (
+            <Link href="/finance" className="text-[10px] font-semibold text-[var(--accent)] hover:underline">
+              View all
+            </Link>
+          )}
         </div>
 
         {highestExpenses.length > 0 ? (

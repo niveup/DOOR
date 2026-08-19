@@ -14,13 +14,8 @@
     },
     "android": {
       "package": "com.jujum.door",
-      "usesCleartextTraffic": false,
       "softwareKeyboardLayoutMode": "pan",
       "backgroundColor": "#09090b",
-      "navigationBar": {
-        "backgroundColor": "#09090b",
-        "barStyle": "light-content"
-      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#09090b"
@@ -49,7 +44,15 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-asset"
+      "expo-asset",
+      "expo-audio",
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false,
+          "style": "light"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

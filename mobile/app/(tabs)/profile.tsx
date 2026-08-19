@@ -24,7 +24,7 @@ export default function ProfileScreen() {
     <SectionTitle title="App controls" />
     <ActionButton label="Lock this device" icon="lock-closed-outline" tone="rose" onPress={lockApp} />
     <ActionButton label="Backend deployment guide" icon="open-outline" tone="ghost" onPress={() => Linking.openURL("https://render.com/docs") } />
-    <View style={[ui.row, styles.footer]}><Text style={styles.footerText}>DOOR Android · Expo SDK 52</Text><Text style={styles.footerText}>v1.0.0</Text></View>
+    <View style={[ui.row, styles.footer]}><Text style={styles.footerText}>DOOR Android · Expo SDK 54</Text><Text style={styles.footerText}>v1.0.0</Text></View>
   </AppScreen>;
 }
 const styles = StyleSheet.create({

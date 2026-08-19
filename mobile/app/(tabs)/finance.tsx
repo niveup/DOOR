@@ -15,6 +15,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScrollView as GHScrollView } from "react-native-gesture-handler";
 import Animated, {
+  FadeInDown,
   runOnJS,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -148,11 +149,11 @@ type DetailMode = "budget" | "all-spending" | "all-bills" | "all-activity" | nul
 
 function getDateLabel(dateStr: string): string {
   const today = todayInKolkata();
-  if (dateStr === today) return "Today";
+  if (dateStr === today) return `Today · ${shortDate(dateStr)}`;
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const yStr = yesterday.toISOString().slice(0, 10);
-  if (dateStr === yStr) return "Yesterday";
+  if (dateStr === yStr) return `Yesterday · ${shortDate(dateStr)}`;
   try {
     return shortDate(dateStr);
   } catch {
@@ -664,12 +665,13 @@ export default function FinanceScreen() {
         contentContainerStyle={styles.screenScrollContent}
       >
         {/* Section 1 — Major: Monthly Runway Hero */}
-        <View
+        <Animated.View
+          entering={FadeInDown.delay(40).duration(320)}
           style={[
             styles.heroCard,
             {
-              backgroundColor: isDark ? "#151519" : "#ffffff",
-              borderColor: isDark ? "#202025" : "#e2e8f0",
+              backgroundColor: isDark ? "#151518" : "#ffffff",
+              borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
             },
           ]}
         >
@@ -725,7 +727,7 @@ export default function FinanceScreen() {
                 ? isOverBudget
                   ? "₹0/day safe spend"
                   : `${formatINR(safeDailySpend)}/day`
-                : "No limit set"}
+                : "No budget limit set"}
             </Text>
             <Text style={[styles.heroMetricDot, { color: isDark ? "#71717A" : theme.textFaint }]}>·</Text>
             <Text style={[styles.heroMetricSecondary, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
@@ -759,12 +761,21 @@ export default function FinanceScreen() {
               <Text style={[styles.heroStatusHealthy, { color: SEMANTIC.emerald }]}>
                 ● On track this month
               </Text>
-            ) : null}
+            ) : (
+              <Pressable onPress={() => openDetail("budget")} hitSlop={6}>
+                <Text style={[styles.heroStatusHealthy, { color: isDark ? "#A1A1AA" : theme.textMuted, fontWeight: "600" }]}>
+                  ● Set monthly limit →
+                </Text>
+              </Pressable>
+            )}
           </View>
-        </View>
+        </Animated.View>
 
         {/* Section 2 — Primary Actions */}
-        <View style={styles.actionRow}>
+        <Animated.View
+          entering={FadeInDown.delay(80).duration(320)}
+          style={styles.actionRow}
+        >
           <Pressable
             onPress={() => openForm("expense")}
             style={({ pressed }) => [
@@ -776,7 +787,14 @@ export default function FinanceScreen() {
               pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
             ]}
           >
-            <Ionicons name="add" size={16} color={isDark ? "#09090b" : "#ffffff"} />
+            <View
+              style={[
+                styles.actionBtnIconBadge,
+                { backgroundColor: isDark ? "#09090b" : "#ffffff" },
+              ]}
+            >
+              <Ionicons name="add" size={13} color={isDark ? "#ffffff" : "#0f172a"} />
+            </View>
             <Text style={[styles.primaryButtonText, { color: isDark ? "#09090b" : "#ffffff" }]}>
               Log Expense
             </Text>
@@ -787,8 +805,8 @@ export default function FinanceScreen() {
             style={({ pressed }) => [
               styles.secondaryButton,
               {
-                backgroundColor: isDark ? "#111113" : "#ffffff",
-                borderColor: isDark ? "#202025" : "#e2e8f0",
+                backgroundColor: isDark ? "#151518" : "#ffffff",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#cbd5e1",
               },
               pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
             ]}
@@ -798,60 +816,65 @@ export default function FinanceScreen() {
               Plan Budget
             </Text>
           </Pressable>
-        </View>
+        </Animated.View>
 
         {/* Section 3 — Spending Overview */}
-        <View style={styles.sectionContainer}>
+        <Animated.View
+          entering={FadeInDown.delay(120).duration(320)}
+          style={styles.sectionContainer}
+        >
           <SectionTitle
             title="Spending"
             trailing={
-              <Pressable
-                onPress={() => openDetail("all-spending")}
-                hitSlop={8}
-                style={styles.textActionPill}
-              >
-                <Text style={[styles.textActionLabel, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                  View all →
-                </Text>
-              </Pressable>
+              allCategoryStats.length > 3 ? (
+                <Pressable
+                  onPress={() => openDetail("all-spending")}
+                  hitSlop={8}
+                  style={styles.textActionPill}
+                >
+                  <Text style={[styles.textActionLabel, { color: isDark ? "#60A5FA" : "#2563EB" }]}>
+                    View all →
+                  </Text>
+                </Pressable>
+              ) : null
             }
           />
 
-          <View
-            style={[
-              styles.unifiedCard,
-              {
-                backgroundColor: isDark ? "#111113" : "#ffffff",
-                borderColor: isDark ? "#1F1F24" : "#e2e8f0",
-              },
-            ]}
-          >
-            {/* Vibrant, bold category allocation strip */}
-            {spent > 0 && allCategoryStats.length > 0 ? (
-              <View style={styles.spendingBarContainer}>
-                <View style={styles.segmentedProgressBar}>
-                  {allCategoryStats.map((item) => {
-                    const flexShare = Math.max(item.total / spent, 0.05);
-                    const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
-                    return (
-                      <View
-                        key={`seg-${item.category}`}
-                        style={[
-                          styles.segmentBarSlice,
-                          {
-                            flex: flexShare,
-                            backgroundColor: meta.barColor,
-                          },
-                        ]}
-                      />
-                    );
-                  })}
+          {allCategoryStats.length > 0 ? (
+            <View
+              style={[
+                styles.unifiedCard,
+                {
+                  backgroundColor: isDark ? "#151518" : "#ffffff",
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                },
+              ]}
+            >
+              {/* Vibrant, bold category allocation strip */}
+              {spent > 0 ? (
+                <View style={styles.spendingBarContainer}>
+                  <View style={styles.segmentedProgressBar}>
+                    {allCategoryStats.map((item) => {
+                      const flexShare = Math.max(item.total / spent, 0.05);
+                      const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
+                      return (
+                        <View
+                          key={`seg-${item.category}`}
+                          style={[
+                            styles.segmentBarSlice,
+                            {
+                              flex: flexShare,
+                              backgroundColor: meta.barColor,
+                            },
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
-            ) : null}
+              ) : null}
 
-            {top3Spending.length > 0 ? (
-              top3Spending.map((item, idx) => {
+              {top3Spending.map((item, idx) => {
                 const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
                 return (
                   <Pressable
@@ -861,21 +884,42 @@ export default function FinanceScreen() {
                       styles.spendingRowItem,
                       (idx > 0 || (spent > 0 && allCategoryStats.length > 0)) && [
                         styles.hairlineDivider,
-                        { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                        { borderTopColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9" },
                       ],
                       pressed && { opacity: 0.75 },
                     ]}
                   >
                     <View style={styles.spendingRowLeft}>
                       <CategoryIconBadge category={item.category} isDark={isDark} />
-                      <View style={{ gap: 2 }}>
+                      <View style={{ gap: 2, flex: 1 }}>
                         <Text style={[styles.itemTitle, { color: isDark ? meta.darkIcon : meta.lightIcon }]}>
                           {item.category}
                         </Text>
-                        {item.isOver ? (
-                          <Text style={{ color: SEMANTIC.crimson, fontSize: 12.5, fontWeight: "600" }}>
-                            {formatINR(item.total - item.cap)} over budget
+                        {item.cap > 0 ? (
+                          item.isOver ? (
+                            <Text style={{ color: SEMANTIC.crimson, fontSize: 12, fontWeight: "600" }}>
+                              {formatINR(item.total - item.cap)} over limit · Cap: {formatINR(item.cap)}
+                            </Text>
+                          ) : (
+                            <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontSize: 12, fontWeight: "500" }}>
+                              {item.total > 0
+                                ? `${formatINR(item.cap - item.total)} left of ${formatINR(item.cap)} limit`
+                                : `Limit: ${formatINR(item.cap)} · ₹0 spent`}
+                            </Text>
+                          )
+                        ) : (
+                          <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontSize: 12, fontWeight: "500" }}>
+                            No limit set
                           </Text>
+                        )}
+                        {item.cap > 0 ? (
+                          <View style={{ marginTop: 4 }}>
+                            <ProgressBar
+                              value={item.percent}
+                              height={3.5}
+                              tone={item.isOver ? SEMANTIC.crimson : item.percent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
+                            />
+                          </View>
                         ) : null}
                       </View>
                     </View>
@@ -887,46 +931,63 @@ export default function FinanceScreen() {
                     </View>
                   </Pressable>
                 );
-              })
-            ) : (
-              <Pressable
-                onPress={() => openDetail("budget")}
-                style={({ pressed }) => [
-                  styles.emptyEnvelopesPrompt,
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Ionicons name="pie-chart-outline" size={18} color={isDark ? "#71717A" : theme.textFaint} />
-                <View style={{ gap: 2, alignItems: "center" }}>
-                  <Text style={[styles.emptyEnvelopesTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                    Plan Spending Limits
-                  </Text>
-                  <Text style={[styles.emptyEnvelopesText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                    Tap to set monthly budgets for Food, Travel & Hostel.
-                  </Text>
-                </View>
-              </Pressable>
-            )}
+              })}
 
+              {allCategoryStats.length > 3 ? (
+                <Pressable
+                  onPress={() => openDetail("all-spending")}
+                  style={({ pressed }) => [
+                    styles.collapseBottomButton,
+                    {
+                      borderTopColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9",
+                    },
+                    pressed && { opacity: 0.65 },
+                  ]}
+                >
+                  <Text style={[styles.collapseBottomText, { color: isDark ? "#60A5FA" : "#2563EB" }]}>
+                    View all {allCategoryStats.length} categories →
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
             <Pressable
-              onPress={() => openDetail("all-spending")}
+              onPress={() => openForm("expense")}
               style={({ pressed }) => [
-                styles.collapseBottomButton,
+                styles.emptyStateBlock,
                 {
-                  borderTopColor: isDark ? "#18181D" : "#f1f5f9",
+                  backgroundColor: isDark ? "#151518" : "#ffffff",
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
                 },
-                pressed && { opacity: 0.65 },
+                pressed && { opacity: 0.82, transform: [{ scale: 0.99 }] },
               ]}
             >
-              <Text style={[styles.collapseBottomText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                View all {allCategoryStats.length || 8} categories →
+              <View
+                style={[
+                  styles.emptyStateIconBadge,
+                  {
+                    backgroundColor: isDark ? "rgba(59, 130, 246, 0.12)" : "rgba(37, 99, 235, 0.08)",
+                    borderColor: isDark ? "rgba(59, 130, 246, 0.22)" : "rgba(37, 99, 235, 0.15)",
+                  },
+                ]}
+              >
+                <Ionicons name="pie-chart-outline" size={20} color={isDark ? "#60A5FA" : "#2563EB"} />
+              </View>
+              <Text style={[styles.emptyStateHeadline, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                No spending yet
+              </Text>
+              <Text style={[styles.emptyStateSubtext, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                Log your first expense to see where it's going
               </Text>
             </Pressable>
-          </View>
-        </View>
+          )}
+        </Animated.View>
 
         {/* Section 4 — Upcoming Bills */}
-        <View style={styles.sectionContainer}>
+        <Animated.View
+          entering={FadeInDown.delay(160).duration(320)}
+          style={styles.sectionContainer}
+        >
           <SectionTitle
             title="Upcoming bills"
             trailing={
@@ -935,7 +996,7 @@ export default function FinanceScreen() {
                 hitSlop={8}
                 style={styles.textActionPill}
               >
-                <Text style={[styles.textActionLabel, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                <Text style={[styles.textActionLabel, { color: isDark ? "#60A5FA" : "#2563EB" }]}>
                   + Add bill
                 </Text>
               </Pressable>
@@ -947,8 +1008,8 @@ export default function FinanceScreen() {
               style={[
                 styles.unifiedCard,
                 {
-                  backgroundColor: isDark ? "#111113" : "#ffffff",
-                  borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+                  backgroundColor: isDark ? "#151518" : "#ffffff",
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
                 },
               ]}
             >
@@ -961,7 +1022,7 @@ export default function FinanceScreen() {
                       styles.unifiedItemRow,
                       idx > 0 && [
                         styles.hairlineDivider,
-                        { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                        { borderTopColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9" },
                       ],
                       pressed && { opacity: 0.8 },
                     ]}
@@ -1014,53 +1075,73 @@ export default function FinanceScreen() {
                 );
               })}
 
-              <Pressable
-                onPress={() => openDetail("all-bills")}
-                style={({ pressed }) => [
-                  styles.collapseBottomButton,
-                  {
-                    borderTopColor: isDark ? "#18181D" : "#f1f5f9",
-                  },
-                  pressed && { opacity: 0.65 },
-                ]}
-              >
-                <Text style={[styles.collapseBottomText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                  View all {unpaidBills.length} bills →
-                </Text>
-              </Pressable>
+              {unpaidBills.length > 2 ? (
+                <Pressable
+                  onPress={() => openDetail("all-bills")}
+                  style={({ pressed }) => [
+                    styles.collapseBottomButton,
+                    {
+                      borderTopColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9",
+                    },
+                    pressed && { opacity: 0.65 },
+                  ]}
+                >
+                  <Text style={[styles.collapseBottomText, { color: isDark ? "#60A5FA" : "#2563EB" }]}>
+                    View all {unpaidBills.length} bills →
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : (
             <View
               style={[
-                styles.compactEmptyRow,
+                styles.emptyStateBlock,
                 {
-                  backgroundColor: isDark ? "#111113" : "#ffffff",
-                  borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+                  backgroundColor: isDark ? "#151518" : "#ffffff",
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
                 },
               ]}
             >
-              <Ionicons name="checkmark-circle-outline" size={15} color={SEMANTIC.emerald} />
-              <Text style={[styles.quietStatusText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+              <View
+                style={[
+                  styles.emptyStateIconBadge,
+                  {
+                    backgroundColor: isDark ? "rgba(24, 184, 135, 0.12)" : "rgba(5, 150, 105, 0.08)",
+                    borderColor: isDark ? "rgba(24, 184, 135, 0.22)" : "rgba(5, 150, 105, 0.15)",
+                  },
+                ]}
+              >
+                <Ionicons name="checkmark-circle-outline" size={20} color={SEMANTIC.emerald} />
+              </View>
+              <Text style={[styles.emptyStateHeadline, { color: isDark ? "#F5F5F7" : theme.text }]}>
                 All clear · No upcoming bills
+              </Text>
+              <Text style={[styles.emptyStateSubtext, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                You have no unpaid bills scheduled for this month.
               </Text>
             </View>
           )}
-        </View>
+        </Animated.View>
 
         {/* Section 5 — Recent Activity */}
-        <View style={styles.sectionContainer}>
+        <Animated.View
+          entering={FadeInDown.delay(200).duration(320)}
+          style={styles.sectionContainer}
+        >
           <SectionTitle
             title="Recent activity"
             trailing={
-              <Pressable
-                onPress={() => openDetail("all-activity")}
-                hitSlop={8}
-                style={styles.textActionPill}
-              >
-                <Text style={[styles.textActionLabel, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                  View all →
-                </Text>
-              </Pressable>
+              expensesList.length > 5 ? (
+                <Pressable
+                  onPress={() => openDetail("all-activity")}
+                  hitSlop={8}
+                  style={styles.textActionPill}
+                >
+                  <Text style={[styles.textActionLabel, { color: isDark ? "#60A5FA" : "#2563EB" }]}>
+                    View all →
+                  </Text>
+                </Pressable>
+              ) : null
             }
           />
 
@@ -1069,8 +1150,8 @@ export default function FinanceScreen() {
               style={[
                 styles.unifiedCard,
                 {
-                  backgroundColor: isDark ? "#111113" : "#ffffff",
-                  borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+                  backgroundColor: isDark ? "#151518" : "#ffffff",
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
                 },
               ]}
             >
@@ -1080,8 +1161,8 @@ export default function FinanceScreen() {
                     style={[
                       styles.dateHeaderRow,
                       {
-                        backgroundColor: isDark ? "#141418" : "#f8fafc",
-                        borderTopColor: isDark ? "#18181D" : "#f1f5f9",
+                        backgroundColor: isDark ? "#1a1a20" : "#f8fafc",
+                        borderTopColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9",
                         borderTopWidth: gIdx > 0 ? StyleSheet.hairlineWidth : 0,
                       },
                     ]}
@@ -1100,7 +1181,7 @@ export default function FinanceScreen() {
                           styles.unifiedItemRow,
                           idx > 0 && [
                             styles.hairlineDivider,
-                            { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                            { borderTopColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9" },
                           ],
                           pressed && { opacity: 0.8 },
                         ]}
@@ -1112,7 +1193,7 @@ export default function FinanceScreen() {
                             {item.title}
                           </Text>
                           <Text style={[styles.itemSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
-                            {item.payment || "UPI"} · {item.category}
+                            {shortDate(item.date)} · {item.category} · {item.payment || "UPI"}
                           </Text>
                         </View>
 
@@ -1125,38 +1206,55 @@ export default function FinanceScreen() {
                 </View>
               ))}
 
-              <Pressable
-                onPress={() => openDetail("all-activity")}
-                style={({ pressed }) => [
-                  styles.collapseBottomButton,
-                  {
-                    borderTopColor: isDark ? "#18181D" : "#f1f5f9",
-                  },
-                  pressed && { opacity: 0.65 },
-                ]}
-              >
-                <Text style={[styles.collapseBottomText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                  View all {expensesList.length} transactions →
-                </Text>
-              </Pressable>
+              {expensesList.length > 5 ? (
+                <Pressable
+                  onPress={() => openDetail("all-activity")}
+                  style={({ pressed }) => [
+                    styles.collapseBottomButton,
+                    {
+                      borderTopColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9",
+                    },
+                    pressed && { opacity: 0.65 },
+                  ]}
+                >
+                  <Text style={[styles.collapseBottomText, { color: isDark ? "#60A5FA" : "#2563EB" }]}>
+                    View all {expensesList.length} transactions →
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : (
-            <View
-              style={[
-                styles.compactEmptyRow,
+            <Pressable
+              onPress={() => openForm("expense")}
+              style={({ pressed }) => [
+                styles.emptyStateBlock,
                 {
-                  backgroundColor: isDark ? "#111113" : "#ffffff",
-                  borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+                  backgroundColor: isDark ? "#151518" : "#ffffff",
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
                 },
+                pressed && { opacity: 0.82, transform: [{ scale: 0.99 }] },
               ]}
             >
-              <Ionicons name="receipt-outline" size={14} color={isDark ? "#71717A" : theme.textFaint} />
-              <Text style={[styles.quietStatusText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                No recent activity · Tap "Log Expense" to begin.
+              <View
+                style={[
+                  styles.emptyStateIconBadge,
+                  {
+                    backgroundColor: isDark ? "rgba(59, 130, 246, 0.12)" : "rgba(37, 99, 235, 0.08)",
+                    borderColor: isDark ? "rgba(59, 130, 246, 0.22)" : "rgba(37, 99, 235, 0.15)",
+                  },
+                ]}
+              >
+                <Ionicons name="receipt-outline" size={19} color={isDark ? "#60A5FA" : "#2563EB"} />
+              </View>
+              <Text style={[styles.emptyStateHeadline, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                Nothing here yet
               </Text>
-            </View>
+              <Text style={[styles.emptyStateSubtext, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                Your logged expenses will show up here.
+              </Text>
+            </Pressable>
           )}
-        </View>
+        </Animated.View>
       </ScrollView>
     </AppScreen>
   );
@@ -1474,16 +1572,18 @@ function AllSpendingContent({
                       {item.cap > 0 ? (
                         item.isOver ? (
                           <Text style={{ color: SEMANTIC.crimson, fontWeight: "600" }}>
-                            {formatINR(item.total - item.cap)} over budget (Cap: {formatINR(item.cap)})
+                            {formatINR(item.total - item.cap)} over limit (Cap: {formatINR(item.cap)})
                           </Text>
                         ) : (
                           <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
-                            {formatINR(item.cap - item.total)} left of {formatINR(item.cap)}
+                            {item.total > 0
+                              ? `${formatINR(item.cap - item.total)} left of ${formatINR(item.cap)} limit`
+                              : `Limit: ${formatINR(item.cap)} · ₹0 spent`}
                           </Text>
                         )
                       ) : (
                         <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
-                          No budget set
+                          No limit set
                         </Text>
                       )}
                     </Text>
@@ -1787,7 +1887,7 @@ function AllActivityContent({
                           {item.title}
                         </Text>
                         <Text style={[styles.itemSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
-                          {item.payment || "UPI"} · {item.category}
+                          {shortDate(item.date)} · {item.category} · {item.payment || "UPI"}
                         </Text>
                       </View>
 
@@ -2216,6 +2316,11 @@ function ExpenseForm({
     date: todayInKolkata(),
   });
 
+  const todayStr = todayInKolkata();
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
+
   return (
     <View style={styles.formContainer}>
       <View style={styles.sheetHeaderRow}>
@@ -2270,6 +2375,62 @@ function ExpenseForm({
           placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
           keyboardType="numeric"
         />
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>DATE</Text>
+        <View style={styles.dateSelectorRow}>
+          <Pressable
+            onPress={() => setForm((prev) => ({ ...prev, date: todayStr }))}
+            style={[
+              styles.dateOptionPill,
+              {
+                backgroundColor: form.date === todayStr ? (isDark ? "#24242A" : "#e2e8f0") : (isDark ? "#121215" : "#f8fafc"),
+                borderColor: form.date === todayStr ? (isDark ? "#60A5FA" : "#2563EB") : (isDark ? "#27272a" : "#e2e8f0"),
+              },
+            ]}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={13}
+              color={form.date === todayStr ? (isDark ? "#60A5FA" : "#2563EB") : (isDark ? "#71717A" : theme.textFaint)}
+            />
+            <Text
+              style={[
+                styles.dateOptionText,
+                {
+                  color: form.date === todayStr ? (isDark ? "#F5F5F7" : "#0f172a") : (isDark ? "#71717A" : theme.textFaint),
+                  fontWeight: form.date === todayStr ? "700" : "500",
+                },
+              ]}
+            >
+              Today ({shortDate(todayStr)})
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setForm((prev) => ({ ...prev, date: yesterdayStr }))}
+            style={[
+              styles.dateOptionPill,
+              {
+                backgroundColor: form.date === yesterdayStr ? (isDark ? "#24242A" : "#e2e8f0") : (isDark ? "#121215" : "#f8fafc"),
+                borderColor: form.date === yesterdayStr ? (isDark ? "#60A5FA" : "#2563EB") : (isDark ? "#27272a" : "#e2e8f0"),
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.dateOptionText,
+                {
+                  color: form.date === yesterdayStr ? (isDark ? "#F5F5F7" : "#0f172a") : (isDark ? "#71717A" : theme.textFaint),
+                  fontWeight: form.date === yesterdayStr ? "700" : "500",
+                },
+              ]}
+            >
+              Yesterday ({shortDate(yesterdayStr)})
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.inputGroup}>
@@ -2478,6 +2639,43 @@ const styles = StyleSheet.create({
   heroLeftCol: {
     gap: 2,
   },
+  heroContextLabel: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    letterSpacing: 0.4,
+  },
+  heroNoLimitHeadlineRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+    marginTop: 3,
+    marginBottom: 3,
+  },
+  heroNoLimitTitle: {
+    fontSize: 18.5,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+  heroNoLimitDot: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  heroNoLimitSecondary: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  heroProgressWrapper: {
+    marginVertical: 2,
+  },
+  heroSetLimitCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 2,
+  },
+  heroSetLimitText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
   heroLabel: {
     fontSize: 12,
     fontWeight: "600",
@@ -2540,17 +2738,24 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: "row",
     gap: 12,
-    marginTop: -12,
+    marginTop: -10,
   },
   primaryButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    height: 52,
+    gap: 8,
+    height: 50,
     borderRadius: 14,
     borderWidth: 1,
+  },
+  actionBtnIconBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
   primaryButtonText: {
     fontSize: 14,
@@ -2561,8 +2766,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    height: 52,
+    gap: 7,
+    height: 50,
     borderRadius: 14,
     borderWidth: 1,
   },
@@ -2654,17 +2859,10 @@ const styles = StyleSheet.create({
   emptyEnvelopesPrompt: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 16,
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 18,
     paddingHorizontal: 16,
-  },
-  emptyEnvelopesTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  emptyEnvelopesText: {
-    fontSize: 12.5,
-    fontWeight: "500",
   },
   collapseBottomButton: {
     flexDirection: "row",
@@ -2716,6 +2914,39 @@ const styles = StyleSheet.create({
   payButtonText: {
     fontSize: 11.5,
     fontWeight: "800",
+  },
+
+  // Elevated Empty State Block
+  emptyStateBlock: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  emptyStateIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  emptyStateHeadline: {
+    fontSize: 14.5,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: -0.2,
+  },
+  emptyStateSubtext: {
+    fontSize: 12.5,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 17,
+    maxWidth: 280,
   },
 
   compactEmptyRow: {
@@ -3015,5 +3246,21 @@ const styles = StyleSheet.create({
   budgetSaveCtaText: {
     fontSize: 13.5,
     fontWeight: "800",
+  },
+  dateSelectorRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  dateOptionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  dateOptionText: {
+    fontSize: 12,
   },
 });
