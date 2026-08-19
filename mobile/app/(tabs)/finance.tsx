@@ -500,12 +500,12 @@ export default function FinanceScreen() {
           {/* Quick Form Bottom Sheet (Log Expense & Add Bill) */}
           <BottomSheetModal
             ref={formSheetRef}
-            snapPoints={["54%", "92%"]}
+            snapPoints={formMode === "bill" ? ["75%", "94%"] : ["80%", "95%"]}
             topInset={insets.top + 16}
             enablePanDownToClose={true}
             backdropComponent={renderBackdrop}
-            keyboardBehavior="extend"
-            keyboardBlurBehavior="restore"
+            keyboardBehavior="interactive"
+            keyboardBlurBehavior="none"
             android_keyboardInputMode="adjustResize"
             handleComponent={() => null}
             onDismiss={() => setFormMode(null)}
@@ -516,8 +516,12 @@ export default function FinanceScreen() {
             }}
           >
             <BottomSheetScrollView
-              keyboardShouldPersistTaps="always"
-              contentContainerStyle={[styles.sheetContent, { paddingBottom: 32 }]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[
+                styles.sheetContent,
+                { paddingBottom: insets.bottom + 120 },
+              ]}
             >
               <View style={styles.sheetDragHandleWrapper}>
                 <View
@@ -2446,14 +2450,15 @@ function ExpenseForm({
         style={({ pressed }) => [
           styles.submitSheetButton,
           {
-            backgroundColor: isDark ? "#fafafa" : "#0f172a",
-            borderColor: isDark ? "#fafafa" : "#0f172a",
+            backgroundColor: isDark ? SEMANTIC.emerald : "#059669",
+            borderColor: isDark ? SEMANTIC.emerald : "#059669",
           },
-          pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
           busy && { opacity: 0.5 },
         ]}
       >
-        <Text style={[styles.submitSheetText, { color: isDark ? "#09090b" : "#ffffff" }]}>
+        <Ionicons name="checkmark-circle" size={18} color={isDark ? "#09090B" : "#ffffff"} />
+        <Text style={[styles.submitSheetText, { color: isDark ? "#09090B" : "#ffffff" }]}>
           {busy ? "Saving..." : "Add to Ledger"}
         </Text>
       </Pressable>
@@ -2501,7 +2506,7 @@ function BillForm({
       </Text>
 
       <View style={styles.inputGroup}>
-        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>BILL TITLE</Text>
+        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>BILL NAME</Text>
         <BottomSheetTextInput
           style={[
             styles.sheetTextInput,
@@ -2513,7 +2518,7 @@ function BillForm({
           ]}
           value={form.title}
           onChangeText={(title) => setForm((prev) => ({ ...prev, title }))}
-          placeholder="e.g. WiFi Bill, Spotify, Hostel Mess"
+          placeholder="e.g. WiFi, Mess Advance, Spotify"
           placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
           autoCapitalize="sentences"
         />
@@ -2555,14 +2560,15 @@ function BillForm({
         style={({ pressed }) => [
           styles.submitSheetButton,
           {
-            backgroundColor: isDark ? "#fafafa" : "#0f172a",
-            borderColor: isDark ? "#fafafa" : "#0f172a",
+            backgroundColor: isDark ? SEMANTIC.emerald : "#059669",
+            borderColor: isDark ? SEMANTIC.emerald : "#059669",
           },
-          pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
           busy && { opacity: 0.5 },
         ]}
       >
-        <Text style={[styles.submitSheetText, { color: isDark ? "#09090b" : "#ffffff" }]}>
+        <Ionicons name="checkmark-circle" size={18} color={isDark ? "#09090B" : "#ffffff"} />
+        <Text style={[styles.submitSheetText, { color: isDark ? "#09090B" : "#ffffff" }]}>
           {busy ? "Saving..." : "Add Bill"}
         </Text>
       </Pressable>
@@ -3043,9 +3049,12 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 6,
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 6,
   },
   submitSheetText: {
     fontSize: 13.5,
