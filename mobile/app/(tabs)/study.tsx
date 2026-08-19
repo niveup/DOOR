@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  BottomSheetModal,
+  BottomSheetScrollView,
+  BottomSheetTextInput,
+} from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,20 +27,55 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/src/providers/theme-provider";
 import { AppScreen } from "@/src/components/screen";
-import { ActionButton, Card, Chip, EmptyState, IconButton, LoadingCard, Metric, ProgressBar, SectionTitle, ui } from "@/src/components/ui";
+import {
+  ActionButton,
+  Card,
+  Chip,
+  EmptyState,
+  LoadingCard,
+  ProgressBar,
+} from "@/src/components/ui";
 import { api } from "@/src/services/api";
 import { todayInKolkata } from "@/src/lib/format";
 import { StudyLog, TrackerSubject } from "@/src/types/domain";
-import { colors } from "@/src/theme/tokens";
+import { colors, radii } from "@/src/theme/tokens";
 
 type SheetMode = "log" | "goal";
 
+function formatHours(hours: number): string {
+  if (hours <= 0) return "0h";
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function formatDateShort(dateStr: string): string {
+  if (!dateStr) return "";
+  const parts = dateStr.slice(0, 10).split("-");
+  if (parts.length === 3) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    if (monthIndex >= 0 && monthIndex < 12) {
+      return `${months[monthIndex]} ${day}`;
+    }
+  }
+  return dateStr.slice(0, 10);
+}
+
 export default function StudyScreen() {
+  const { theme, isDark } = useTheme();
   const client = useQueryClient();
   const sheetRef = useRef<BottomSheetModal>(null);
   const [sheetMode, setSheetMode] = useState<SheetMode>("log");
   const [viewAllVisible, setViewAllVisible] = useState(false);
-  const tracker = useQuery({ queryKey: ["tracker"], queryFn: api.tracker.status });
+
+  const tracker = useQuery({
+    queryKey: ["tracker"],
+    queryFn: api.tracker.status,
+  });
 
   const open = (mode: SheetMode) => {
     setSheetMode(mode);
@@ -47,116 +93,496 @@ export default function StudyScreen() {
 
   const goalMutation = useMutation({
     mutationFn: api.tracker.goal,
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       sheetRef.current?.dismiss();
       client.invalidateQueries({ queryKey: ["tracker"] });
     },
   });
 
-  const readiness = tracker.data?.overallReadiness || 0;
-  const totalHours = tracker.data?.subjects.reduce((sum, subject) => sum + subject.cumulativeHours, 0) || 0;
-  const totalQuestions = tracker.data?.subjects.reduce((sum, subject) => sum + subject.cumulativeQuestions, 0) || 0;
-  const top3Logs = useMemo(() => (tracker.data?.logs || []).slice(0, 3), [tracker.data?.logs]);
+  // Real data calculations
+  const todayStr = todayInKolkata();
+  const todayLogs = useMemo(() => {
+    return (tracker.data?.logs || []).filter(
+      (l) => (l.logDate || "").slice(0, 10) === todayStr
+    );
+  }, [tracker.data?.logs, todayStr]);
+
+  const todayHours = useMemo(() => {
+    return todayLogs.reduce((sum, l) => sum + (Number(l.hoursStudied) || 0), 0);
+  }, [todayLogs]);
+
+  const todayQuestions = useMemo(() => {
+    return todayLogs.reduce((sum, l) => sum + (Number(l.questionsSolved) || 0), 0);
+  }, [todayLogs]);
+
+  const dailyGoal = Number(tracker.data?.dailyAvailableHours) || 4;
+  const remainingHours = Math.max(0, dailyGoal - todayHours);
+  const progressPercent =
+    dailyGoal > 0 ? Math.min(100, Math.round((todayHours / dailyGoal) * 100)) : 0;
+
+  const readiness = tracker.data?.overallReadiness ?? 0;
+  const totalHours = useMemo(() => {
+    return (
+      tracker.data?.subjects.reduce(
+        (sum, subject) => sum + (Number(subject.cumulativeHours) || 0),
+        0
+      ) || 0
+    );
+  }, [tracker.data?.subjects]);
+
+  const totalQuestions = useMemo(() => {
+    return (
+      tracker.data?.subjects.reduce(
+        (sum, subject) => sum + (Number(subject.cumulativeQuestions) || 0),
+        0
+      ) || 0
+    );
+  }, [tracker.data?.subjects]);
+
+  const totalSessions = tracker.data?.logs.length || 0;
+  const top3Logs = useMemo(
+    () => (tracker.data?.logs || []).slice(0, 3),
+    [tracker.data?.logs]
+  );
 
   return (
     <AppScreen
       title="GATE Progress"
-      subtitle="Your honest signal—not just a streak."
+      subtitle="Personal study companion"
       refreshing={tracker.isRefetching}
       onRefresh={tracker.refetch}
-      action={<IconButton icon="add" label="Log study session" onPress={() => open("log")} tone={colors.cyan} />}
     >
-      {tracker.isLoading ? <LoadingCard label="Loading your GATE signal…" /> : null}
+      {tracker.isLoading ? (
+        <LoadingCard label="Loading your GATE progress…" />
+      ) : null}
+
       {tracker.error ? (
         <EmptyState
           icon="cloud-offline-outline"
           title="Tracker is offline"
           description="Your cached progress will return when the server reconnects."
-          action={<ActionButton label="Retry" compact onPress={() => tracker.refetch()} />}
+          action={
+            <ActionButton
+              label="Retry"
+              compact
+              onPress={() => tracker.refetch()}
+            />
+          }
         />
       ) : null}
+
       {tracker.data ? (
-        <>
-          <Card style={styles.readiness}>
-            <View style={ui.spread}>
-              <View>
-                <Text style={styles.overline}>OVERALL READINESS</Text>
-                <Text style={styles.readinessValue}>{readiness}%</Text>
+        <View style={styles.contentContainer}>
+          {/* ========================================================= */}
+          {/* LEVEL 1: TODAY'S FOCUS & GOAL GRADIENT (VISUAL HERO)      */}
+          {/* ========================================================= */}
+          <Card style={styles.todayHeroCard}>
+            <View style={styles.todayHeaderRow}>
+              <View style={styles.todayTitleGroup}>
+                <View
+                  style={[
+                    styles.pulseDot,
+                    {
+                      backgroundColor:
+                        progressPercent >= 100 ? colors.emerald : colors.cyan,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.sectionOverline,
+                    { color: isDark ? "#A1A1AA" : theme.textMuted },
+                  ]}
+                >
+                  TODAY’S FOCUS
+                </Text>
               </View>
-              <View style={styles.goalBox}>
-                <Text style={styles.goalLabel}>DAILY GOAL</Text>
-                <Text style={styles.goalValue}>{tracker.data.dailyAvailableHours}h</Text>
-                <ActionButton label="Edit" compact tone="ghost" onPress={() => open("goal")} />
-              </View>
+              <Pressable
+                onPress={() => open("goal")}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.goalBadgeButton,
+                  {
+                    backgroundColor: isDark ? "#18181D" : "#f1f5f9",
+                    borderColor: isDark ? "#27272A" : "#e2e8f0",
+                  },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.goalBadgeText,
+                    { color: isDark ? "#FAFAFA" : theme.text },
+                  ]}
+                >
+                  {dailyGoal}h goal
+                </Text>
+                <Ionicons
+                  name="pencil-outline"
+                  size={12}
+                  color={isDark ? "#A1A1AA" : theme.textMuted}
+                />
+              </Pressable>
             </View>
-            <ProgressBar value={readiness} tone={readiness >= 65 ? colors.emerald : colors.cyan} />
+
+            <View style={styles.todayNumbersRow}>
+              <View style={styles.todayHoursGroup}>
+                <Text
+                  style={[
+                    styles.todayHoursValue,
+                    { color: isDark ? "#FAFAFA" : theme.text },
+                  ]}
+                >
+                  {formatHours(todayHours)}
+                </Text>
+                <Text
+                  style={[
+                    styles.todayHoursGoal,
+                    { color: isDark ? "#71717A" : theme.textFaint },
+                  ]}
+                >
+                  / {dailyGoal}h
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.todayPercentValue,
+                  {
+                    color:
+                      progressPercent >= 100 ? colors.emerald : colors.cyan,
+                  },
+                ]}
+              >
+                {progressPercent}%
+              </Text>
+            </View>
+
+            <ProgressBar
+              value={progressPercent}
+              height={6}
+              tone={progressPercent >= 100 ? colors.emerald : colors.cyan}
+            />
+
+            <View style={styles.todayMetaRow}>
+              <Text
+                style={[
+                  styles.todayMetaText,
+                  { color: isDark ? "#A1A1AA" : theme.textMuted },
+                ]}
+              >
+                {remainingHours > 0
+                  ? `${formatHours(remainingHours)} remaining to reach target`
+                  : todayHours > 0
+                  ? "Daily goal achieved! Excellent momentum."
+                  : "No study logged yet today"}
+              </Text>
+              {todayQuestions > 0 ? (
+                <Text
+                  style={[
+                    styles.todayQuestionsText,
+                    { color: isDark ? "#FAFAFA" : theme.text },
+                  ]}
+                >
+                  {todayQuestions} questions
+                </Text>
+              ) : null}
+            </View>
           </Card>
-          <Card style={styles.metrics}>
-            <Metric label="Cumulative hours" value={`${totalHours.toFixed(1)}h`} accent={colors.cyan} />
-            <Metric label="Questions solved" value={totalQuestions} accent={colors.emerald} />
-            <Metric label="Logged sessions" value={tracker.data.logs.length} accent={colors.violet} />
-          </Card>
-          <SectionTitle
-            title="Recent study logs"
-            trailing={
-              tracker.data.logs.length > 0 ? (
+
+          {/* ========================================================= */}
+          {/* LEVEL 2: PRIMARY ACTION                                   */}
+          {/* ========================================================= */}
+          <Pressable
+            onPress={() => open("log")}
+            style={({ pressed }) => [
+              styles.primaryStudyButton,
+              pressed && { opacity: 0.9, transform: [{ scale: 0.985 }] },
+            ]}
+          >
+            <Ionicons name="play-circle" size={19} color="#09090B" />
+            <Text style={styles.primaryStudyButtonText}>
+              Start Study Session
+            </Text>
+          </Pressable>
+
+          {/* ========================================================= */}
+          {/* LEVEL 3: QUICK STATS (SINGLE 3-COLUMN COMPONENT)          */}
+          {/* ========================================================= */}
+          <View
+            style={[
+              styles.quickStatsContainer,
+              {
+                backgroundColor: isDark ? "#121215" : "#ffffff",
+                borderColor: isDark ? "#27272A" : "#e2e8f0",
+              },
+            ]}
+          >
+            <View style={styles.quickStatCol}>
+              <Text
+                style={[
+                  styles.quickStatNumber,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                {totalHours.toFixed(1)}h
+              </Text>
+              <Text
+                style={[
+                  styles.quickStatLabel,
+                  { color: isDark ? "#71717A" : theme.textFaint },
+                ]}
+              >
+                Study time
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.statDivider,
+                { backgroundColor: isDark ? "#222226" : "#e2e8f0" },
+              ]}
+            />
+
+            <View style={styles.quickStatCol}>
+              <Text
+                style={[
+                  styles.quickStatNumber,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                {totalQuestions}
+              </Text>
+              <Text
+                style={[
+                  styles.quickStatLabel,
+                  { color: isDark ? "#71717A" : theme.textFaint },
+                ]}
+              >
+                Questions
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.statDivider,
+                { backgroundColor: isDark ? "#222226" : "#e2e8f0" },
+              ]}
+            />
+
+            <View style={styles.quickStatCol}>
+              <Text
+                style={[
+                  styles.quickStatNumber,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                {totalSessions}
+              </Text>
+              <Text
+                style={[
+                  styles.quickStatLabel,
+                  { color: isDark ? "#71717A" : theme.textFaint },
+                ]}
+              >
+                Sessions
+              </Text>
+            </View>
+          </View>
+
+          {/* ========================================================= */}
+          {/* LEVEL 5: RECENT STUDY LOGS (COMPACT 68PX ROWS)            */}
+          {/* ========================================================= */}
+          <View style={styles.sectionGroup}>
+            <View style={styles.sectionHeaderRow}>
+              <Text
+                style={[
+                  styles.sectionTitleText,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                Recent Study
+              </Text>
+              {tracker.data.logs.length > 0 ? (
                 <Pressable
                   onPress={() => setViewAllVisible(true)}
                   hitSlop={8}
-                  style={styles.textActionPill}
+                  style={styles.viewAllButton}
                 >
-                  <Text style={styles.textActionLabel}>
-                    View all →
-                  </Text>
+                  <Text style={styles.viewAllButtonText}>View all →</Text>
                 </Pressable>
-              ) : (
-                <ActionButton label="Log session" compact onPress={() => open("log")} />
-              )
-            }
-          />
-          {tracker.data.logs.length ? (
-            <Card style={styles.logsCard}>
-              {top3Logs.map((log, idx) => (
-                <View
-                  key={log.id}
+              ) : null}
+            </View>
+
+            {tracker.data.logs.length > 0 ? (
+              <View
+                style={[
+                  styles.logsContainer,
+                  {
+                    backgroundColor: isDark ? "#121215" : "#ffffff",
+                    borderColor: isDark ? "#27272A" : "#e2e8f0",
+                  },
+                ]}
+              >
+                {top3Logs.map((log, idx) => (
+                  <Pressable
+                    key={log.id}
+                    onPress={() => setViewAllVisible(true)}
+                    style={({ pressed }) => [
+                      styles.logItemRow,
+                      idx > 0 && [
+                        styles.logRowDivider,
+                        { borderTopColor: isDark ? "#1D1D22" : "#f1f5f9" },
+                      ],
+                      pressed && { opacity: 0.75 },
+                    ]}
+                  >
+                    <View style={styles.logTextContainer}>
+                      <Text
+                        style={[
+                          styles.logSubjectTitle,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {log.subjectName}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.logMetaSubtitle,
+                          { color: isDark ? "#71717A" : theme.textFaint },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {formatDateShort(log.logDate)} · {log.questionsSolved}{" "}
+                        {log.questionsSolved === 1 ? "question" : "questions"}
+                        {log.notes ? ` · ${log.notes}` : ""}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.logDurationText}>
+                      {log.hoursStudied}h
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.emptyLogsCard,
+                  {
+                    backgroundColor: isDark ? "#121215" : "#ffffff",
+                    borderColor: isDark ? "#27272A" : "#e2e8f0",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="school-outline"
+                  size={24}
+                  color={isDark ? "#52525B" : "#a1a1aa"}
+                />
+                <Text
                   style={[
-                    styles.logRow,
-                    idx > 0 && styles.logRowDivider,
+                    styles.emptyLogsText,
+                    { color: isDark ? "#A1A1AA" : theme.textMuted },
                   ]}
                 >
-                  <View style={styles.logIcon}>
-                    <Ionicons name="time-outline" color={colors.cyan} size={17} />
-                  </View>
-                  <View style={styles.logCopy}>
-                    <Text style={styles.logTitle}>{log.subjectName}</Text>
-                    <Text style={styles.logMeta}>
-                      {log.logDate} · {log.questionsSolved} questions {log.notes ? `· ${log.notes}` : ""}
-                    </Text>
-                  </View>
-                  <Text style={styles.logHours}>{log.hoursStudied}h</Text>
+                  No study sessions recorded yet. Start your first session above.
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* ========================================================= */}
+          {/* LEVEL 6: WEEKLY INSIGHT (AI READ / CALM STATE)            */}
+          {/* ========================================================= */}
+          <View style={styles.sectionGroup}>
+            <Text
+              style={[
+                styles.sectionTitleText,
+                { color: isDark ? "#FAFAFA" : theme.text },
+              ]}
+            >
+              Weekly Insight
+            </Text>
+
+            {tracker.data.weeklyAnalysis ? (
+              <Card
+                style={[
+                  styles.insightCard,
+                  {
+                    backgroundColor: isDark ? "#121215" : "#ffffff",
+                    borderColor: isDark ? "#27272A" : "#e2e8f0",
+                  },
+                ]}
+              >
+                <View style={styles.insightHeader}>
+                  <Ionicons
+                    name="sparkles-outline"
+                    size={16}
+                    color={colors.violet}
+                  />
+                  <Text style={styles.insightOverline}>WEEKLY JUJUM READ</Text>
                 </View>
-              ))}
-            </Card>
-          ) : (
-            <Card>
-              <Text style={styles.muted}>Log your first focused block—the tracker will handle the aggregation.</Text>
-            </Card>
-          )}
-          {tracker.data.weeklyAnalysis ? (
-            <Card>
-              <Text style={styles.analysisLabel}>WEEKLY JUJUM READ</Text>
-              <Text style={styles.analysis}>{tracker.data.weeklyAnalysis}</Text>
-            </Card>
-          ) : null}
-        </>
+                <Text
+                  style={[
+                    styles.insightBody,
+                    { color: isDark ? "#D4D4D8" : theme.textMuted },
+                  ]}
+                >
+                  {tracker.data.weeklyAnalysis}
+                </Text>
+              </Card>
+            ) : (
+              <View
+                style={[
+                  styles.insightPlaceholderCard,
+                  {
+                    backgroundColor: isDark ? "#121215" : "#ffffff",
+                    borderColor: isDark ? "#222226" : "#e2e8f0",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="bulb-outline"
+                  size={20}
+                  color={isDark ? "#71717A" : "#a1a1aa"}
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text
+                    style={[
+                      styles.insightPlaceholderTitle,
+                      { color: isDark ? "#FAFAFA" : theme.text },
+                    ]}
+                  >
+                    Building your study profile
+                  </Text>
+                  <Text
+                    style={[
+                      styles.insightPlaceholderDesc,
+                      { color: isDark ? "#71717A" : theme.textFaint },
+                    ]}
+                  >
+                    Your weekly analysis will appear here as your study history
+                    builds.
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
       ) : null}
 
-      {/* Dedicated Full View All Modal */}
+      {/* ========================================================= */}
+      {/* FULL CHRONOLOGICAL VIEW ALL MODAL                        */}
+      {/* ========================================================= */}
       {tracker.data ? (
         <ViewAllStudyModal
           visible={viewAllVisible}
           title="Study History"
-          subtitle={`${tracker.data.logs.length} logged sessions · ${totalHours.toFixed(1)}h total · ${totalQuestions} questions`}
+          subtitle={`${tracker.data.logs.length} logged sessions · ${totalHours.toFixed(
+            1
+          )}h total · ${totalQuestions} questions`}
           onClose={() => setViewAllVisible(false)}
           action={
             <Pressable
@@ -187,11 +613,20 @@ export default function StudyScreen() {
         </ViewAllStudyModal>
       ) : null}
 
+      {/* ========================================================= */}
+      {/* BOTTOM SHEET FOR LOGGING & GOAL SETTING                  */}
+      {/* ========================================================= */}
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={["72%"]}
-        backgroundStyle={styles.sheet}
-        handleIndicatorStyle={styles.handle}
+        snapPoints={sheetMode === "log" ? ["75%"] : ["48%"]}
+        backgroundStyle={[
+          styles.sheetBackground,
+          { backgroundColor: isDark ? "#121215" : "#ffffff" },
+        ]}
+        handleIndicatorStyle={[
+          styles.sheetHandle,
+          { backgroundColor: isDark ? "#3f3f46" : "#cbd5e1" },
+        ]}
       >
         <BottomSheetScrollView
           keyboardShouldPersistTaps="handled"
@@ -336,12 +771,11 @@ function ViewAllStudyModal({
           style={[
             styles.viewAllContainer,
             {
-              backgroundColor: isDark ? "#08080A" : "#f8fafc",
+              backgroundColor: isDark ? "#09090b" : "#f8fafc",
             },
             animatedStyle,
           ]}
         >
-          {/* Header with HeaderPanGesture */}
           <GestureDetector gesture={headerPanGesture}>
             <View
               style={[
@@ -349,11 +783,10 @@ function ViewAllStudyModal({
                 {
                   paddingTop: Math.max(insets.top, 14),
                   borderBottomColor: isDark ? "#18181D" : "#e2e8f0",
-                  backgroundColor: isDark ? "#08080A" : "#f8fafc",
+                  backgroundColor: isDark ? "#09090b" : "#f8fafc",
                 },
               ]}
             >
-              {/* Drag Handle Bar */}
               <View style={styles.sheetDragHandleWrapper}>
                 <View
                   style={[
@@ -367,10 +800,22 @@ function ViewAllStudyModal({
                 <Pressable
                   onPress={onClose}
                   hitSlop={8}
-                  style={({ pressed }) => [styles.detailBackButton, pressed && { opacity: 0.7 }]}
+                  style={({ pressed }) => [
+                    styles.detailBackButton,
+                    pressed && { opacity: 0.7 },
+                  ]}
                 >
-                  <Ionicons name="arrow-back" size={18} color={isDark ? "#F5F5F7" : theme.text} />
-                  <Text style={[styles.detailHeaderTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                  <Ionicons
+                    name="arrow-back"
+                    size={18}
+                    color={isDark ? "#F5F5F7" : theme.text}
+                  />
+                  <Text
+                    style={[
+                      styles.detailHeaderTitle,
+                      { color: isDark ? "#F5F5F7" : theme.text },
+                    ]}
+                  >
                     {title}
                   </Text>
                 </Pressable>
@@ -378,14 +823,18 @@ function ViewAllStudyModal({
               </View>
 
               {subtitle ? (
-                <Text style={[styles.detailHeaderSubtitle, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                <Text
+                  style={[
+                    styles.detailHeaderSubtitle,
+                    { color: isDark ? "#A1A1AA" : theme.textMuted },
+                  ]}
+                >
                   {subtitle}
                 </Text>
               ) : null}
             </View>
           </GestureDetector>
 
-          {/* Content with ContentPanGesture */}
           <GestureDetector gesture={contentPanGesture}>
             <View style={{ flex: 1 }}>
               {children({
@@ -425,14 +874,23 @@ function AllLogsContent({
 }) {
   const { theme, isDark } = useTheme();
 
-  // Head-to-Head Subject Aggregation
   const subjectBreakdown = useMemo(() => {
     return subjects
       .map((sub) => {
-        const subLogs = logs.filter((l) => l.subjectName === sub.subjectName || l.subjectId === sub.subjectId);
-        const hours = subLogs.reduce((sum, l) => sum + (l.hoursStudied || 0), 0) || sub.cumulativeHours || 0;
-        const questions = subLogs.reduce((sum, l) => sum + (l.questionsSolved || 0), 0) || sub.cumulativeQuestions || 0;
-        const share = totalHours > 0 ? Math.round((hours / totalHours) * 100) : 0;
+        const subLogs = logs.filter(
+          (l) =>
+            l.subjectName === sub.subjectName || l.subjectId === sub.subjectId
+        );
+        const hours =
+          subLogs.reduce((sum, l) => sum + (l.hoursStudied || 0), 0) ||
+          sub.cumulativeHours ||
+          0;
+        const questions =
+          subLogs.reduce((sum, l) => sum + (l.questionsSolved || 0), 0) ||
+          sub.cumulativeQuestions ||
+          0;
+        const share =
+          totalHours > 0 ? Math.round((hours / totalHours) * 100) : 0;
         return {
           id: sub.subjectId,
           name: sub.subjectName,
@@ -453,48 +911,138 @@ function AllLogsContent({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
     >
-      {/* 1. Summary Highlights */}
       <View style={styles.metricsRow}>
-        <View style={[styles.metricCard, { backgroundColor: isDark ? "#121215" : "#ffffff", borderColor: isDark ? "#27272a" : "#e2e8f0" }]}>
-          <Text style={[styles.metricLabelText, { color: isDark ? "#71717A" : theme.textFaint }]}>TOTAL SESSIONS</Text>
-          <Text style={[styles.metricNumber, { color: colors.cyan }]}>{logs.length}</Text>
+        <View
+          style={[
+            styles.metricCard,
+            {
+              backgroundColor: isDark ? "#121215" : "#ffffff",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.metricLabelText,
+              { color: isDark ? "#71717A" : theme.textFaint },
+            ]}
+          >
+            TOTAL SESSIONS
+          </Text>
+          <Text style={[styles.metricNumber, { color: colors.cyan }]}>
+            {logs.length}
+          </Text>
         </View>
-        <View style={[styles.metricCard, { backgroundColor: isDark ? "#121215" : "#ffffff", borderColor: isDark ? "#27272a" : "#e2e8f0" }]}>
-          <Text style={[styles.metricLabelText, { color: isDark ? "#71717A" : theme.textFaint }]}>HOURS LOGGED</Text>
-          <Text style={[styles.metricNumber, { color: colors.emerald }]}>{totalHours.toFixed(1)}h</Text>
+        <View
+          style={[
+            styles.metricCard,
+            {
+              backgroundColor: isDark ? "#121215" : "#ffffff",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.metricLabelText,
+              { color: isDark ? "#71717A" : theme.textFaint },
+            ]}
+          >
+            HOURS LOGGED
+          </Text>
+          <Text style={[styles.metricNumber, { color: colors.emerald }]}>
+            {totalHours.toFixed(1)}h
+          </Text>
         </View>
-        <View style={[styles.metricCard, { backgroundColor: isDark ? "#121215" : "#ffffff", borderColor: isDark ? "#27272a" : "#e2e8f0" }]}>
-          <Text style={[styles.metricLabelText, { color: isDark ? "#71717A" : theme.textFaint }]}>QUESTIONS</Text>
-          <Text style={[styles.metricNumber, { color: colors.amber }]}>{totalQuestions}</Text>
+        <View
+          style={[
+            styles.metricCard,
+            {
+              backgroundColor: isDark ? "#121215" : "#ffffff",
+              borderColor: isDark ? "#27272a" : "#e2e8f0",
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.metricLabelText,
+              { color: isDark ? "#71717A" : theme.textFaint },
+            ]}
+          >
+            QUESTIONS
+          </Text>
+          <Text style={[styles.metricNumber, { color: colors.amber }]}>
+            {totalQuestions}
+          </Text>
         </View>
       </View>
 
-      {/* 2. Head-to-Head Subject Comparison */}
       {subjectBreakdown.length > 0 ? (
         <View style={{ gap: 8 }}>
-          <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+          <Text
+            style={[
+              styles.fieldLabel,
+              { color: isDark ? "#71717A" : theme.textFaint },
+            ]}
+          >
             HEAD-TO-HEAD SUBJECT BREAKDOWN
           </Text>
-          <View style={[styles.unifiedCard, { backgroundColor: isDark ? "#121215" : "#ffffff", borderColor: isDark ? "#27272a" : "#e2e8f0" }]}>
+          <View
+            style={[
+              styles.unifiedCard,
+              {
+                backgroundColor: isDark ? "#121215" : "#ffffff",
+                borderColor: isDark ? "#27272a" : "#e2e8f0",
+              },
+            ]}
+          >
             {subjectBreakdown.map((item, idx) => (
               <View
                 key={item.name}
                 style={[
                   styles.subjectBreakdownRow,
-                  idx > 0 && [styles.hairlineDivider, { borderTopColor: isDark ? "#18181D" : "#f1f5f9" }],
+                  idx > 0 && [
+                    styles.hairlineDivider,
+                    { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                  ],
                 ]}
               >
                 <View style={styles.subjectBreakdownHeader}>
                   <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[styles.subjectBreakdownTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                    <Text
+                      style={[
+                        styles.subjectBreakdownTitle,
+                        { color: isDark ? "#F5F5F7" : theme.text },
+                      ]}
+                    >
                       {item.name}
                     </Text>
-                    <Text style={[styles.subjectBreakdownSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
-                      {item.sessionsCount} {item.sessionsCount === 1 ? "session" : "sessions"} · {item.questions} questions
+                    <Text
+                      style={[
+                        styles.subjectBreakdownSubtext,
+                        { color: isDark ? "#71717A" : theme.textFaint },
+                      ]}
+                    >
+                      {item.sessionsCount}{" "}
+                      {item.sessionsCount === 1 ? "session" : "sessions"} ·{" "}
+                      {item.questions} questions
                     </Text>
                   </View>
-                  <Text style={[styles.subjectBreakdownHours, { color: colors.cyan }]}>
-                    {item.hours.toFixed(1)}h <Text style={{ fontSize: 11, color: isDark ? "#71717A" : theme.textFaint }}>({item.share}%)</Text>
+                  <Text
+                    style={[
+                      styles.subjectBreakdownHours,
+                      { color: colors.cyan },
+                    ]}
+                  >
+                    {item.hours.toFixed(1)}h{" "}
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: isDark ? "#71717A" : theme.textFaint,
+                      }}
+                    >
+                      ({item.share}%)
+                    </Text>
                   </Text>
                 </View>
                 <ProgressBar value={item.share} height={4} tone={colors.cyan} />
@@ -504,50 +1052,87 @@ function AllLogsContent({
         </View>
       ) : null}
 
-      {/* 3. All Chronological Study Logs */}
       <View style={{ gap: 8 }}>
-        <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+        <Text
+          style={[
+            styles.fieldLabel,
+            { color: isDark ? "#71717A" : theme.textFaint },
+          ]}
+        >
           ALL STUDY SESSIONS ({logs.length})
         </Text>
         {logs.length > 0 ? (
-          <View style={[styles.unifiedCard, { backgroundColor: isDark ? "#121215" : "#ffffff", borderColor: isDark ? "#27272a" : "#e2e8f0" }]}>
+          <View
+            style={[
+              styles.unifiedCard,
+              {
+                backgroundColor: isDark ? "#121215" : "#ffffff",
+                borderColor: isDark ? "#27272a" : "#e2e8f0",
+              },
+            ]}
+          >
             {logs.map((log, idx) => (
               <View
                 key={log.id}
                 style={[
                   styles.logHistoryRow,
-                  idx > 0 && [styles.hairlineDivider, { borderTopColor: isDark ? "#18181D" : "#f1f5f9" }],
+                  idx > 0 && [
+                    styles.hairlineDivider,
+                    { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                  ],
                 ]}
               >
-                <View style={styles.logIcon}>
-                  <Ionicons name="time-outline" color={colors.cyan} size={17} />
-                </View>
-                <View style={styles.logCopy}>
-                  <Text style={[styles.logTitle, { color: isDark ? "#F5F5F7" : theme.text }]}>{log.subjectName}</Text>
-                  <Text style={[styles.logMeta, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                <View style={styles.logTextContainer}>
+                  <Text
+                    style={[
+                      styles.logSubjectTitle,
+                      { color: isDark ? "#F5F5F7" : theme.text },
+                    ]}
+                  >
+                    {log.subjectName}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.logMetaSubtitle,
+                      { color: isDark ? "#71717A" : theme.textFaint },
+                    ]}
+                  >
                     {log.logDate} · {log.questionsSolved} questions
                   </Text>
                   {log.notes ? (
-                    <Text style={[styles.logNotes, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                    <Text
+                      style={[
+                        styles.logNotes,
+                        { color: isDark ? "#A1A1AA" : theme.textMuted },
+                      ]}
+                    >
                       "{log.notes}"
                     </Text>
                   ) : null}
                 </View>
-                <Text style={styles.logHours}>{log.hoursStudied}h</Text>
+                <Text style={styles.logDurationText}>{log.hoursStudied}h</Text>
               </View>
             ))}
           </View>
         ) : (
           <Card>
-            <Text style={styles.muted}>No study sessions recorded yet.</Text>
+            <Text
+              style={{ color: isDark ? "#71717A" : theme.textFaint, fontSize: 13 }}
+            >
+              No study sessions recorded yet.
+            </Text>
           </Card>
         )}
       </View>
 
-      {/* 4. Weekly Jujum Read if present */}
       {weeklyAnalysis ? (
         <View style={{ gap: 8, marginTop: 4 }}>
-          <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+          <Text
+            style={[
+              styles.fieldLabel,
+              { color: isDark ? "#71717A" : theme.textFaint },
+            ]}
+          >
             WEEKLY ANALYSIS
           </Text>
           <Card>
@@ -560,6 +1145,9 @@ function AllLogsContent({
   );
 }
 
+// -----------------------------------------------------------------
+// Log Study Block Form (Sheet)
+// -----------------------------------------------------------------
 function LogForm({
   subjects,
   busy,
@@ -577,35 +1165,68 @@ function LogForm({
     notes: string;
   }) => void;
 }) {
-  const [selected, setSelected] = useState<TrackerSubject | null>(subjects[0] || null);
+  const { theme, isDark } = useTheme();
+  const [selected, setSelected] = useState<TrackerSubject | null>(
+    subjects[0] || null
+  );
   const [customSubject, setCustomSubject] = useState("");
+  const [timeBlock, setTimeBlock] = useState("Morning");
   const [hours, setHours] = useState("1");
   const [questions, setQuestions] = useState("0");
   const [notes, setNotes] = useState("");
 
+  const timeBlocks = ["Morning", "Afternoon", "Evening", "Night"];
+  const durationPresets = ["0.5", "1", "1.5", "2", "3"];
+
   const handleSave = () => {
-    const finalSubjectName = selected?.subjectName || customSubject.trim() || "General Study";
+    const finalSubjectName =
+      selected?.subjectName || customSubject.trim() || "General Study";
     const finalSubjectId = selected?.subjectId || 1;
     onSave({
       logDate: todayInKolkata(),
-      timeBlock: "Mobile log",
+      timeBlock,
       subjectId: finalSubjectId,
       subjectName: finalSubjectName,
-      hoursStudied: Math.max(0, Number(hours) || 0),
+      hoursStudied: Math.max(0.1, Number(hours) || 1),
       questionsSolved: Math.max(0, Number(questions) || 0),
       notes: notes.trim(),
     });
   };
 
   return (
-    <View style={styles.form}>
-      <Text style={styles.sheetTitle}>Log study block</Text>
-      <Text style={styles.sheetSubtitle}>
-        The dashboard updates optimistically, then securely syncs in the background.
+    <View style={styles.formContainer}>
+      <Text
+        style={[
+          styles.sheetTitle,
+          { color: isDark ? "#FAFAFA" : theme.text },
+        ]}
+      >
+        Log Study Session
       </Text>
-      <Text style={styles.fieldLabel}>SUBJECT</Text>
+      <Text
+        style={[
+          styles.sheetSubtitle,
+          { color: isDark ? "#A1A1AA" : theme.textMuted },
+        ]}
+      >
+        Record your focused block to update readiness and track goal progress.
+      </Text>
+
+      {/* Subject Selection */}
+      <Text
+        style={[
+          styles.fieldLabel,
+          { color: isDark ? "#71717A" : theme.textFaint },
+        ]}
+      >
+        SUBJECT
+      </Text>
       {subjects.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.picker}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalChipRow}
+        >
           {subjects.map((subject) => (
             <Chip
               key={subject.subjectId}
@@ -618,50 +1239,147 @@ function LogForm({
         </ScrollView>
       ) : (
         <BottomSheetTextInput
-          style={styles.input}
+          style={[
+            styles.inputField,
+            {
+              backgroundColor: isDark ? "#18181D" : "#f4f4f5",
+              borderColor: isDark ? "#27272A" : "#e4e4e7",
+              color: isDark ? "#FAFAFA" : theme.text,
+            },
+          ]}
           value={customSubject}
           onChangeText={setCustomSubject}
           placeholder="e.g. Operating Systems"
-          placeholderTextColor={colors.textFaint}
+          placeholderTextColor={isDark ? "#52525B" : "#a1a1aa"}
           autoCapitalize="sentences"
         />
       )}
-      <View style={styles.fields}>
-        <View style={styles.smallField}>
-          <Text style={styles.fieldLabel}>HOURS</Text>
+
+      {/* Time Block Selection */}
+      <Text
+        style={[
+          styles.fieldLabel,
+          { color: isDark ? "#71717A" : theme.textFaint },
+        ]}
+      >
+        TIME OF DAY
+      </Text>
+      <View style={styles.horizontalGrid}>
+        {timeBlocks.map((block) => (
+          <Chip
+            key={block}
+            label={block}
+            active={timeBlock === block}
+            tone={colors.emerald}
+            onPress={() => setTimeBlock(block)}
+          />
+        ))}
+      </View>
+
+      {/* Duration Quick Presets & Manual Hours */}
+      <Text
+        style={[
+          styles.fieldLabel,
+          { color: isDark ? "#71717A" : theme.textFaint },
+        ]}
+      >
+        DURATION (HOURS)
+      </Text>
+      <View style={styles.horizontalGrid}>
+        {durationPresets.map((preset) => (
+          <Chip
+            key={preset}
+            label={`${preset}h`}
+            active={hours === preset}
+            tone={colors.cyan}
+            onPress={() => setHours(preset)}
+          />
+        ))}
+      </View>
+
+      <View style={styles.twoColumnFields}>
+        <View style={styles.columnField}>
+          <Text
+            style={[
+              styles.fieldLabel,
+              { color: isDark ? "#71717A" : theme.textFaint },
+            ]}
+          >
+            EXACT HOURS
+          </Text>
           <BottomSheetTextInput
-            style={styles.input}
+            style={[
+              styles.inputField,
+              {
+                backgroundColor: isDark ? "#18181D" : "#f4f4f5",
+                borderColor: isDark ? "#27272A" : "#e4e4e7",
+                color: isDark ? "#FAFAFA" : theme.text,
+              },
+            ]}
             value={hours}
             onChangeText={setHours}
             keyboardType="decimal-pad"
             placeholder="1"
-            placeholderTextColor={colors.textFaint}
+            placeholderTextColor={isDark ? "#52525B" : "#a1a1aa"}
           />
         </View>
-        <View style={styles.smallField}>
-          <Text style={styles.fieldLabel}>QUESTIONS</Text>
+        <View style={styles.columnField}>
+          <Text
+            style={[
+              styles.fieldLabel,
+              { color: isDark ? "#71717A" : theme.textFaint },
+            ]}
+          >
+            QUESTIONS
+          </Text>
           <BottomSheetTextInput
-            style={styles.input}
+            style={[
+              styles.inputField,
+              {
+                backgroundColor: isDark ? "#18181D" : "#f4f4f5",
+                borderColor: isDark ? "#27272A" : "#e4e4e7",
+                color: isDark ? "#FAFAFA" : theme.text,
+              },
+            ]}
             value={questions}
             onChangeText={setQuestions}
             keyboardType="number-pad"
             placeholder="0"
-            placeholderTextColor={colors.textFaint}
+            placeholderTextColor={isDark ? "#52525B" : "#a1a1aa"}
           />
         </View>
       </View>
-      <Text style={styles.fieldLabel}>NOTE (OPTIONAL)</Text>
+
+      {/* Note Field */}
+      <Text
+        style={[
+          styles.fieldLabel,
+          { color: isDark ? "#71717A" : theme.textFaint },
+        ]}
+      >
+        NOTE (OPTIONAL)
+      </Text>
       <BottomSheetTextInput
-        style={[styles.input, styles.multiline]}
+        style={[
+          styles.inputField,
+          styles.multilineInput,
+          {
+            backgroundColor: isDark ? "#18181D" : "#f4f4f5",
+            borderColor: isDark ? "#27272A" : "#e4e4e7",
+            color: isDark ? "#FAFAFA" : theme.text,
+          },
+        ]}
         value={notes}
         onChangeText={setNotes}
         multiline
-        placeholder="What did you learn or get stuck on?"
-        placeholderTextColor={colors.textFaint}
+        placeholder="Topics covered, problem areas, or formulas revised"
+        placeholderTextColor={isDark ? "#52525B" : "#a1a1aa"}
       />
+
       <ActionButton
-        label={busy ? "Logging…" : "Save study log"}
-        icon="checkmark"
+        label={busy ? "Saving…" : "Save Study Session"}
+        icon="checkmark-circle"
+        tone="emerald"
         disabled={busy}
         onPress={handleSave}
       />
@@ -669,6 +1387,9 @@ function LogForm({
   );
 }
 
+// -----------------------------------------------------------------
+// Set Daily Goal Form (Sheet)
+// -----------------------------------------------------------------
 function GoalForm({
   initialGoal,
   busy,
@@ -678,24 +1399,72 @@ function GoalForm({
   busy: boolean;
   onSave: (val: string) => void;
 }) {
+  const { theme, isDark } = useTheme();
   const [goal, setGoal] = useState(initialGoal);
+  const presets = ["2", "4", "6", "8"];
 
   return (
-    <View style={styles.form}>
-      <Text style={styles.sheetTitle}>Set daily availability</Text>
-      <Text style={styles.sheetSubtitle}>This is capacity, not pressure. Pick the time you can protect most days.</Text>
-      <BottomSheetTextInput
-        style={styles.goalInput}
-        value={goal}
-        onChangeText={setGoal}
-        keyboardType="decimal-pad"
-        placeholder="4"
-        placeholderTextColor={colors.textFaint}
-      />
-      <Text style={styles.goalHint}>hours per day</Text>
+    <View style={styles.formContainer}>
+      <Text
+        style={[
+          styles.sheetTitle,
+          { color: isDark ? "#FAFAFA" : theme.text },
+        ]}
+      >
+        Daily Study Goal
+      </Text>
+      <Text
+        style={[
+          styles.sheetSubtitle,
+          { color: isDark ? "#A1A1AA" : theme.textMuted },
+        ]}
+      >
+        Set a realistic daily target you can comfortably protect most days.
+      </Text>
+
+      {/* Quick Presets */}
+      <View style={styles.horizontalGrid}>
+        {presets.map((preset) => (
+          <Chip
+            key={preset}
+            label={`${preset} hours`}
+            active={goal === preset}
+            tone={colors.emerald}
+            onPress={() => setGoal(preset)}
+          />
+        ))}
+      </View>
+
+      <View style={styles.goalInputWrapper}>
+        <BottomSheetTextInput
+          style={[
+            styles.goalBigInput,
+            {
+              backgroundColor: isDark ? "#18181D" : "#f4f4f5",
+              borderColor: isDark ? "#27272A" : "#e4e4e7",
+              color: isDark ? "#FAFAFA" : theme.text,
+            },
+          ]}
+          value={goal}
+          onChangeText={setGoal}
+          keyboardType="decimal-pad"
+          placeholder="4"
+          placeholderTextColor={isDark ? "#52525B" : "#a1a1aa"}
+        />
+        <Text
+          style={[
+            styles.goalInputUnit,
+            { color: isDark ? "#71717A" : theme.textFaint },
+          ]}
+        >
+          hours per day
+        </Text>
+      </View>
+
       <ActionButton
-        label={busy ? "Saving…" : "Save daily goal"}
+        label={busy ? "Saving…" : "Save Daily Goal"}
         icon="checkmark"
+        tone="emerald"
         disabled={busy}
         onPress={() => onSave(goal)}
       />
@@ -703,94 +1472,339 @@ function GoalForm({
   );
 }
 
+// -----------------------------------------------------------------
+// STYLESHEET (STRICT OBSIDIAN TOKENS & MATHEMATICAL 8-PT SPACING)
+// -----------------------------------------------------------------
 const styles = StyleSheet.create({
-  readiness: { backgroundColor: colors.surface, borderColor: colors.border, gap: 13 },
-  overline: { color: colors.cyan, fontSize: 10, letterSpacing: 1, fontWeight: "900" },
-  readinessValue: { color: colors.text, fontSize: 39, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  goalBox: { alignItems: "flex-end", gap: 5 },
-  goalLabel: { color: colors.textFaint, fontSize: 9, letterSpacing: 0.8, fontWeight: "900" },
-  goalValue: { color: colors.amber, fontSize: 19, fontWeight: "900" },
-  metrics: { flexDirection: "row", gap: 8 },
-
-  // Single Merged Logs Card on Main Screen
-  logsCard: {
-    padding: 0,
-    overflow: "hidden",
+  contentContainer: {
+    gap: 14,
+    paddingBottom: 24,
   },
-  logRow: {
+
+  // 1. TODAY'S HERO CARD
+  todayHeroCard: {
+    padding: 16,
+    gap: 12,
+    borderRadius: radii.lg,
+  },
+  todayHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  todayTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  sectionOverline: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.9,
+  },
+  goalBadgeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  goalBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  todayNumbersRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  todayHoursGroup: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 4,
+  },
+  todayHoursValue: {
+    fontSize: 32,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -0.5,
+  },
+  todayHoursGoal: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  todayPercentValue: {
+    fontSize: 22,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+  },
+  todayMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  todayMetaText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  todayQuestionsText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  // 2. PRIMARY ACTION
+  primaryStudyButton: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.emerald,
+    height: 46,
+    borderRadius: radii.md,
+    paddingHorizontal: 16,
+  },
+  primaryStudyButtonText: {
+    color: "#09090B",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  // 3. QUICK STATS (3-COLUMN ROW)
+  quickStatsContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 10,
+    paddingHorizontal: 8,
+    borderRadius: radii.md,
+    borderWidth: 1,
   },
-  logRowDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  logIcon: {
-    width: 32,
-    height: 32,
+  quickStatCol: {
+    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    backgroundColor: colors.raised,
-    borderColor: colors.border,
-    borderWidth: 1,
+    gap: 2,
   },
-  logCopy: { flex: 1, gap: 3 },
-  logTitle: { color: colors.text, fontSize: 13, fontWeight: "800" },
-  logMeta: { color: colors.textFaint, fontSize: 10, lineHeight: 14 },
-  logHours: { color: colors.cyan, fontWeight: "900", fontSize: 13 },
-  analysisLabel: { color: colors.violet, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  analysis: { color: colors.textMuted, fontSize: 13, lineHeight: 20 },
-  muted: { color: colors.textMuted, fontSize: 13 },
-  sheet: { backgroundColor: colors.surface },
-  handle: { backgroundColor: colors.border },
-  sheetContent: { padding: 20, paddingBottom: 48 },
-  form: { gap: 13 },
-  sheetTitle: { color: colors.text, fontSize: 23, fontWeight: "900" },
-  sheetSubtitle: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 5 },
-  fieldLabel: { color: colors.textMuted, fontSize: 10, letterSpacing: 0.8, fontWeight: "900" },
-  picker: { gap: 8 },
-  fields: { flexDirection: "row", gap: 10 },
-  smallField: { flex: 1, gap: 7 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    borderRadius: 12,
-    minHeight: 46,
-    paddingHorizontal: 13,
-    fontSize: 14,
-  },
-  multiline: { minHeight: 90, textAlignVertical: "top", paddingTop: 12 },
-  goalInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    textAlign: "center",
-    fontSize: 40,
+  quickStatNumber: {
+    fontSize: 17,
     fontWeight: "900",
-    paddingVertical: 12,
+    fontVariant: ["tabular-nums"],
   },
-  goalHint: { color: colors.textMuted, textAlign: "center", fontSize: 13, marginTop: -7 },
+  quickStatLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 24,
+  },
 
-  // Action Pills
-  textActionPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  // 4. RECENT STUDY LOGS
+  sectionGroup: {
+    gap: 8,
   },
-  textActionLabel: {
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 2,
+  },
+  sectionTitleText: {
+    fontSize: 14.5,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  viewAllButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  viewAllButtonText: {
     fontSize: 12,
     fontWeight: "700",
     color: colors.cyan,
   },
+  logsContainer: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  logItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    gap: 10,
+    minHeight: 62,
+  },
+  logRowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  logIconBox: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  logTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  logSubjectTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  logMetaSubtitle: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  logDurationText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: colors.cyan,
+    fontVariant: ["tabular-nums"],
+  },
+  emptyLogsCard: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: radii.md,
+    borderWidth: 1,
+  },
+  emptyLogsText: {
+    fontSize: 12.5,
+    textAlign: "center",
+    fontWeight: "500",
+  },
 
-  // View All Presentation Layer
+  // 6. WEEKLY INSIGHT
+  insightCard: {
+    padding: 14,
+    gap: 8,
+    borderRadius: radii.md,
+  },
+  insightHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  insightOverline: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.violet,
+    letterSpacing: 0.8,
+  },
+  insightBody: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  insightPlaceholderCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 12,
+    borderRadius: radii.md,
+    borderWidth: 1,
+  },
+  insightPlaceholderTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  insightPlaceholderDesc: {
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+
+  // BOTTOM SHEET STYLES
+  sheetBackground: {
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+  },
+  sheetContent: {
+    padding: 20,
+    paddingBottom: 44,
+  },
+  formContainer: {
+    gap: 12,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  sheetSubtitle: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  horizontalChipRow: {
+    gap: 8,
+    paddingBottom: 2,
+  },
+  horizontalGrid: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  twoColumnFields: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  columnField: {
+    flex: 1,
+    gap: 6,
+  },
+  inputField: {
+    height: 44,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 13.5,
+  },
+  multilineInput: {
+    height: 76,
+    textAlignVertical: "top",
+    paddingTop: 10,
+  },
+  goalInputWrapper: {
+    alignItems: "center",
+    gap: 4,
+    marginVertical: 6,
+  },
+  goalBigInput: {
+    width: 120,
+    height: 64,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    fontSize: 34,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  goalInputUnit: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  // VIEW ALL PRESENTATION MODAL
   viewAllBackdrop: {
     flex: 1,
     backgroundColor: "transparent",
@@ -809,8 +1823,8 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   detailHeaderArea: {
-    paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 4,
   },
@@ -825,32 +1839,40 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   detailHeaderTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "800",
     letterSpacing: -0.3,
   },
   detailHeaderSubtitle: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: "500",
     paddingLeft: 26,
   },
   detailScrollBody: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    gap: 14,
   },
-
-  // Metrics Highlights Row
+  textActionPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  textActionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.cyan,
+  },
   metricsRow: {
     flexDirection: "row",
     gap: 8,
   },
   metricCard: {
     flex: 1,
-    padding: 12,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    gap: 4,
+    gap: 3,
   },
   metricLabelText: {
     fontSize: 9,
@@ -858,55 +1880,62 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   metricNumber: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "900",
     fontVariant: ["tabular-nums"],
   },
   unifiedCard: {
-    borderRadius: 14,
+    borderRadius: radii.md,
     borderWidth: 1,
     overflow: "hidden",
   },
   hairlineDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-
-  // Head-to-Head Subject Breakdown
   subjectBreakdownRow: {
-    padding: 14,
-    gap: 8,
+    padding: 12,
+    gap: 6,
   },
   subjectBreakdownHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
   },
   subjectBreakdownTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: "700",
   },
   subjectBreakdownSubtext: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: "500",
   },
   subjectBreakdownHours: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
   },
-
-  // Log History Rows in View All
   logHistoryRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    padding: 14,
+    padding: 12,
     gap: 10,
   },
   logNotes: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontStyle: "italic",
     marginTop: 2,
     lineHeight: 16,
+  },
+  analysisLabel: {
+    color: colors.violet,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  analysis: {
+    color: colors.textMuted,
+    fontSize: 12.5,
+    lineHeight: 19,
   },
 });

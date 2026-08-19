@@ -210,6 +210,8 @@ async function handleNativeTrackerRoute(safePath: string, method: string, parsed
       },
     });
 
+    await prisma.settings.updateMany({ data: { analysisStale: true } }).catch(() => {});
+
     return NextResponse.json({ success: true, logId: newStudyLog.id });
   }
 

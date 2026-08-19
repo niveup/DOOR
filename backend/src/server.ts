@@ -2229,6 +2229,9 @@ app.post("/api/tracker/log", async (req: Request, res: Response) => {
     }).catch(() => {});
 
     trackerStatusCache = null;
+    await (prisma.settings as any).updateMany({
+      data: { analysisStale: true },
+    }).catch(() => {});
     res.json({ success: true, logId: newStudyLog.id });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2337,60 +2340,7 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
 
     const overallReadiness = totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : 0;
 
-    // Retrieve settings cache
-    let settings: any = await prisma.settings.findUnique({ where: { id: "default" } });
-    if (!settings) {
-      settings = await prisma.settings.create({
-        data: { id: "default", name: "GATE Aspirant" },
-      });
-    }
-
-    // Determine Monday of current week in Asia/Kolkata timezone
-    const currentMonday = getKolkataMonday();
-
-    const isStale = settings?.analysisStale ||
-      !settings?.weeklyAnalysis ||
-      !settings?.analysisWeekOf ||
-      new Date(settings?.analysisWeekOf).getTime() !== currentMonday.getTime();
-
-    let weeklyAnalysis = settings?.weeklyAnalysis || "";
-
-    if (isStale) {
-      try {
-        let subjectsTable = "| Subject | Weight | Rating | Hours (Weekly) | Questions (Weekly) | Neglected? | Avoidance? |\n";
-        subjectsTable += "|---|---|---|---|---|---|---|\n";
-        for (const r of ratingsList) {
-          subjectsTable += `| ${r.subjectName} | ${Math.round(r.importanceLevel * 100)}% | ${r.latestRating || "Not rated"} | ${r.hoursStudied}h | ${r.questionsSolved} | ${r.isNeglected ? "Yes" : "No"} | ${r.hasAvoidanceWarning ? "Yes" : "No"} |\n`;
-        }
-
-        const sysPrompt = loadPrompt("tracker_analysis.md", {
-          user_name: settings?.name || "Aspirant",
-          readiness: overallReadiness,
-          subjects_table: subjectsTable,
-        });
-
-        const aiResponse = await aiChat(sysPrompt, "Review my progress and give me honest feedback.", {
-          model: "openrouter/free"
-        });
-
-        weeklyAnalysis = aiResponse.replace(/```(?:markdown)?/gi, "").replace(/```/g, "").trim();
-
-        // Update cached values in settings
-        settings = await (prisma.settings as any).update({
-          where: { id: "default" },
-          data: {
-            weeklyAnalysis,
-            analysisWeekOf: currentMonday,
-            analysisStale: false,
-          },
-        });
-      } catch (aiError) {
-        console.error("Failed to generate tracker AI analysis:", aiError);
-        weeklyAnalysis = settings?.weeklyAnalysis || "Unable to generate AI analysis at this time.";
-      }
-    }
-
-    // Fetch study logs directly from Prisma Postgres (Primary Store)
+    // 1. Fetch study logs directly from Prisma Postgres (Primary Store)
     const prismaLogs: any[] = await ((prisma as any).studyLog?.findMany({
       orderBy: [{ logDate: "desc" }, { createdAt: "desc" }],
       take: 300,
@@ -2408,6 +2358,92 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
       createdAt: l.createdAt instanceof Date ? l.createdAt.getTime() : Number(l.createdAt || Date.now()),
     }));
 
+    // 2. Compute rolling last 7-day statistics in Asia/Kolkata timezone
+    const todayKolkataDateStr = getKolkataDateString();
+    const nowKolkata = getKolkataDate();
+    const sevenDaysAgoDate = new Date(nowKolkata);
+    sevenDaysAgoDate.setDate(sevenDaysAgoDate.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgoDate.toISOString().slice(0, 10);
+
+    const last7DayLogs = logs.filter((l) => (l.logDate || "").slice(0, 10) >= sevenDaysAgoStr);
+    const total7DayHours = last7DayLogs.reduce((sum, l) => sum + (Number(l.hoursStudied) || 0), 0);
+    const total7DayQuestions = last7DayLogs.reduce((sum, l) => sum + (Number(l.questionsSolved) || 0), 0);
+
+    const subject7DayMap = new Map<number, { hours: number; questions: number; sessionCount: number }>();
+    for (const l of last7DayLogs) {
+      const existing = subject7DayMap.get(l.subjectId) || { hours: 0, questions: 0, sessionCount: 0 };
+      existing.hours += Number(l.hoursStudied) || 0;
+      existing.questions += Number(l.questionsSolved) || 0;
+      existing.sessionCount += 1;
+      subject7DayMap.set(l.subjectId, existing);
+    }
+
+    // Retrieve settings cache
+    let settings: any = await prisma.settings.findUnique({ where: { id: "default" } });
+    if (!settings) {
+      settings = await prisma.settings.create({
+        data: { id: "default", name: "GATE Aspirant" },
+      });
+    }
+
+    // Check if daily analysis is stale (Daily refresh: regenerate each day, or when new logs/ratings arrive)
+    const lastAnalysisDate = settings?.analysisWeekOf
+      ? new Date(settings.analysisWeekOf).toISOString().slice(0, 10)
+      : null;
+
+    const isStale =
+      settings?.analysisStale ||
+      !settings?.weeklyAnalysis ||
+      settings.weeklyAnalysis === "Unable to generate AI analysis at this time." ||
+      lastAnalysisDate !== todayKolkataDateStr;
+
+    let weeklyAnalysis = settings?.weeklyAnalysis || "";
+
+    if (isStale) {
+      try {
+        let subjectsTable = "| Subject | Weight | 7-Day Hours | 7-Day Questions | Sessions (7d) | All-Time Hours | Status |\n";
+        subjectsTable += "|---|---|---|---|---|---|---|\n";
+        for (const r of ratingsList) {
+          const s7 = subject7DayMap.get(r.subjectId) || { hours: 0, questions: 0, sessionCount: 0 };
+          const status = s7.hours > 0 ? "Active this week" : r.isNeglected ? "Neglected (>21d)" : "No study this week";
+          subjectsTable += `| ${r.subjectName} | ${Math.round(r.importanceLevel * 100)}% | ${s7.hours.toFixed(1)}h | ${s7.questions} | ${s7.sessionCount} | ${r.cumulativeHours.toFixed(1)}h | ${status} |\n`;
+        }
+
+        const logHistorySummary = last7DayLogs.slice(0, 10).map((l) =>
+          `- ${l.logDate} (${l.timeBlock}): ${l.subjectName} — ${l.hoursStudied}h, ${l.questionsSolved} questions${l.notes ? ` ("${l.notes}")` : ""}`
+        ).join("\n") || "No study sessions logged in the last 7 days.";
+
+        const sysPrompt = loadPrompt("tracker_analysis.md", {
+          user_name: settings?.name || "Aspirant",
+          readiness: overallReadiness,
+          subjects_table: subjectsTable,
+          recent_logs: logHistorySummary,
+          total_7d_hours: total7DayHours.toFixed(1),
+          total_7d_questions: String(total7DayQuestions),
+          daily_goal: String(settings.dailyAvailableHours || 4.0),
+        });
+
+        const aiResponse = await aiChat(
+          sysPrompt,
+          `Review my last 7-day study logs (${total7DayHours.toFixed(1)}h total studied across ${last7DayLogs.length} sessions, ${total7DayQuestions} questions solved) and give me daily actionable feedback for GATE CSE.`
+        );
+
+        weeklyAnalysis = aiResponse.replace(/```(?:markdown)?/gi, "").replace(/```/g, "").trim();
+
+        // Update cached values in settings with today's date
+        settings = await (prisma.settings as any).update({
+          where: { id: "default" },
+          data: {
+            weeklyAnalysis,
+            analysisWeekOf: new Date(`${todayKolkataDateStr}T00:00:00.000Z`),
+            analysisStale: false,
+          },
+        });
+      } catch (aiError) {
+        console.error("Failed to generate tracker AI analysis:", aiError);
+        weeklyAnalysis = settings?.weeklyAnalysis || "";
+      }
+    }
 
     const value = {
       overallReadiness,
