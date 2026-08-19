@@ -26,6 +26,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/src/providers/theme-provider";
+import { useNotify } from "@/src/providers/notification-provider";
 import { AppScreen } from "@/src/components/screen";
 import {
   ActionButton,
@@ -52,21 +53,26 @@ function formatHours(hours: number): string {
 }
 
 function formatDateShort(dateStr: string): string {
-  if (!dateStr) return "";
-  const parts = dateStr.slice(0, 10).split("-");
-  if (parts.length === 3) {
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const monthIndex = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    if (monthIndex >= 0 && monthIndex < 12) {
-      return `${months[monthIndex]} ${day}`;
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const monthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      ];
+      const mIdx = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      return `${monthNames[mIdx] || parts[1]} ${d}`;
     }
+    return dateStr;
+  } catch {
+    return dateStr;
   }
-  return dateStr.slice(0, 10);
 }
 
 export default function StudyScreen() {
   const { theme, isDark } = useTheme();
+  const notify = useNotify();
   const client = useQueryClient();
   const sheetRef = useRef<BottomSheetModal>(null);
   const [sheetMode, setSheetMode] = useState<SheetMode>("log");
@@ -75,6 +81,7 @@ export default function StudyScreen() {
   const tracker = useQuery({
     queryKey: ["tracker"],
     queryFn: api.tracker.status,
+    staleTime: 5_000,
   });
 
   const open = (mode: SheetMode) => {
@@ -85,18 +92,24 @@ export default function StudyScreen() {
   const logMutation = useMutation({
     mutationFn: api.tracker.log,
     onSuccess: async () => {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       sheetRef.current?.dismiss();
+      notify.success("Study Session Logged", "Progress and daily goal updated.");
       client.invalidateQueries({ queryKey: ["tracker"] });
+    },
+    onError: () => {
+      notify.error("Save Failed", "Could not record study session.");
     },
   });
 
   const goalMutation = useMutation({
     mutationFn: api.tracker.goal,
     onSuccess: async () => {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       sheetRef.current?.dismiss();
+      notify.success("Goal Updated", "Daily study target updated.");
       client.invalidateQueries({ queryKey: ["tracker"] });
+    },
+    onError: () => {
+      notify.error("Update Failed", "Could not update daily goal.");
     },
   });
 

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   BackHandler,
   Modal,
   Pressable,
@@ -39,6 +38,7 @@ import { api } from "@/src/services/api";
 import { formatINR, shortDate, todayInKolkata } from "@/src/lib/format";
 import { Bill, Budget, Expense, FinanceCategory, financeCategories } from "@/src/types/domain";
 import { useTheme } from "@/src/providers/theme-provider";
+import { useNotify } from "@/src/providers/notification-provider";
 
 // -------------------------------------------------------------
 // Centralized Fintech Design & Category Color Tokens
@@ -196,6 +196,7 @@ function CategoryIconBadge({
 
 export default function FinanceScreen() {
   const client = useQueryClient();
+  const notify = useNotify();
   const formSheetRef = useRef<BottomSheetModal>(null);
 
   const [formMode, setFormMode] = useState<FormMode>(null);
@@ -261,7 +262,6 @@ export default function FinanceScreen() {
   const expenseMutation = useMutation({
     mutationFn: api.finance.saveExpense,
     onMutate: async (newExpense) => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       formSheetRef.current?.dismiss();
       setFormMode(null);
 
@@ -283,9 +283,12 @@ export default function FinanceScreen() {
       );
       return { previous };
     },
+    onSuccess: (res, newExpense) => {
+      notify.success("Expense Recorded", `${newExpense.title} (${formatINR(Number(newExpense.amount))})`);
+    },
     onError: (_error, _variables, context) => {
       client.setQueryData(["finance"], context?.previous);
-      Alert.alert("Save Failed", "Could not reach cloud database. Please try again.");
+      notify.error("Save Failed", "Could not reach cloud database. Please try again.");
     },
     onSettled: refresh,
   });
@@ -294,7 +297,6 @@ export default function FinanceScreen() {
   const budgetMutation = useMutation({
     mutationFn: api.finance.saveBudget,
     onMutate: async (newBudget) => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setDetailMode(null);
 
       await client.cancelQueries({ queryKey: ["finance"] });
@@ -313,9 +315,12 @@ export default function FinanceScreen() {
       });
       return { previous };
     },
+    onSuccess: () => {
+      notify.success("Budget Saved", "Monthly allocation plan updated.");
+    },
     onError: (_error, _variables, context) => {
       client.setQueryData(["finance"], context?.previous);
-      Alert.alert("Budget Save Failed", "Could not sync budget with cloud.");
+      notify.error("Budget Save Failed", "Could not sync budget with cloud.");
     },
     onSettled: refresh,
   });
@@ -324,7 +329,6 @@ export default function FinanceScreen() {
   const billMutation = useMutation({
     mutationFn: api.finance.saveBill,
     onMutate: async (newBill) => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       formSheetRef.current?.dismiss();
       setFormMode(null);
 
@@ -346,8 +350,12 @@ export default function FinanceScreen() {
       );
       return { previous };
     },
+    onSuccess: (res, newBill) => {
+      notify.success("Bill Scheduled", `${newBill.title} (${formatINR(Number(newBill.amount))})`);
+    },
     onError: (_error, _variables, context) => {
       client.setQueryData(["finance"], context?.previous);
+      notify.error("Bill Save Failed", "Could not save bill to cloud.");
     },
     onSettled: refresh,
   });
@@ -356,7 +364,6 @@ export default function FinanceScreen() {
   const payMutation = useMutation({
     mutationFn: api.finance.payBill,
     onMutate: async (id) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       await client.cancelQueries({ queryKey: ["finance"] });
       const previous = client.getQueryData<typeof data>(["finance"]);
       client.setQueryData<typeof data>(["finance"], (current) => {
@@ -368,9 +375,12 @@ export default function FinanceScreen() {
       });
       return { previous };
     },
+    onSuccess: () => {
+      notify.success("Bill Paid", "Payment recorded in ledger.");
+    },
     onError: (_error, _variables, context) => {
       client.setQueryData(["finance"], context?.previous);
-      Alert.alert("Payment Failed", "Could not record payment. Please try again.");
+      notify.error("Payment Failed", "Could not record payment. Please try again.");
     },
     onSettled: refresh,
   });
@@ -542,7 +552,7 @@ export default function FinanceScreen() {
                   onSave={(expense) => {
                     const amount = Number(expense.amount);
                     if (!expense.title.trim() || !Number.isFinite(amount) || amount <= 0) {
-                      return Alert.alert("Check expense", "Enter a title and an amount above ₹0.");
+                      return notify.warning("Check Expense", "Enter a title and an amount above ₹0.");
                     }
                     expenseMutation.mutate({ ...expense, title: expense.title.trim(), amount });
                   }}
@@ -558,7 +568,7 @@ export default function FinanceScreen() {
                   onSave={(bill) => {
                     const amount = Number(bill.amount);
                     if (!bill.title.trim() || amount <= 0) {
-                      return Alert.alert("Check bill", "Enter a bill title and amount.");
+                      return notify.warning("Check Bill", "Enter a bill title and an amount above ₹0.");
                     }
                     billMutation.mutate({ ...bill, title: bill.title.trim(), amount, paid: false });
                   }}
@@ -1631,6 +1641,7 @@ function AllBillsContent({
   contentContainerStyle: any;
 }) {
   const { theme, isDark } = useTheme();
+  const notify = useNotify();
 
   const unpaid = bills.filter((b) => !b.paid).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const paid = bills.filter((b) => b.paid).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
@@ -1661,10 +1672,14 @@ function AllBillsContent({
                 <Pressable
                   key={item.id}
                   onLongPress={() => {
-                    Alert.alert("Delete Bill", item.title, [
-                      { text: "Cancel", style: "cancel" },
-                      { text: "Delete", style: "destructive", onPress: () => onDelete(item.id) },
-                    ]);
+                    notify.confirm({
+                      title: "Delete Bill?",
+                      message: `Remove "${item.title}" from your upcoming bills?`,
+                      confirmLabel: "Delete Bill",
+                      tone: "destructive",
+                      icon: "trash-outline",
+                      onConfirm: () => onDelete(item.id),
+                    });
                   }}
                   style={[
                     styles.unifiedItemRow,
@@ -1791,6 +1806,7 @@ function AllActivityContent({
   contentContainerStyle: any;
 }) {
   const { theme, isDark } = useTheme();
+  const notify = useNotify();
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -1869,10 +1885,14 @@ function AllActivityContent({
                     <Pressable
                       key={item.id}
                       onLongPress={() => {
-                        Alert.alert("Delete Expense", `${item.title} — ${formatINR(item.amount)}`, [
-                          { text: "Cancel", style: "cancel" },
-                          { text: "Delete", style: "destructive", onPress: () => onDelete(item.id) },
-                        ]);
+                        notify.confirm({
+                          title: "Delete Expense?",
+                          message: `Remove "${item.title}" (${formatINR(item.amount)}) from your ledger?`,
+                          confirmLabel: "Delete",
+                          tone: "destructive",
+                          icon: "trash-outline",
+                          onConfirm: () => onDelete(item.id),
+                        });
                       }}
                       style={[
                         styles.unifiedItemRow,
@@ -1931,6 +1951,7 @@ function BudgetFormContent({
   contentContainerStyle: any;
 }) {
   const { theme, isDark } = useTheme();
+  const notify = useNotify();
   const insets = useSafeAreaInsets();
 
   const [allowanceText, setAllowanceText] = useState<string>(
@@ -1986,23 +2007,20 @@ function BudgetFormContent({
     }
 
     if (totalAllocated > finalAllowance && finalAllowance > 0) {
-      Alert.alert(
-        "Category Caps Exceed Allowance",
-        `Your category caps total ₹${totalAllocated.toLocaleString("en-IN")}, but your monthly allowance is set to ₹${finalAllowance.toLocaleString("en-IN")}.`,
-        [
-          {
-            text: `Update Allowance to ₹${totalAllocated.toLocaleString("en-IN")}`,
-            onPress: () => {
-              const finalCaps: Record<string, number> = {};
-              financeCategories.forEach((cat) => {
-                finalCaps[cat] = capsText[cat] ? parseInt(capsText[cat], 10) || 0 : 0;
-              });
-              onSave({ allowance: totalAllocated, caps: finalCaps as any });
-            },
-          },
-          { text: "Adjust Caps", style: "cancel" },
-        ]
-      );
+      notify.confirm({
+        title: "Category Caps Exceed Allowance",
+        message: `Your category caps total ₹${totalAllocated.toLocaleString("en-IN")}, but your monthly allowance is set to ₹${finalAllowance.toLocaleString("en-IN")}. Update allowance to match caps?`,
+        confirmLabel: "Update Allowance",
+        cancelLabel: "Adjust Caps",
+        tone: "primary",
+        onConfirm: () => {
+          const finalCaps: Record<string, number> = {};
+          financeCategories.forEach((cat) => {
+            finalCaps[cat] = capsText[cat] ? parseInt(capsText[cat], 10) || 0 : 0;
+          });
+          onSave({ allowance: totalAllocated, caps: finalCaps as any });
+        },
+      });
       return;
     }
 

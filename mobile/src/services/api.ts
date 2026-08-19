@@ -102,4 +102,8 @@ export const api = {
   },
   explain: (input: { subject?: string; topic?: string; userQuery: string }) => request<ExplainResponse>("/api/explainer/explain", { method: "POST", body: JSON.stringify(input) }),
   interview: (input: { sessionId: string; questionIndex: number; sessionLength: number; company: string; mode: string; question: string; answer: string }) => request<Record<string, unknown>>("/api/interview/evaluate", { method: "POST", body: JSON.stringify(input) }),
+  health: () => request<{ status: string; timestamp?: string }>("/health"),
+  settings: {
+    get: () => request<any>("/api/settings"),
+  },
 };

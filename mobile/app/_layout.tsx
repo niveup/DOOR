@@ -11,6 +11,7 @@ import { colors } from "@/src/theme/tokens";
 import { queryClient, queryPersister } from "@/src/services/query-client";
 import { AuthProvider } from "@/src/providers/auth-provider";
 import { AppThemeProvider, useTheme } from "@/src/providers/theme-provider";
+import { NotificationProvider } from "@/src/providers/notification-provider";
 
 function NavigationWrapper() {
   const { isDark, theme } = useTheme();
@@ -44,14 +45,16 @@ function NavigationWrapper() {
   return (
     <NavThemeProvider value={activeNavTheme}>
       <AuthProvider>
-        <BottomSheetModalProvider>
-          <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="passcode" options={{ animation: "fade" }} />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-          <StatusBar style={isDark ? "light" : "dark"} backgroundColor={theme.canvas} />
-        </BottomSheetModalProvider>
+        <NotificationProvider>
+          <BottomSheetModalProvider>
+            <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="passcode" options={{ animation: "fade" }} />
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+            <StatusBar style={isDark ? "light" : "dark"} backgroundColor={theme.canvas} />
+          </BottomSheetModalProvider>
+        </NotificationProvider>
       </AuthProvider>
     </NavThemeProvider>
   );

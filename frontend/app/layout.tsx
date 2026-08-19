@@ -42,15 +42,18 @@ export default function RootLayout({
       <body className="min-h-full bg-[var(--bg-page)] text-[var(--text-primary)] font-sans">
         <Toaster
           position="bottom-right"
+          closeButton
           toastOptions={{
             style: {
               fontFamily: "var(--font-sans)",
-              borderRadius: "8px",
+              borderRadius: "12px",
               border: "1px solid var(--border)",
               background: "var(--bg-card)",
               color: "var(--text-primary)",
-              fontSize: "12px",
-              fontWeight: "700",
+              fontSize: "12.5px",
+              fontWeight: "600",
+              boxShadow: "var(--shadow-soft)",
+              padding: "12px 16px",
             },
           }}
         />

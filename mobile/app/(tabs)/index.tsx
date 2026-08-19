@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   BackHandler,
   Modal,
   NativeScrollEvent,
@@ -23,6 +22,7 @@ import { FullScreenGlitterOverlay } from "@/src/components/glitter-overlay";
 import { todayInKolkata } from "@/src/lib/format";
 import { api } from "@/src/services/api";
 import { useTheme } from "@/src/providers/theme-provider";
+import { useNotify } from "@/src/providers/notification-provider";
 
 type TodoTag = "GATE" | "College" | "Personal";
 
@@ -231,6 +231,7 @@ function CompactDurationDialerModal({
 export default function TodayScreen() {
   const date = todayInKolkata();
   const queryClient = useQueryClient();
+  const notify = useNotify();
   const { theme, isDark, toggleTheme } = useTheme();
   const cheerPlayer = useAudioPlayer(require("@/assets/sounds/cheer.mp3"));
 
@@ -530,32 +531,32 @@ export default function TodayScreen() {
 
   // Delete via Long Press
   const confirmDeleteTodo = (item: PersonalTodo) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-    Alert.alert("Delete Task", item.text, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          const nextTodos = todos.filter((t) => t.id !== item.id);
-          setTodos(nextTodos);
-          setShowCelebration(false);
+    notify.confirm({
+      title: "Delete Task?",
+      message: `Remove "${item.text}" from today's routine?`,
+      confirmLabel: "Delete Task",
+      tone: "destructive",
+      icon: "trash-outline",
+      onConfirm: () => {
+        const nextTodos = todos.filter((t) => t.id !== item.id);
+        setTodos(nextTodos);
+        setShowCelebration(false);
 
-          queryClient.setQueryData(["routine", date], (old: any) => {
-            if (!old || !Array.isArray(old.tasks)) return old;
-            return {
-              ...old,
-              tasks: old.tasks.filter((t: any) => t.taskId !== item.id),
-            };
-          });
-          AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(nextTodos)).catch(() => {});
+        queryClient.setQueryData(["routine", date], (old: any) => {
+          if (!old || !Array.isArray(old.tasks)) return old;
+          return {
+            ...old,
+            tasks: old.tasks.filter((t: any) => t.taskId !== item.id),
+          };
+        });
+        AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(nextTodos)).catch(() => {});
 
-          if (!item.id.startsWith("temp-")) {
-            api.routine.deleteTask(item.id).catch(() => {});
-          }
-        },
+        if (!item.id.startsWith("temp-")) {
+          api.routine.deleteTask(item.id).catch(() => {});
+        }
+        notify.success("Task Removed", `"${item.text}" removed.`);
       },
-    ]);
+    });
   };
 
   const clearCompletedTodos = () => {
