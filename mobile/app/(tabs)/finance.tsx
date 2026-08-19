@@ -114,13 +114,13 @@ const CATEGORY_TOKENS: Record<
   },
   "Personal & health": {
     icon: "fitness-outline",
-    darkIcon: "#B56F7E",
-    darkBg: "#241B1F",
-    darkBorder: "#35272E",
-    lightIcon: "#964C5C",
-    lightBg: "#FBF1F3",
-    lightBorder: "#F3DAE0",
-    barColor: "#EC4899",
+    darkIcon: "#FB7185",
+    darkBg: "#2A161E",
+    darkBorder: "#4A2030",
+    lightIcon: "#E11D48",
+    lightBg: "#FFF1F2",
+    lightBorder: "#FECDD3",
+    barColor: "#F43F5E",
   },
   "Fun & social": {
     icon: "game-controller-outline",
@@ -1186,14 +1186,12 @@ export default function FinanceScreen() {
                           pressed && { opacity: 0.8 },
                         ]}
                       >
-                        <CategoryIconBadge category={item.category} isDark={isDark} />
-
                         <View style={styles.itemDetails}>
                           <Text style={[styles.itemTitle, { color: isDark ? "#F5F5F7" : theme.text }]} numberOfLines={1}>
                             {item.title}
                           </Text>
                           <Text style={[styles.itemSubtext, { color: isDark ? "#71717A" : theme.textFaint }]}>
-                            {shortDate(item.date)} · {item.category} · {item.payment || "UPI"}
+                            {shortDate(item.date)} · {item.category}
                           </Text>
                         </View>
 
