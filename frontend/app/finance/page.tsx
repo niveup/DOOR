@@ -1280,16 +1280,27 @@ export default function FinancePage() {
                   const percentage =
                     budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : spent > 0 ? 100 : 0;
                   return (
-                    <div key={category}>
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategoryFilter(category);
+                        setShowFilterBar(true);
+                        document.getElementById("live-ledger-section")?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="w-full text-left group p-1.5 -mx-1.5 rounded-lg hover:bg-[var(--bg-elevated)] transition cursor-pointer"
+                    >
                       <div className="mb-1.5 flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
                           <span
                             style={{ background: soft, color }}
-                            className="grid h-6.5 w-6.5 place-items-center rounded-md shrink-0"
+                            className="grid h-6.5 w-6.5 place-items-center rounded-md shrink-0 group-hover:scale-105 transition-transform"
                           >
                             <Icon name={icon} className="h-3.5 w-3.5" />
                           </span>
-                          <span className="truncate text-xs font-semibold text-[var(--text-primary)]">{category}</span>
+                          <span className="truncate text-xs font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                            {category}
+                          </span>
                           {isOverBudget && (
                             <span
                               className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)] text-[9px] font-black"
@@ -1317,7 +1328,7 @@ export default function FinancePage() {
                           className="h-full rounded-full transition-[width] duration-500"
                         />
                       </div>
-                    </div>
+                    </button>
                   );
                 })
               ) : (
@@ -1361,7 +1372,7 @@ export default function FinancePage() {
           </div>
 
           {/* Live Ledger / Expense Transactions */}
-          <div className="surface overflow-hidden rounded-2xl">
+          <div id="live-ledger-section" className="surface overflow-hidden rounded-2xl scroll-mt-6">
             <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
                 <p className="section-label">LIVE LEDGER</p>
