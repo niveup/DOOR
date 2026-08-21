@@ -674,21 +674,14 @@ export default function ProfileScreen() {
               <Ionicons name="school-outline" size={18} color={colors.emerald} />
             </View>
             <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Target Exam
-                </Text>
-                <InfoButton
-                  title="Target Exam"
-                  message="Your target competitive exam and graduation year used to personalize PYQs, syllabus coverage, and timetable pacing."
-                  isDark={isDark}
-                />
-              </View>
+              <Text
+                style={[
+                  styles.rowTitle,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                Target Exam
+              </Text>
               <Text
                 style={[
                   styles.rowSubtitle,
@@ -732,21 +725,14 @@ export default function ProfileScreen() {
               <Ionicons name="layers-outline" size={18} color={colors.violet} />
             </View>
             <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Discipline & Stage
-                </Text>
-                <InfoButton
-                  title="Discipline & Stage"
-                  message="Your branch curriculum and current phase (Concept Building, PYQs, Test Series) to tailor daily focus areas."
-                  isDark={isDark}
-                />
-              </View>
+              <Text
+                style={[
+                  styles.rowTitle,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                Discipline & Stage
+              </Text>
               <Text
                 style={[
                   styles.rowSubtitle,
@@ -787,21 +773,14 @@ export default function ProfileScreen() {
               onPress={() => openSheet("daily_goal")}
               style={[styles.rowContent, { flex: 1 }]}
             >
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Daily Study Goal
-                </Text>
-                <InfoButton
-                  title="Daily Study Goal"
-                  message="Allocated study focus per day for the AI routine engine to build your daily schedule and compute consistency scores."
-                  isDark={isDark}
-                />
-              </View>
+              <Text
+                style={[
+                  styles.rowTitle,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                Daily Study Goal
+              </Text>
               <Text
                 style={[
                   styles.rowSubtitle,
@@ -879,21 +858,14 @@ export default function ProfileScreen() {
               <Ionicons name="alarm-outline" size={18} color={colors.violet} />
             </View>
             <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Sleep & Wake
-                </Text>
-                <InfoButton
-                  title="Sleep & Wake"
-                  message="Circadian rest routine to maintain high mental stamina, memory consolidation, and prevent fatigue."
-                  isDark={isDark}
-                />
-              </View>
+              <Text
+                style={[
+                  styles.rowTitle,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                Sleep & Wake
+              </Text>
               <Text
                 style={[
                   styles.rowSubtitle,
@@ -937,21 +909,14 @@ export default function ProfileScreen() {
               <Ionicons name="trophy-outline" size={18} color={colors.cyan} />
             </View>
             <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Target Benchmark
-                </Text>
-                <InfoButton
-                  title="Target Benchmark"
-                  message="Your primary exam target (e.g. AIR < 100 or 85+ marks) for readiness scoring and milestone tracking."
-                  isDark={isDark}
-                />
-              </View>
+              <Text
+                style={[
+                  styles.rowTitle,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                Target Benchmark
+              </Text>
               <Text
                 style={[
                   styles.rowSubtitle,
@@ -995,21 +960,14 @@ export default function ProfileScreen() {
               <Ionicons name="fitness-outline" size={18} color={colors.rose} />
             </View>
             <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Daily Fitness
-                </Text>
-                <InfoButton
-                  title="Daily Fitness"
-                  message="Daily physical workout or walk to maintain focus, energy, and cardiovascular health during intense study."
-                  isDark={isDark}
-                />
-              </View>
+              <Text
+                style={[
+                  styles.rowTitle,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                Daily Fitness
+              </Text>
               <Text
                 style={[
                   styles.rowSubtitle,
@@ -1059,22 +1017,14 @@ export default function ProfileScreen() {
               <Ionicons name="options-outline" size={18} color={colors.emerald} />
             </View>
             <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: colors.emerald },
-                  ]}
-                >
-                  Full Cockpit Setup
-                </Text>
-                <InfoButton
-                  title="Academic Cockpit"
-                  message="All-in-one comprehensive setup for your target exam, discipline, available study hours, and habits."
-                  isDark={isDark}
-                  color={colors.emerald}
-                />
-              </View>
+              <Text
+                style={[
+                  styles.rowTitle,
+                  { color: colors.emerald },
+                ]}
+              >
+                Full Cockpit Setup
+              </Text>
               <Text
                 style={[
                   styles.rowSubtitle,
