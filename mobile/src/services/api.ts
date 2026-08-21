@@ -1,4 +1,4 @@
-import { Bill, Budget, Expense, FinanceData, JournalEntry, RoutinePlan, RoutineStatus, TrackerStatus } from "@/src/types/domain";
+import { AppSettings, Bill, Budget, Expense, FinanceData, JournalEntry, RoutinePlan, RoutineStatus, TrackerStatus } from "@/src/types/domain";
 import { securePasscode } from "@/src/services/secure-store";
 
 const configuredBaseUrl = (process.env.EXPO_PUBLIC_API_URL || "").replace(/\/$/, "");
@@ -104,6 +104,8 @@ export const api = {
   interview: (input: { sessionId: string; questionIndex: number; sessionLength: number; company: string; mode: string; question: string; answer: string }) => request<Record<string, unknown>>("/api/interview/evaluate", { method: "POST", body: JSON.stringify(input) }),
   health: () => request<{ status: string; timestamp?: string }>("/health"),
   settings: {
-    get: () => request<any>("/api/settings"),
+    get: () => request<AppSettings>("/api/settings"),
+    save: (body: Partial<AppSettings>) =>
+      request<AppSettings>("/api/settings", { method: "POST", body: JSON.stringify(body) }),
   },
 };

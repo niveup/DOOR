@@ -74,7 +74,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const showToast = useCallback(
-    ({ type, title, message, duration = 3500 }: Omit<ToastItem, "id">) => {
+    ({ type, title, message, duration = 4500 }: Omit<ToastItem, "id">) => {
       const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const newToast: ToastItem = { id, type, title, message, duration };
 
@@ -91,7 +91,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
       } catch {}
 
-      setToasts((prev) => [newToast, ...prev.slice(0, 2)]); // Keep at most 3 visible
+      setToasts((prev) => [newToast, ...prev.slice(0, 1)]); // Keep at most 2 to avoid clutter
 
       const timer = setTimeout(() => {
         dismissToast(id);
@@ -193,8 +193,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           return (
             <Animated.View
               key={item.id}
-              entering={SlideInUp.springify().damping(18).stiffness(180)}
-              exiting={SlideOutUp.duration(180)}
+              entering={SlideInUp.duration(320)}
+              exiting={SlideOutUp.duration(280)}
               style={[
                 styles.toastPill,
                 {

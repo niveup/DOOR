@@ -203,17 +203,30 @@ export default function FinanceScreen() {
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [detailMode, setDetailMode] = useState<DetailMode>(null);
   const [selectedCategory, setSelectedCategory] = useState<FinanceCategory | null>(null);
+  const [categoryOrigin, setCategoryOrigin] = useState<"home" | "all-spending" | null>(null);
   const [preselectedCategory, setPreselectedCategory] = useState<FinanceCategory | undefined>(undefined);
   const [formSessionKey, setFormSessionKey] = useState(1);
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const openCategoryDetail = (category: FinanceCategory, origin: "home" | "all-spending" = "home") => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setCategoryOrigin(origin);
+    setSelectedCategory(category);
+    setFormSessionKey((prev) => prev + 1);
+  };
+
+  const handleCloseCategoryDetail = () => {
+    setSelectedCategory(null);
+    setCategoryOrigin(null);
+  };
 
   // Intercept Android hardware back press
   useEffect(() => {
     if (!detailMode && !formMode && !selectedCategory) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (selectedCategory) {
-        setSelectedCategory(null);
+        handleCloseCategoryDetail();
         return true;
       }
       if (detailMode) {
@@ -228,7 +241,7 @@ export default function FinanceScreen() {
       return false;
     });
     return () => subscription.remove();
-  }, [detailMode, formMode, selectedCategory]);
+  }, [detailMode, formMode, selectedCategory, categoryOrigin]);
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -460,7 +473,7 @@ export default function FinanceScreen() {
   const safeDailySpend = allowance && !isOverBudget ? Math.floor(remaining / daysLeft) : 0;
   const rawSpendPercent = allowance > 0 ? Math.round((spent / allowance) * 100) : 0;
 
-  // Active Spending Categories
+  // All Categories with Spending & Caps (Complete 8-category breakdown)
   const allCategoryStats = useMemo(() => {
     return financeCategories
       .map((category) => {
@@ -476,16 +489,27 @@ export default function FinanceScreen() {
           isOver: cap > 0 && total > cap,
         };
       })
-      .filter((c) => c.cap > 0 || c.total > 0)
       .sort((a, b) => {
         if (a.isOver && !b.isOver) return -1;
         if (!a.isOver && b.isOver) return 1;
-        return b.total - a.total;
+        if (a.total > 0 || b.total > 0) return b.total - a.total;
+        if (a.cap > 0 || b.cap > 0) return b.cap - a.cap;
+        return 0;
       });
   }, [budgetData.caps, expensesList, month]);
 
-  // Dashboard Capped Previews
-  const top3Spending = useMemo(() => allCategoryStats.slice(0, 3), [allCategoryStats]);
+  // Categories with activity or caps for home preview
+  const activeCategoryStats = useMemo(() => {
+    return allCategoryStats.filter((c) => c.cap > 0 || c.total > 0);
+  }, [allCategoryStats]);
+
+  // Dashboard Capped Previews (Top 3 on home screen)
+  const top3Spending = useMemo(() => {
+    if (activeCategoryStats.length > 0) {
+      return activeCategoryStats.slice(0, 3);
+    }
+    return allCategoryStats.slice(0, 3);
+  }, [activeCategoryStats, allCategoryStats]);
 
   const selectedCategoryStats = useMemo(() => {
     if (!selectedCategory) return null;
@@ -627,59 +651,6 @@ export default function FinanceScreen() {
             )}
           </ViewAllModal>
 
-          {/* Dedicated View: Specific Category Detail & Transactions */}
-          <ViewAllModal
-            visible={selectedCategory !== null}
-            title={selectedCategory || "Category Details"}
-            subtitle={
-              selectedCategoryStats
-                ? selectedCategoryStats.cap > 0
-                  ? `${formatINR(selectedCategoryStats.total)} spent of ${formatINR(selectedCategoryStats.cap)} limit`
-                  : `${formatINR(selectedCategoryStats.total)} total spent · No limit set`
-                : undefined
-            }
-            onClose={() => setSelectedCategory(null)}
-            action={
-              <Pressable
-                onPress={() => {
-                  const cat = selectedCategory;
-                  setSelectedCategory(null);
-                  setTimeout(() => openForm("expense", cat || undefined), 250);
-                }}
-                hitSlop={8}
-                style={styles.textActionPill}
-              >
-                <Text style={[styles.textActionLabel, { color: isDark ? "#FAFBFD" : theme.text, fontWeight: "700" }]}>
-                  + Log expense
-                </Text>
-              </Pressable>
-            }
-          >
-            {({ scrollHandler, contentContainerStyle }) => (
-              <CategoryDetailContent
-                key={`cat-${selectedCategory}-${formSessionKey}`}
-                category={selectedCategory!}
-                stats={
-                  selectedCategoryStats || {
-                    category: selectedCategory!,
-                    cap: 0,
-                    total: 0,
-                    percent: 0,
-                    isOver: false,
-                  }
-                }
-                expenses={expensesList.filter((e) => e.category === selectedCategory)}
-                onDeleteExpense={(id) => deleteExpense.mutate(id)}
-                onLogExpense={(cat) => {
-                  setSelectedCategory(null);
-                  setTimeout(() => openForm("expense", cat), 250);
-                }}
-                scrollHandler={scrollHandler}
-                contentContainerStyle={contentContainerStyle}
-              />
-            )}
-          </ViewAllModal>
-
           <ViewAllModal
             visible={detailMode === "all-spending"}
             title="Spending Breakdown"
@@ -697,10 +668,7 @@ export default function FinanceScreen() {
               <AllSpendingContent
                 key={`spending-${formSessionKey}`}
                 allStats={allCategoryStats}
-                onSelectCategory={(cat) => {
-                  setDetailMode(null);
-                  setTimeout(() => setSelectedCategory(cat), 150);
-                }}
+                onSelectCategory={(cat) => openCategoryDetail(cat, "all-spending")}
                 scrollHandler={scrollHandler}
                 contentContainerStyle={contentContainerStyle}
               />
@@ -751,6 +719,59 @@ export default function FinanceScreen() {
                 key={`activity-${formSessionKey}`}
                 expenses={expensesList}
                 onDelete={(id) => deleteExpense.mutate(id)}
+                scrollHandler={scrollHandler}
+                contentContainerStyle={contentContainerStyle}
+              />
+            )}
+          </ViewAllModal>
+
+          {/* Dedicated View: Specific Category Detail & Transactions (Always Topmost) */}
+          <ViewAllModal
+            visible={selectedCategory !== null}
+            title={selectedCategory || "Category Details"}
+            subtitle={
+              selectedCategoryStats
+                ? selectedCategoryStats.cap > 0
+                  ? `${formatINR(selectedCategoryStats.total)} spent of ${formatINR(selectedCategoryStats.cap)} limit`
+                  : `${formatINR(selectedCategoryStats.total)} total spent · No limit set`
+                : undefined
+            }
+            onClose={handleCloseCategoryDetail}
+            action={
+              <Pressable
+                onPress={() => {
+                  const cat = selectedCategory;
+                  handleCloseCategoryDetail();
+                  setTimeout(() => openForm("expense", cat || undefined), 250);
+                }}
+                hitSlop={8}
+                style={styles.textActionPill}
+              >
+                <Text style={[styles.textActionLabel, { color: isDark ? "#FAFBFD" : theme.text, fontWeight: "700" }]}>
+                  + Log expense
+                </Text>
+              </Pressable>
+            }
+          >
+            {({ scrollHandler, contentContainerStyle }) => (
+              <CategoryDetailContent
+                key={`cat-${selectedCategory}-${formSessionKey}`}
+                category={selectedCategory!}
+                stats={
+                  selectedCategoryStats || {
+                    category: selectedCategory!,
+                    cap: 0,
+                    total: 0,
+                    percent: 0,
+                    isOver: false,
+                  }
+                }
+                expenses={expensesList.filter((e) => e.category === selectedCategory)}
+                onDeleteExpense={(id) => deleteExpense.mutate(id)}
+                onLogExpense={(cat) => {
+                  handleCloseCategoryDetail();
+                  setTimeout(() => openForm("expense", cat), 250);
+                }}
                 scrollHandler={scrollHandler}
                 contentContainerStyle={contentContainerStyle}
               />
@@ -978,7 +999,7 @@ export default function FinanceScreen() {
                 return (
                   <Pressable
                     key={item.category}
-                    onPress={() => setSelectedCategory(item.category)}
+                    onPress={() => openCategoryDetail(item.category, "home")}
                     style={({ pressed }) => [
                       styles.spendingRowItem,
                       (idx > 0 || (spent > 0 && allCategoryStats.length > 0)) && [
@@ -1916,77 +1937,98 @@ function AllSpendingContent({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
     >
-      <View
-        style={[
-          styles.unifiedCard,
-          {
-            backgroundColor: isDark ? "#111113" : "#ffffff",
-            borderColor: isDark ? "#1F1F24" : "#e2e8f0",
-          },
-        ]}
-      >
-        {allStats.map((item, idx) => {
-          const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
-          return (
-            <Pressable
-              key={item.category}
-              onPress={() => onSelectCategory?.(item.category)}
-              style={({ pressed }) => [
-                styles.detailEnvelopeItem,
-                idx > 0 && [
-                  styles.hairlineDivider,
-                  { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
-                ],
-                pressed && { opacity: 0.75 },
-              ]}
-            >
-              <View style={styles.envelopeTopRow}>
-                <View style={styles.envelopeLeftBlock}>
-                  <CategoryIconBadge category={item.category} isDark={isDark} />
-                  <View style={{ gap: 2 }}>
-                    <Text style={[styles.itemTitle, { color: isDark ? meta.darkIcon : meta.lightIcon }]}>
-                      {item.category}
-                    </Text>
-                    <Text style={styles.itemSubtext}>
-                      {item.cap > 0 ? (
-                        item.isOver ? (
-                          <Text style={{ color: SEMANTIC.crimson, fontWeight: "600" }}>
-                            {formatINR(item.total - item.cap)} over limit (Cap: {formatINR(item.cap)})
-                          </Text>
+      <View style={{ gap: 12 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 9,
+            backgroundColor: isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)",
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0",
+          }}
+        >
+          <Ionicons name="information-circle-outline" size={15} color={isDark ? "#60A5FA" : "#2563EB"} />
+          <Text style={{ fontSize: 11.5, color: isDark ? "#A1A1AA" : theme.textMuted, fontWeight: "500", flex: 1 }}>
+            Tap any category to inspect its full transaction ledger & budget breakdown.
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.unifiedCard,
+            {
+              backgroundColor: isDark ? "#111113" : "#ffffff",
+              borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+            },
+          ]}
+        >
+          {allStats.map((item, idx) => {
+            const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
+            return (
+              <Pressable
+                key={item.category}
+                onPress={() => onSelectCategory?.(item.category)}
+                style={({ pressed }) => [
+                  styles.detailEnvelopeItem,
+                  idx > 0 && [
+                    styles.hairlineDivider,
+                    { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+                  ],
+                  pressed && { opacity: 0.75 },
+                ]}
+              >
+                <View style={styles.envelopeTopRow}>
+                  <View style={styles.envelopeLeftBlock}>
+                    <CategoryIconBadge category={item.category} isDark={isDark} />
+                    <View style={{ gap: 2 }}>
+                      <Text style={[styles.itemTitle, { color: isDark ? meta.darkIcon : meta.lightIcon }]}>
+                        {item.category}
+                      </Text>
+                      <Text style={styles.itemSubtext}>
+                        {item.cap > 0 ? (
+                          item.isOver ? (
+                            <Text style={{ color: SEMANTIC.crimson, fontWeight: "600" }}>
+                              {formatINR(item.total - item.cap)} over limit (Cap: {formatINR(item.cap)})
+                            </Text>
+                          ) : (
+                            <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
+                              {item.total > 0
+                                ? `${formatINR(item.cap - item.total)} left of ${formatINR(item.cap)} limit`
+                                : `Limit: ${formatINR(item.cap)} · ₹0 spent`}
+                            </Text>
+                          )
                         ) : (
                           <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
-                            {item.total > 0
-                              ? `${formatINR(item.cap - item.total)} left of ${formatINR(item.cap)} limit`
-                              : `Limit: ${formatINR(item.cap)} · ₹0 spent`}
+                            No limit set
                           </Text>
-                        )
-                      ) : (
-                        <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
-                          No limit set · Tap to view details →
-                        </Text>
-                      )}
+                        )}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                      {formatINR(item.total)}
                     </Text>
+                    <Ionicons name="chevron-forward" size={14} color={isDark ? "#71717A" : theme.textFaint} />
                   </View>
                 </View>
 
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                    {formatINR(item.total)}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={14} color={isDark ? "#71717A" : theme.textFaint} />
-                </View>
-              </View>
-
-              {item.cap > 0 ? (
-                <ProgressBar
-                  value={item.percent}
-                  height={4.5}
-                  tone={item.isOver ? SEMANTIC.crimson : item.percent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
-                />
-              ) : null}
-            </Pressable>
-          );
-        })}
+          {item.cap > 0 ? (
+            <ProgressBar
+              value={item.percent}
+              height={4.5}
+              tone={item.isOver ? SEMANTIC.crimson : item.percent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
+            />
+          ) : null}
+        </Pressable>
+      );
+    })}
+        </View>
       </View>
     </Animated.ScrollView>
   );

@@ -7,7 +7,6 @@ const tabIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   index: "grid-outline",
   finance: "wallet-outline",
   study: "school-outline",
-  mentor: "sparkles-outline",
   profile: "person-circle-outline",
 };
 
@@ -52,7 +51,6 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: "Today" }} />
       <Tabs.Screen name="finance" options={{ title: "Cashflow" }} />
       <Tabs.Screen name="study" options={{ title: "GATE" }} />
-      <Tabs.Screen name="mentor" options={{ title: "Mentor" }} />
       <Tabs.Screen name="profile" options={{ title: "More" }} />
     </Tabs>
   );

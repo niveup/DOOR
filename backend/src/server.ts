@@ -381,11 +381,51 @@ app.get("/api/settings", async (req: Request, res: Response) => {
 // Settings Updater
 app.post("/api/settings", async (req: Request, res: Response) => {
   try {
-    const { name, dailyAvailableHours, wakeTime, sleepTime, scoreWeights } = req.body;
+    const {
+      name,
+      dailyAvailableHours,
+      wakeTime,
+      sleepTime,
+      scoreWeights,
+      targetExam,
+      targetYear,
+      preferredLanguage,
+      prepLevel,
+      exerciseGoal,
+      otherGoals,
+    } = req.body;
+
+    const dataToUpdate: Record<string, any> = {};
+    if (name !== undefined) dataToUpdate.name = String(name);
+    if (dailyAvailableHours !== undefined) dataToUpdate.dailyAvailableHours = Number(dailyAvailableHours);
+    if (wakeTime !== undefined) dataToUpdate.wakeTime = String(wakeTime);
+    if (sleepTime !== undefined) dataToUpdate.sleepTime = String(sleepTime);
+    if (scoreWeights !== undefined) dataToUpdate.scoreWeights = scoreWeights;
+    if (targetExam !== undefined) dataToUpdate.targetExam = String(targetExam);
+    if (targetYear !== undefined) dataToUpdate.targetYear = Number(targetYear);
+    if (preferredLanguage !== undefined) dataToUpdate.preferredLanguage = String(preferredLanguage);
+    if (prepLevel !== undefined) dataToUpdate.prepLevel = String(prepLevel);
+    if (exerciseGoal !== undefined) dataToUpdate.exerciseGoal = exerciseGoal ? String(exerciseGoal) : null;
+    if (otherGoals !== undefined) dataToUpdate.otherGoals = otherGoals;
+
     const settings = await prisma.settings.upsert({
       where: { id: "default" },
-      update: { name, dailyAvailableHours, wakeTime, sleepTime, scoreWeights },
-      create: { id: "default", name, dailyAvailableHours, wakeTime, sleepTime, scoreWeights }
+      update: dataToUpdate,
+      create: {
+        id: "default",
+        name: name ? String(name) : "GATE Aspirant",
+        targetExam: targetExam ? String(targetExam) : "GATE",
+        targetYear: targetYear ? Number(targetYear) : 2026,
+        dailyAvailableHours: dailyAvailableHours !== undefined ? Number(dailyAvailableHours) : 4.0,
+        preferredLanguage: preferredLanguage ? String(preferredLanguage) : "hinglish",
+        timezone: "Asia/Kolkata",
+        wakeTime: wakeTime ? String(wakeTime) : "06:00",
+        sleepTime: sleepTime ? String(sleepTime) : "22:00",
+        exerciseGoal: exerciseGoal ? String(exerciseGoal) : null,
+        otherGoals: otherGoals ?? null,
+        prepLevel: prepLevel ? String(prepLevel) : "Beginner",
+        scoreWeights: scoreWeights ?? null,
+      },
     });
     res.json(settings);
   } catch (error: any) {

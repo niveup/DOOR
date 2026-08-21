@@ -53,3 +53,53 @@ export type JournalEntry = {
 export const financeCategories: FinanceCategory[] = [
   "Hostel & utilities", "Food & mess", "Travel & commute", "Academics", "Personal & health", "Subscriptions", "Fun & social", "Others",
 ];
+
+export type ScoreWeights = {
+  study: number;
+  exercise: number;
+  reading: number;
+  routine: number;
+};
+
+export type StreakFreezeConfig = {
+  active: boolean;
+  reason?: string;
+  durationDays?: number;
+  untilDate?: string | null;
+  leftCount: number;
+};
+
+export type ComebackConfig = {
+  thresholdDays: number;
+  autoTrigger: boolean;
+  isComebackActive?: boolean;
+};
+
+export type AcademicProfileGoals = {
+  branch?: string;
+  targetRank?: string;
+  targetScore?: string;
+  streakFreeze?: StreakFreezeConfig;
+  comeback?: ComebackConfig;
+  [key: string]: any;
+};
+
+export type AppSettings = {
+  id?: string;
+  name: string;
+  targetExam: string;
+  targetYear: number;
+  dailyAvailableHours: number;
+  preferredLanguage: string;
+  timezone?: string;
+  wakeTime: string;
+  sleepTime: string;
+  exerciseGoal?: string | null;
+  otherGoals?: AcademicProfileGoals | null;
+  prepLevel: string;
+  scoreWeights?: ScoreWeights | Record<string, number> | null;
+  weeklyAnalysis?: string | null;
+  updatedAt?: string;
+};
+
+
