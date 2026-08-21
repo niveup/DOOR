@@ -1,13 +1,13 @@
-import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from "react";
+import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
-import { darkColors, lightColors } from "@/src/theme/tokens";
+import { ThemeColors, darkColors, lightColors } from "@/src/theme/tokens";
 
 export type ThemeMode = "dark" | "light" | "system";
-export type ColorTheme = typeof darkColors;
+export type ColorTheme = ThemeColors;
 
-interface ThemeContextValue {
+export interface ThemeContextValue {
   mode: ThemeMode;
   isDark: boolean;
   theme: ColorTheme;
@@ -36,20 +36,22 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
     return mode === "dark";
   }, [mode, systemScheme]);
 
-  const theme = useMemo(() => {
-    return isDark ? darkColors : (lightColors as unknown as ColorTheme);
+  const theme: ColorTheme = useMemo(() => {
+    return isDark ? darkColors : lightColors;
   }, [isDark]);
 
-  const setThemeMode = async (newMode: ThemeMode) => {
+  const setThemeMode = useCallback(async (newMode: ThemeMode) => {
     setMode(newMode);
     await AsyncStorage.setItem(STORAGE_KEY, newMode).catch(() => {});
-  };
+  }, []);
 
-  const toggleTheme = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const toggleTheme = useCallback(async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
     const nextMode: ThemeMode = isDark ? "light" : "dark";
     await setThemeMode(nextMode);
-  };
+  }, [isDark, setThemeMode]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
@@ -59,17 +61,17 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
       toggleTheme,
       setThemeMode,
     }),
-    [mode, isDark, theme]
+    [mode, isDark, theme, toggleTheme, setThemeMode]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
-export function useTheme() {
+export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
   if (!context) {
     return {
-      mode: "dark" as ThemeMode,
+      mode: "dark",
       isDark: true,
       theme: darkColors,
       toggleTheme: () => {},
@@ -78,3 +80,4 @@ export function useTheme() {
   }
   return context;
 }
+

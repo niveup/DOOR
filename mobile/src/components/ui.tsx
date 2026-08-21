@@ -12,7 +12,14 @@ import {
   ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { radii, shadows, spacing } from "@/src/theme/tokens";
+import {
+  fontWeights,
+  layout,
+  radii,
+  shadows,
+  spacing,
+  typography,
+} from "@/src/theme/tokens";
 import { useTheme } from "@/src/providers/theme-provider";
 
 export type IconName = ComponentProps<typeof Ionicons>["name"];
@@ -30,16 +37,23 @@ export interface CardProps extends PropsWithChildren<{
 export function Card({ children, style, variant = "default", onPress }: CardProps) {
   const { theme, isDark } = useTheme();
 
-  const cardStyle = [
+  const isElevated = variant === "elevated";
+  const isOutlined = variant === "outlined";
+
+  const cardStyle: StyleProp<ViewStyle> = [
     styles.card,
     {
-      backgroundColor: variant === "elevated" ? theme.surfaceElevated : theme.surface,
-      borderColor: theme.border,
+      backgroundColor: isElevated
+        ? theme.surfaceElevated
+        : isOutlined
+        ? "transparent"
+        : theme.surface,
+      borderColor: isOutlined ? theme.border : theme.border,
       shadowColor: isDark ? "#000000" : "#64748b",
-      shadowOpacity: isDark ? 0.25 : 0.08,
-      shadowRadius: 10,
+      shadowOpacity: isElevated ? (isDark ? 0.35 : 0.12) : isDark ? 0.22 : 0.06,
+      shadowRadius: isElevated ? 12 : 8,
       shadowOffset: { width: 0, height: 2 },
-      elevation: isDark ? 1 : 2,
+      elevation: isElevated ? (isDark ? 3 : 3) : isDark ? 1 : 2,
     },
     style,
   ];
@@ -125,11 +139,11 @@ export function Button({
   const getToneSoftBg = (t: ButtonTone): string => {
     switch (t) {
       case "emerald":
-        return isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(5, 150, 105, 0.12)";
+        return theme.successSoft;
       case "rose":
-        return isDark ? "rgba(244, 63, 94, 0.14)" : "rgba(225, 29, 72, 0.12)";
+        return theme.errorSoft;
       case "amber":
-        return isDark ? "rgba(245, 158, 11, 0.14)" : "rgba(217, 119, 6, 0.12)";
+        return theme.warningSoft;
       case "cyan":
         return isDark ? "rgba(6, 182, 212, 0.14)" : "rgba(2, 132, 199, 0.12)";
       case "violet":
@@ -225,7 +239,7 @@ export function Button({
   );
 }
 
-// ActionButton maintains backwards compatibility with previous signature while supporting new solid/outline variants
+// ActionButton maintains backwards compatibility with previous signature
 export function ActionButton({
   label,
   icon,
@@ -354,7 +368,7 @@ export function Input({
           styles.inputContainer,
           compact && styles.inputContainerCompact,
           {
-            backgroundColor: theme.surface,
+            backgroundColor: theme.inputBg || theme.surface,
             borderColor,
             shadowColor: isFocused ? (isDark ? theme.emerald : "#059669") : "transparent",
             shadowOpacity: isFocused ? (isDark ? 0.25 : 0.12) : 0,
@@ -397,7 +411,7 @@ export function Input({
             accessibilityRole="button"
             accessibilityLabel={isPasswordVisible ? "Hide password" : "Show password"}
             style={({ pressed }) => [styles.inputActionIcon, pressed && styles.buttonPressed]}
-            hitSlop={8}
+            hitSlop={layout.minTouchTarget ? 8 : 8}
           >
             <Ionicons
               name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
@@ -553,8 +567,9 @@ export function ProgressBar({
   showEmptyCap?: boolean;
 }) {
   const { theme, isDark } = useTheme();
-  const fillColor = tone || (isDark ? "#3B82F6" : "#2563EB");
-  const clampedValue = Math.min(Math.max(value, 0), 100);
+  const fillColor = tone || theme.accent;
+  const numericVal = Number(value) || 0;
+  const clampedValue = Math.min(Math.max(numericVal, 0), 100);
 
   return (
     <View
@@ -562,7 +577,7 @@ export function ProgressBar({
         styles.progressTrack,
         {
           height,
-          backgroundColor: isDark ? "#22222a" : "#e2e8f0",
+          backgroundColor: isDark ? theme.surfaceSubtle : theme.raised,
           borderRadius: height / 2,
         },
       ]}
@@ -748,7 +763,7 @@ export function Badge({
 
 export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   const { theme } = useTheme();
-  return <View style={[styles.divider, { backgroundColor: theme.borderMuted }, style]} />;
+  return <View style={[styles.divider, { backgroundColor: theme.divider || theme.borderMuted }, style]} />;
 }
 
 // ============================================================================
@@ -764,7 +779,7 @@ export const ui = StyleSheet.create({
 const styles = StyleSheet.create({
   // Card
   card: {
-    borderRadius: radii.lg,
+    borderRadius: radii.card,
     borderWidth: 1,
     padding: spacing.md,
     gap: spacing.sm,
@@ -776,45 +791,41 @@ const styles = StyleSheet.create({
 
   // Button
   button: {
-    minHeight: 48,
+    minHeight: layout.buttonHeight,
     borderWidth: 1,
-    borderRadius: radii.md,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: radii.button,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.xs,
     alignItems: "center",
     justifyContent: "center",
   },
   buttonCompact: {
-    minHeight: 36,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radii.sm + 2,
-    gap: 6,
+    minHeight: layout.buttonHeightSm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs - 2,
+    borderRadius: radii.control,
+    gap: spacing.xxs + 2,
   },
   buttonLarge: {
-    minHeight: 54,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    minHeight: layout.buttonHeightLg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md - 2,
     borderRadius: radii.lg,
-    gap: 10,
+    gap: spacing.sm,
   },
   buttonFullWidth: {
     width: "100%",
   },
   buttonText: {
-    fontSize: 14,
-    fontWeight: "800",
-    letterSpacing: -0.1,
+    ...typography.button,
   },
   buttonTextCompact: {
-    fontSize: 12,
-    fontWeight: "700",
+    ...typography.buttonSmall,
   },
   buttonTextLarge: {
-    fontSize: 16,
-    fontWeight: "800",
+    ...typography.buttonLarge,
   },
   buttonPressed: {
     opacity: 0.82,
@@ -829,20 +840,20 @@ const styles = StyleSheet.create({
 
   // Icon Button
   iconButton: {
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderRadius: radii.md,
+    borderRadius: radii.button,
   },
   iconButtonSmall: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderRadius: radii.sm + 2,
+    borderRadius: radii.control,
   },
   iconButtonLarge: {
     width: 52,
@@ -855,38 +866,35 @@ const styles = StyleSheet.create({
 
   // Input
   inputWrapper: {
-    gap: 6,
+    gap: spacing.xxs + 2,
   },
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xxs,
     paddingHorizontal: 2,
   },
   inputLabel: {
-    fontSize: 11,
-    letterSpacing: 0.7,
-    fontWeight: "800",
-    textTransform: "uppercase",
+    ...typography.label,
   },
   requiredAsterisk: {
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: fontWeights.black,
   },
   inputContainer: {
     borderWidth: 1,
-    borderRadius: radii.md,
-    minHeight: 48,
-    paddingHorizontal: 14,
+    borderRadius: radii.input,
+    minHeight: layout.inputHeight,
+    paddingHorizontal: spacing.sm + 2,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: spacing.sm,
   },
   inputContainerCompact: {
-    minHeight: 40,
-    paddingHorizontal: 11,
-    borderRadius: radii.sm + 2,
-    gap: 8,
+    minHeight: layout.inputHeightCompact,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.control,
+    gap: spacing.xs,
   },
   inputLeftIconWrapper: {
     alignItems: "center",
@@ -895,23 +903,23 @@ const styles = StyleSheet.create({
   inputField: {
     flex: 1,
     minHeight: 44,
-    fontSize: 14,
-    paddingVertical: 10,
+    ...typography.body,
+    paddingVertical: spacing.xs,
   },
   inputFieldCompact: {
     minHeight: 36,
-    fontSize: 13,
-    paddingVertical: 6,
+    ...typography.bodySmall,
+    paddingVertical: spacing.xxs,
   },
   inputActionIcon: {
-    padding: 4,
+    padding: spacing.xxs,
     alignItems: "center",
     justifyContent: "center",
   },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: spacing.xxs + 1,
     paddingHorizontal: 3,
     marginTop: 2,
   },
@@ -919,56 +927,55 @@ const styles = StyleSheet.create({
     marginTop: 0.5,
   },
   inputErrorText: {
-    fontSize: 12,
-    fontWeight: "700",
+    ...typography.caption,
+    fontWeight: fontWeights.bold,
   },
   inputHelperText: {
-    fontSize: 12,
-    lineHeight: 16,
+    ...typography.caption,
   },
 
   // Metric
-  metric: { flex: 1, gap: 4 },
-  metricValue: { fontSize: 20, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  metricLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.3 },
-  metricSublabel: { fontSize: 10, marginTop: 1 },
+  metric: { flex: 1, gap: spacing.xxs },
+  metricValue: { ...typography.metric },
+  metricLabel: { ...typography.label },
+  metricSublabel: { ...typography.caption, marginTop: 1 },
 
   // Progress Bar
-  progressTrack: { height: 6.5, borderRadius: 99, overflow: "hidden" },
-  progressFill: { height: "100%", borderRadius: 99 },
+  progressTrack: { height: 6.5, borderRadius: radii.full, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: radii.full },
 
   // Chip
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radii.sm + 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs - 1,
+    borderRadius: radii.control,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: spacing.xs - 2,
   },
   chipIcon: {
     marginRight: 2,
   },
-  chipText: { fontSize: 12, fontWeight: "600" },
-  chipTextActive: { fontWeight: "800" },
+  chipText: { ...typography.caption, fontWeight: fontWeights.semibold },
+  chipTextActive: { fontWeight: fontWeights.heavy },
 
   // Loading & Empty
-  loading: { alignItems: "center", justifyContent: "center", paddingVertical: 28, gap: 10 },
-  muted: { fontSize: 13 },
-  empty: { alignItems: "center", justifyContent: "center", paddingVertical: 28, textAlign: "center", gap: 10 },
+  loading: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.xl, gap: spacing.sm },
+  muted: { ...typography.bodySmall },
+  empty: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.xl, textAlign: "center", gap: spacing.sm },
   emptyIconCircle: {
     width: 54,
     height: 54,
     borderRadius: 27,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 4,
+    marginBottom: spacing.xxs,
   },
-  emptyTitle: { fontSize: 17, fontWeight: "800", textAlign: "center" },
-  emptyDescription: { fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 280 },
-  emptyAction: { marginTop: 6 },
+  emptyTitle: { ...typography.subheading, fontWeight: fontWeights.heavy, textAlign: "center" },
+  emptyDescription: { ...typography.bodySmall, textAlign: "center", maxWidth: 280 },
+  emptyAction: { marginTop: spacing.xs },
 
   // Section Title
   sectionHeader: {
@@ -976,35 +983,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 2,
-    marginTop: 4,
+    marginTop: spacing.xxs,
   },
   sectionHeaderCopy: {
     flex: 1,
     gap: 2,
   },
-  sectionText: { fontSize: 15, fontWeight: "800", letterSpacing: -0.3 },
-  sectionSubtitle: { fontSize: 12, lineHeight: 16 },
+  sectionText: { ...typography.subheading, fontWeight: fontWeights.heavy },
+  sectionSubtitle: { ...typography.caption },
 
   // Badge
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs - 1,
     borderRadius: radii.xs + 2,
     borderWidth: 1,
     alignSelf: "flex-start",
   },
   badgeSmall: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.xs - 2,
+    paddingVertical: spacing.xxs - 2,
     borderRadius: radii.xs,
   },
   badgeText: {
-    fontSize: 11,
-    fontWeight: "800",    letterSpacing: 0.3,
+    ...typography.label,
   },
   badgeTextSmall: {
+    ...typography.label,
     fontSize: 9,
-    fontWeight: "800",
   },
 
   // Divider
@@ -1014,3 +1020,4 @@ const styles = StyleSheet.create({
     marginVertical: spacing.xs,
   },
 });
+
