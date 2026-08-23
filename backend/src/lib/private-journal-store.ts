@@ -85,6 +85,7 @@ async function storeRequest<T>(method: "GET" | "POST", pathname: string, body?: 
   const response = await fetch(`${url}${pathname}`, {
     method,
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
@@ -105,6 +106,7 @@ export async function listPrivateJournalEntries(limit: number) {
   const signature = crypto.createHmac("sha256", secret).update(`${timestamp}.`).digest("base64url");
   const response = await fetch(`${url}/v1/entries?limit=${safeLimit}`, {
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
     headers: {
       Accept: "application/json",
       "X-Journal-Timestamp": timestamp,

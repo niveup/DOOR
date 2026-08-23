@@ -1254,7 +1254,11 @@ export default function TrackerPage() {
       }
 
       // 2. Execute D1 database reset
-      const resetRes = await appFetch(`${backendUrl}/api/tracker/reset`, { method: "POST" });
+      const resetRes = await appFetch(`${backendUrl}/api/tracker/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "DELETE" }),
+      });
       if (!resetRes.ok) throw new Error("Could not reset tracker database.");
 
       clearCache('tracker_full');

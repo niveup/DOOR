@@ -12,8 +12,12 @@ export type StoredStudyLogRecord = {
   createdAt: number;
 };
 
-// Global in-memory log store as fallback for server process
-const fallbackLogStore: Map<string, StoredStudyLogRecord> = new Map();
+// Postgres (Prisma StudyLog) is the primary durable store. This module mirrors
+// records into Cloudflare D1 as a secondary copy. The former in-memory
+// fallbackLogStore Map was removed: it grew without bound and silently
+// diverged from D1 after restarts (audit finding F-CODE-4 / GA-123).
+
+const FETCH_TIMEOUT_MS = 15_000;
 
 function storeConfig() {
   const rawUrl = process.env.CF_JOURNAL_STORE_URL;
@@ -30,7 +34,7 @@ function storeConfig() {
   }
 }
 
-async function signedFetch(path: string, options: RequestInit = {}) {
+async function signedFetch(path: string, options: RequestInit = {}): Promise<Response | null> {
   const config = storeConfig();
   if (!config) return null;
 
@@ -44,28 +48,28 @@ async function signedFetch(path: string, options: RequestInit = {}) {
   headers.set("X-Journal-Timestamp", timestamp);
   headers.set("X-Journal-Signature", signature);
 
-  const response = await fetch(`${config.url}${path}`, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
+  try {
+    return await fetch(`${config.url}${path}`, {
+      ...options,
+      headers,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    console.warn("D1 store request failed:", error instanceof Error ? error.message : error);
     return null;
   }
-  return response.json();
 }
 
 export async function saveStudyLogToD1(log: StoredStudyLogRecord): Promise<boolean> {
-  // Always store in server fallback store
-  fallbackLogStore.set(log.id, log);
-
   try {
     const result = await signedFetch("/v1/tracker/logs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(log),
     });
-    return Boolean(result?.success);
+    if (!result || !result.ok) return false;
+    const payload = (await result.json().catch(() => ({}))) as { success?: boolean };
+    return Boolean(payload?.success);
   } catch (error) {
     console.warn("D1 Tracker Log Save Warning:", error);
     return false;
@@ -73,50 +77,26 @@ export async function saveStudyLogToD1(log: StoredStudyLogRecord): Promise<boole
 }
 
 export async function fetchStudyLogsFromD1(): Promise<StoredStudyLogRecord[]> {
-  let allLogs: StoredStudyLogRecord[] = [];
   try {
-    const result = await signedFetch("/v1/tracker/logs?limit=100", { method: "GET" });
-    if (result && Array.isArray(result.logs) && result.logs.length > 0) {
-      for (const log of result.logs) {
-        fallbackLogStore.set(log.id, log);
-      }
-      allLogs = result.logs as StoredStudyLogRecord[];
-    }
+    const result = await signedFetch("/v1/tracker/logs?limit=200", { method: "GET" });
+    if (!result || !result.ok) return [];
+    const payload = (await result.json().catch(() => ({}))) as { logs?: unknown };
+    if (!Array.isArray(payload.logs)) return [];
+    return payload.logs as StoredStudyLogRecord[];
   } catch (error) {
     console.warn("D1 Tracker Log Fetch Warning:", error);
+    return [];
   }
-
-  if (allLogs.length === 0) {
-    allLogs = Array.from(fallbackLogStore.values());
-  }
-
-  // Deduplication by unique log ID only — composite-key dedup was incorrectly
-  // dropping legitimate separate study sessions with the same date/timeBlock/subject/hours
-  const seenIds = new Set<string>();
-  const deduplicated: StoredStudyLogRecord[] = [];
-
-  for (const log of allLogs) {
-    if (seenIds.has(log.id)) continue;
-    seenIds.add(log.id);
-    deduplicated.push(log);
-  }
-
-  return deduplicated.sort(
-    (a, b) => new Date(b.logDate).getTime() - new Date(a.logDate).getTime() || b.createdAt - a.createdAt
-  );
 }
 
-
 export async function clearTrackerLogsInD1(): Promise<boolean> {
-  fallbackLogStore.clear();
   try {
     const result = await signedFetch("/v1/tracker/logs", { method: "DELETE" });
-    return Boolean(result?.success);
+    if (!result || !result.ok) return false;
+    const payload = (await result.json().catch(() => ({}))) as { success?: boolean };
+    return Boolean(payload?.success);
   } catch (error) {
     console.warn("D1 Tracker Log Clear Warning:", error);
     return false;
   }
 }
-
-
-

@@ -9,7 +9,7 @@ import { createAiProvider, AiProviderName } from "./lib/ai/provider";
 import { decryptApiKey, encryptApiKey } from "./lib/ai/credentials";
 import { jsonrepair } from "jsonrepair";
 import { listPrivateJournalEntries, privateJournalByDate, savePrivateJournalEntry } from "./lib/private-journal-store";
-import { saveStudyLogToD1, fetchStudyLogsFromD1, clearTrackerLogsInD1 } from "./lib/private-tracker-store";
+import { saveStudyLogToD1, clearTrackerLogsInD1 } from "./lib/private-tracker-store";
 import { isPasscodeConfigured, verifySharedSecret } from "./lib/auth";
 import { payBillById } from "./lib/billing";
 
@@ -2082,6 +2082,9 @@ app.post("/api/tracker/log", async (req: Request, res: Response) => {
 });
 
 app.post("/api/tracker/reset", async (req: Request, res: Response) => {
+  if (req.body?.confirm !== "DELETE") {
+    return res.status(400).json({ error: "This wipes the data permanently. Send { \"confirm\": \"DELETE\" } to confirm." });
+  }
   try {
     if ((prisma as any).studyLog?.deleteMany) {
       await (prisma as any).studyLog.deleteMany({});
@@ -2291,15 +2294,18 @@ function getFinanceModels() {
 app.get("/api/finance/data", async (_req: Request, res: Response) => {
   try {
     const { expense, budget, bill } = getFinanceModels();
+    // Rolling 180-day window with a hard cap: the finance screen must not
+    // grow unbounded (audit A-CODE-15). Older expenses remain in Postgres.
+    const cutoff = getKolkataDateString(new Date(Date.now() - 180 * 24 * 60 * 60 * 1000));
     const [expenses, budgetRecord, bills] = await Promise.all([
       expense?.findMany
-        ? expense.findMany({ orderBy: [{ date: "desc" }, { createdAt: "desc" }] })
+        ? expense.findMany({ where: { date: { gte: cutoff } }, orderBy: [{ date: "desc" }, { createdAt: "desc" }], take: 2000 })
         : Promise.resolve([]),
       budget?.findUnique
         ? budget.findUnique({ where: { id: "default" } })
         : Promise.resolve(null),
       bill?.findMany
-        ? bill.findMany({ orderBy: [{ date: "asc" }, { createdAt: "asc" }] })
+        ? bill.findMany({ orderBy: [{ date: "asc" }, { createdAt: "asc" }], take: 2000 })
         : Promise.resolve([]),
     ]);
 
@@ -2535,8 +2541,11 @@ app.delete("/api/finance/bill", async (req: Request, res: Response) => {
   }
 });
 
-app.post("/api/finance/reset", async (_req: Request, res: Response) => {
+app.post("/api/finance/reset", async (req: Request, res: Response) => {
   try {
+    if (req.body?.confirm !== "DELETE") {
+      return res.status(400).json({ error: "This wipes the data permanently. Send { \"confirm\": \"DELETE\" } to confirm." });
+    }
     const { expense, budget, bill } = getFinanceModels();
     if (expense?.deleteMany) await expense.deleteMany({});
     if (bill?.deleteMany) await bill.deleteMany({});
