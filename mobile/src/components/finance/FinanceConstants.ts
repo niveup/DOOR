@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import { FinanceCategory } from "@/src/types/domain";
 import { shortDate, todayInKolkata } from "@/src/lib/format";
 

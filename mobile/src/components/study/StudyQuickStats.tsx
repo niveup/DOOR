@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/src/providers/theme-provider";
 import { radii, spacing, typography } from "@/src/theme/tokens";
 
@@ -17,7 +18,8 @@ export function StudyQuickStats({
   const { theme, isDark } = useTheme();
 
   return (
-    <View
+    <Animated.View
+      entering={FadeInDown.delay(60).duration(300)}
       accessible={true}
       accessibilityRole="summary"
       accessibilityLabel={`Lifetime study summary: ${totalHours.toFixed(
@@ -47,10 +49,7 @@ export function StudyQuickStats({
           {totalHours.toFixed(1)}h
         </Text>
         <Text
-          style={[
-            styles.quickStatLabel,
-            { color: theme.textMuted },
-          ]}
+          style={[styles.quickStatLabel, { color: theme.textMuted }]}
           numberOfLines={1}
         >
           Study time
@@ -81,10 +80,7 @@ export function StudyQuickStats({
           {totalQuestions.toLocaleString()}
         </Text>
         <Text
-          style={[
-            styles.quickStatLabel,
-            { color: theme.textMuted },
-          ]}
+          style={[styles.quickStatLabel, { color: theme.textMuted }]}
           numberOfLines={1}
         >
           Questions
@@ -115,16 +111,13 @@ export function StudyQuickStats({
           {totalSessions.toLocaleString()}
         </Text>
         <Text
-          style={[
-            styles.quickStatLabel,
-            { color: theme.textMuted },
-          ]}
+          style={[styles.quickStatLabel, { color: theme.textMuted }]}
           numberOfLines={1}
         >
           Sessions
         </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -141,22 +134,25 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xxs,
+    gap: 3,
     paddingHorizontal: spacing.xxs,
   },
   quickStatNumber: {
     ...typography.metric,
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 21,
+    fontWeight: "800",
     letterSpacing: -0.3,
+    fontVariant: ["tabular-nums"],
   },
   quickStatLabel: {
     ...typography.caption,
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: "500",
   },
   statDivider: {
     width: StyleSheet.hairlineWidth,
-    height: 22,
+    height: 24,
   },
 });
+

@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { ScrollView as GHScrollView } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/providers/theme-provider";
 import { FinanceCategory, financeCategories } from "@/src/types/domain";

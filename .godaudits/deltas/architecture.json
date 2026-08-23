@@ -1,0 +1,170 @@
+{
+  "domain": "architecture",
+  "dom": "ARC",
+  "checks": [
+    {"id":"A-ARCH-1","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"PRD.md","line":22,"quote":"In Scope: The user daily loop, 5 core modules, a decoupled free-tier architecture, a lean data model, AI personality prompts, and a 3-phase build plan."}
+    ]},
+    {"id":"A-ARCH-2","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -ln \"LibreChat\" backend/src frontend/app frontend/lib mobile/src render.yaml","scope":"first-party code and deploy manifest","quote":"0 hits: the vendored LibreChat tree (164k files) is referenced by no first-party code and deployed by no service; its role in the system shape is recorded nowhere."},
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":742,"quote":"// Try direct native Prisma database execution first for 100% reliable cloud sync"}
+    ],"finding_titles":["A second backend implementation inside the Vercel relay duplicates Express domain logic with divergent semantics","Vendored LibreChat tree is dead weight with no recorded role"]},
+    {"id":"A-ARCH-3","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"PRD.md","line":24,"quote":"Fast load times: Desktop dashboard loads under 2 seconds."},
+      {"type":"absence","command":"rg -n \"scale ceiling|users per|requests per|RTO|RPO|availability target\" PRD.md README.md RENDER_DEPLOYMENT.md VERCEL_DEPLOYMENT.md","scope":"all durable docs","quote":"0 hits: a numeric 12-month scale ceiling, availability target, or recovery objective exists nowhere; PRD only states the app 'does not scale' qualitatively."}
+    ],"finding_titles":["No backup or restore path exists for the primary Postgres store"]},
+    {"id":"A-ARCH-4","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"git ls-files | rg -i 'ADR|decisions|\\.stack-ready|architecture'","scope":"tracked tree","quote":"0 ADR/decision records exist for a three-deployable system (Render API, Vercel frontend+relay, Cloudflare worker); PRD prose is the only shape rationale."}
+    ],"finding_titles":["No architecture decision records or diagrams exist for a three-deployable system"]},
+    {"id":"A-ARCH-5","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":1,"quote":"import express, { Request, Response, NextFunction } from \"express\";","symbol":"2880-line module holding settings, journal, routine, tracker, finance, explainer, interview-support, cron and JSON-repair contexts in one file"}
+    ],"finding_titles":["server.ts concentrates every domain context in one 2880-line transport file"]},
+    {"id":"A-ARCH-6","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":8,"quote":"import { createAiProvider, AiProviderName } from \"./lib/ai/provider\";\nimport { decryptApiKey, encryptApiKey } from \"./lib/ai/credentials\";","symbol":"one-direction imports: entry -> lib; lib never imports entry"}
+    ]},
+    {"id":"A-ARCH-7","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/private-journal-store.ts","line":3,"quote":"const CIPHER_PREFIX = \"door-journal:v1:\";","symbol":"private journal stored as opaque ciphertext blob in D1; structured relational data stays in Postgres"},
+      {"type":"source","path":"cloudflare/journal-store/migrations/0001_create_journal_entries.sql","line":1,"quote":"CREATE TABLE journal_entries (id TEXT PRIMARY KEY, entry_date TEXT UNIQUE NOT NULL, ciphertext TEXT NOT NULL, created_at INTEGER NOT NULL, edited_at INTEGER NOT NULL);"}
+    ]},
+    {"id":"A-ARCH-8","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":2259,"quote":"saveStudyLogToD1({\n      id: newStudyLog.id,\n      ...\n    }).catch(() => {});","symbol":"Postgres write then non-blocking D1 backup write, no reconciliation job"}
+    ],"finding_titles":["Tracker study-log backup to D1 is a silent dual write with no reconciliation"]},
+    {"id":"A-ARCH-9","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/ai/provider.ts","line":30,"quote":"timeout: 90_000,\n      maxRetries: 1,"},
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":14,"quote":"const UPSTREAM_TIMEOUT_MS = 110_000;"}
+    ]},
+    {"id":"A-ARCH-10","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"kubernetes|kafka|service mesh|event sourcing|CQRS\" backend/src PRD.md -i","scope":"code and records","quote":"0 hits: no heavy distribution patterns are present at side-project scale."}
+    ]},
+    {"id":"A-ARCH-11","outcome":"unknown","confidence":"Tentative","evidence":[
+      {"type":"source","path":"PRD.md","line":24,"quote":"Fast load times: Desktop dashboard loads under 2 seconds."}
+    ],"question":"Does the dashboard meet its recorded 2-second load target on the free-tier deployments? Static mode cannot measure runtime latency."},
+    {"id":"A-ARCH-12","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"PRD.md","line":25,"quote":"Data durability: Journal entries, subject ratings, and interview attempts survive redeploys. Data is backed up weekly via JSON export."}
+    ]},
+    {"id":"A-ARCH-13","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":279,"quote":"app.use(passcodeAuth);","symbol":"network edge + authn boundary mounted before all routes"},
+      {"type":"source","path":"frontend/lib/session.ts","line":8,"quote":"journalUnlockedUntil?: number;\n  journalUnlockFailures?: number;\n  journalUnlockBlockedUntil?: number;","symbol":"second independent layer guarding the highest-blast-radius data (journal): separate passcode + lockout + AES-GCM at rest"}
+    ]},
+    {"id":"A-ARCH-14","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"git ls-files | rg -i 'ADR|decision record'","scope":"tracked tree","quote":"0 hits: zero decision records after 193 commits including at least two architecture pivots (journal moved to D1, plan generation removed)."}
+    ],"finding_titles":["No architecture decision records or diagrams exist for a three-deployable system"]},
+    {"id":"A-ARCH-15","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"git ls-files | rg '\\.(mmd|puml|dot)$|docs.*diagram'","scope":"tracked tree","quote":"0 hits: no version-controlled diagrams; deployment docs are prose-only."}
+    ],"finding_titles":["No architecture decision records or diagrams exist for a three-deployable system"]},
+    {"id":"A-ARCH-16","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/package.json","line":2,"quote":"\"name\": \"jujum-backend\",","symbol":"single backend package, single context; fitness-function tooling has no multi-context surface to constrain"}
+    ]},
+    {"id":"A-ARCH-17","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"render.yaml","line":4,"quote":"- type: web\n    name: door-backend\n    env: node\n    plan: free\n    rootDir: backend\n    buildCommand: npm install --include=dev && npm run prisma:generate && npm run build"}
+    ]},
+    {"id":"A-ARCH-18","outcome":"fail","confidence":"Certain","evidence":[
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":744,"quote":"const nativeTrackerRes = await handleNativeTrackerRoute(safePath, request.method, parsedBody, request.nextUrl);\n    if (nativeTrackerRes) return nativeTrackerRes;","symbol":"declared relay ships as a second writer implementing domain routes inline"},
+      {"type":"source","path":"backend/src/server.ts","line":2748,"quote":"targetBill = await bill.findFirst({\n          where: { OR: [{ id }, { paid: false }] },\n          orderBy: { createdAt: \"desc\" },\n        });","symbol":"Express twin diverges from relay twin on the same route"}
+    ],"finding_titles":["A second backend implementation inside the Vercel relay duplicates Express domain logic with divergent semantics"]},
+    {"id":"A-ARCH-19","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"PRD.md","line":1,"quote":"# Jujum AI - Personal PRD v3.1 (The Bible)","symbol":"specific, substitution-test-passing product record under three pages of architecture prose"}
+    ]},
+    {"id":"A-ARCH-20","outcome":"fail","confidence":"Certain","evidence":[
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":201,"quote":"const newStudyLog = await prisma.studyLog.create({\n      data: {\n        logDate: dateStr,\n        ...","symbol":"Vercel relay writes StudyLog directly"},
+      {"type":"source","path":"backend/src/server.ts","line":2246,"quote":"const newStudyLog: any = await ((prisma as any).studyLog?.create ? (prisma as any).studyLog.create({\n      data: {\n        logDate: dateStr,...","symbol":"Express writes the same table with different surrounding logic"}
+    ],"finding_titles":["A second backend implementation inside the Vercel relay duplicates Express domain logic with divergent semantics"]},
+    {"id":"A-ARCH-21","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"from \\.\\./\\.\\./|deep import\" backend/src/frontend --glob '!node_modules'","scope":"first-party imports","quote":"No cross-context deep-import violations found; frontend consumes backend only over HTTP."}
+    ]},
+    {"id":"A-ARCH-22","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":18,"quote":"function getKolkataMonday(date: Date = new Date()): Date {","symbol":"domain date logic duplicated from server.ts:87 with an independent implementation"},
+      {"type":"source","path":"backend/src/gateway.ts","line":26,"quote":"function robustJsonExtract(raw: string): unknown { const clean = raw.replace(/```(?:json)?/gi, \"\")...","symbol":"a second, weaker JSON-extraction implementation than server.ts:1745"}
+    ],"finding_titles":["A second backend implementation inside the Vercel relay duplicates Express domain logic with divergent semantics"]},
+    {"id":"A-ARCH-23","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"/api/v[0-9]|openapi|swagger\" backend/src frontend/app/api","scope":"API surfaces","quote":"0 hits: no versioning strategy; the two backend implementations answer identical paths with different behavior (bill/pay, task-add taskType, tracker analysis)."}
+    ],"finding_titles":["A second backend implementation inside the Vercel relay duplicates Express domain logic with divergent semantics","Mobile client still calls removed endpoint POST /api/routine/generate"]},
+    {"id":"A-ARCH-24","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":2107,"quote":"trackerStatusCache = null;","symbol":"every tracker mutation invalidates the 300s-TTL cache"},
+      {"type":"source","path":"backend/src/server.ts","line":2496,"quote":"trackerStatusCache = { value, expiresAt: Date.now() + 300_000 };"}
+    ]},
+    {"id":"A-ARCH-25","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"queue|consumer|bullmq|redis\" backend/src package.json -i","scope":"backend","quote":"0 hits: no async queue infrastructure exists; cron runs in-process."}
+    ]},
+    {"id":"A-ARCH-26","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"RTO|RPO|backup|restore\" render.yaml VERCEL_DEPLOYMENT.md RENDER_DEPLOYMENT.md","scope":"deploy docs and manifest","quote":"0 hits: no recovery objectives and no backup mechanism for the Supabase Postgres primary; only tracker logs mirror to D1."},
+      {"type":"source","path":"PRD.md","line":25,"quote":"Data is backed up weekly via JSON export.","symbol":"promised mechanism has no implementation"}
+    ],"finding_titles":["No backup or restore path exists for the primary Postgres store"]},
+    {"id":"A-ARCH-27","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"PRD.md","line":16,"quote":"This is the build-ready specification for **Jujum AI** \u2014 a personal, free, single-user web application","symbol":"single-replica deployment documented as deliberate; module-scope caches acceptable at replica=1"}
+    ]},
+    {"id":"A-ARCH-28","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"replica|read replica|partition\" render.yaml PRD.md -i","scope":"deploy config and docs","quote":"0 hits: no replicas or partitioned stores exist."}
+    ]},
+    {"id":"A-ARCH-29","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"uptime|availability|SLA|SLO\" PRD.md RENDER_DEPLOYMENT.md VERCEL_DEPLOYMENT.md","scope":"durable docs","quote":"0 hits: no availability target is claimed; free-tier single-instance posture is documented as accepted (PRD Section 1.2 trade-off)."}
+    ]}
+  ],
+  "findings": [
+    {
+      "title": "A second backend implementation inside the Vercel relay duplicates Express domain logic with divergent semantics",
+      "severity": "High",
+      "confidence": "Certain",
+      "effort": "L",
+      "evidence": [
+        {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":43,"quote":"async function handleNativeTrackerRoute(safePath: string, method: string, parsedBody: any, reqUrl: URL) {","symbol":"801-line second backend: native Prisma handlers for tracker/routine/finance run before relaying"},
+        {"type":"source","path":"backend/src/server.ts","line":2748,"quote":"targetBill = await bill.findFirst({\n          where: { OR: [{ id }, { paid: false }] },\n          orderBy: { createdAt: \"desc\" },\n        });","symbol":"Express bill/pay pays an arbitrary unpaid bill; relay twin returns 404 (route.ts:653)"},
+        {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":383,"quote":"taskType: \"study\",","symbol":"relay hardcodes taskType; Express infers it (server.ts:1314 inferTaskType)"},
+        {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":18,"quote":"function getKolkataMonday(date: Date = new Date()): Date {","symbol":"independently re-implemented domain date helpers; tracker weekly-analysis generation exists only in Express (server.ts:2442)"}
+      ],
+      "impact": "The same operation behaves differently depending on which platform handles it: fixes applied to one copy silently miss the other, and the drift has already shipped a finance-mutation defect (arbitrary bill payment) that the relay copy does not have. Two platforms hold DATABASE_URL and write the same tables with different invariant enforcement.",
+      "fix": "Choose one writer per table: delete the native tracker/routine/finance handlers from the relay and always forward to Express, or extract shared domain logic into one package consumed by both. Add contract tests asserting identical responses from both surfaces for the same payload.",
+      "verify": "node -e \"const s=require('fs').readFileSync('D:/DOOR/frontend/app/api/backend/[...path]/route.ts','utf8');console.log((s.match(/handleNative(Tracker|Finance)Route/g)||[]).length)\" (expect 2 definitions removed, i.e. 0)",
+      "checks": ["A-ARCH-18", "A-ARCH-20", "A-ARCH-22", "A-ARCH-2", "A-ARCH-23"]
+    },
+    {
+      "title": "No backup or restore path exists for the primary Postgres store",
+      "severity": "High",
+      "confidence": "Firm",
+      "effort": "M",
+      "evidence": [
+        {"type":"absence","command":"rg -n \"RTO|RPO|backup|restore|pg_dump\" render.yaml VERCEL_DEPLOYMENT.md RENDER_DEPLOYMENT.md scripts/","scope":"deploy configs, docs, scripts","quote":"0 hits: nothing backs up the Supabase Postgres that holds journals-adjacent data, finances, plans, ratings, and interview history."},
+        {"type":"source","path":"PRD.md","line":25,"quote":"Data is backed up weekly via JSON export."}
+      ],
+      "impact": "A bad deploy, accidental reset endpoint call (/api/tracker/reset and /api/finance/reset wipe tables irreversibly), or Supabase free-tier data loss destroys the user's entire history with no recovery; the PRD's durability promise is unmet.",
+      "fix": "Add a weekly cron job (the existing /cron/tick harness) that exports all tables to JSON and pushes them to Cloudflare R2 or the D1 store, plus document a restore procedure; gate /reset endpoints behind a confirmation token.",
+      "verify": "rg -n \"pg_dump|export.*json|R2|backup\" scripts/ .github/workflows/ (expect >=1 hit)",
+      "checks": ["A-ARCH-26", "A-ARCH-3"]
+    },
+    {
+      "title": "Vendored LibreChat tree is dead weight with no recorded role",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"absence","command":"rg -ln \"LibreChat\" backend/src frontend/app frontend/lib mobile/src render.yaml package.json","scope":"all first-party code and manifests","quote":"0 hits: 164k vendored files referenced by nothing, deployed by nothing, explained nowhere."}
+      ],
+      "impact": "Every clone, scan, grep, and future audit pays for 164k third-party files that no code path reaches; the audit fingerprint itself mis-signals product overlays (chatbot/marketplace/logistics matches come from LibreChat text), and a stale vendored chat server is a standing supply-chain liability if anyone ever wires it in.",
+      "fix": "Delete the directory, or move it behind a git submodule pinned to an upstream tag with a documented integration plan; record the decision in one ADR line.",
+      "verify": "Test-Path D:\\DOOR\\LibreChat (expect False, or SUBMODULE content with docs/LibreChat-role.md present)",
+      "checks": ["A-ARCH-2"]
+    },
+    {
+      "title": "No architecture decision records or diagrams exist for a three-deployable system",
+      "severity": "Low",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"absence","command":"git ls-files | rg -i 'ADR|decision|\\.(mmd|puml|dot)$'","scope":"tracked tree","quote":"0 hits across 193 commits and at least two architecture pivots (journal to D1, plan generation removal)."}
+      ],
+      "impact": "Pivots are recoverable only from code comments and commit messages; the next maintainer (or the owner in six months) cannot tell why the relay carries a second backend or why plan generation was removed.",
+      "fix": "Add docs/adr/ with three entries: journal-D1 privacy split, relay-native handlers (or their removal per F-ARC-1), routine-plan generation removal; one Mermaid diagram of the three deployables and data stores.",
+      "verify": "git ls-files docs/adr | Measure-Object -Line (expect >=3)",
+      "checks": ["A-ARCH-14", "A-ARCH-15", "A-ARCH-4"]
+    }
+  ],
+  "strengths": [
+    {"title":"Journal privacy boundary carries two independent layers","evidence":[
+      {"type":"source","path":"frontend/lib/session.ts","line":8,"quote":"journalUnlockedUntil?: number;\n  journalUnlockFailures?: number;\n  journalUnlockBlockedUntil?: number;"},
+      {"type":"source","path":"backend/src/lib/private-journal-store.ts","line":74,"quote":"const cipher = crypto.createCipheriv(\"aes-256-gcm\", journalEncryptionKey(), iv);"}
+    ],"preserve":"Never collapse the journal into the ordinary passcode/session boundary; keep the separate unlock brake, envelope encryption, and ciphertext-only D1 storage."},
+    {"title":"Multi-step state changes use real transactions where they matter most","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":860,"quote":"const plan = await prisma.$transaction(async (transaction) => {\n      await transaction.routinePlan.deleteMany({ where: { date: targetDate } });\n      return transaction.routinePlan.create({"}
+    ],"preserve":"Keep delete-and-replace plan swaps and credential rotations inside $transaction; extend the same discipline to any new multi-table write instead of sequential awaits."}
+  ]
+}

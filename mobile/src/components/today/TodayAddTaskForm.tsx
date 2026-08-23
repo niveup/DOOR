@@ -6,7 +6,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import { Card } from "@/src/components/ui";
 import { useTheme } from "@/src/providers/theme-provider";
 import { fontWeights, layout, radii, spacing, typography } from "@/src/theme/tokens";

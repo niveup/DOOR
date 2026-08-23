@@ -18,7 +18,7 @@ export function StudyGoalForm({ initialGoal, busy, onSave }: StudyGoalFormProps)
 
   return (
     <View style={styles.formContainer}>
-      {/* 1. Header Area */}
+      {/* 1. Header Block */}
       <View style={styles.headerBlock}>
         <Text
           style={[
@@ -105,22 +105,23 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     ...typography.largeHeading,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     letterSpacing: -0.3,
   },
   sheetSubtitle: {
     ...typography.caption,
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   presetsSection: {
     gap: spacing.xs,
   },
   fieldLabel: {
     ...typography.label,
-    fontSize: 10,
+    fontSize: 9.5,
     letterSpacing: 0.8,
+    fontWeight: "700",
   },
   horizontalGrid: {
     flexDirection: "row",
@@ -134,10 +135,10 @@ const styles = StyleSheet.create({
   },
   goalBigInput: {
     width: 120,
-    height: 64,
+    height: 60,
     borderRadius: radii.md,
     borderWidth: 1,
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: "900",
     textAlign: "center",
     fontVariant: ["tabular-nums"],
@@ -151,3 +152,4 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxs,
   },
 });
+

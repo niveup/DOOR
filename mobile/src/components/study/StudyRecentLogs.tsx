@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/src/providers/theme-provider";
 import { radii, spacing, typography } from "@/src/theme/tokens";
 import { shortDate, todayInKolkata } from "@/src/lib/format";
@@ -19,6 +20,15 @@ export function formatLogDate(dateStr: string): string {
   }
 }
 
+function formatHours(hours: number): string {
+  if (!hours || hours <= 0) return "0h";
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 export interface StudyRecentLogsProps {
   logs: StudyLog[];
   onViewAll: () => void;
@@ -26,11 +36,14 @@ export interface StudyRecentLogsProps {
 
 export function StudyRecentLogs({ logs, onViewAll }: StudyRecentLogsProps) {
   const { theme, isDark } = useTheme();
-  const top3Logs = logs.slice(0, 3);
+  const top3Logs = (logs || []).slice(0, 3);
 
   return (
-    <View style={styles.sectionGroup}>
-      {/* Section Header */}
+    <Animated.View
+      entering={FadeInDown.delay(90).duration(300)}
+      style={styles.sectionGroup}
+    >
+      {/* 1. Section Header */}
       <View style={styles.sectionHeaderRow}>
         <Text
           style={[
@@ -38,102 +51,131 @@ export function StudyRecentLogs({ logs, onViewAll }: StudyRecentLogsProps) {
             { color: isDark ? "#fafafa" : theme.text },
           ]}
         >
-          Recent Study
+          Recent Activity
         </Text>
 
-        {logs.length > 0 ? (
+        {logs && logs.length > 0 ? (
           <Pressable
             onPress={onViewAll}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel="View full study history"
-            style={({ pressed }) => [
-              styles.viewAllButton,
-              pressed && { opacity: 0.7 },
-            ]}
+            accessibilityLabel={`View all ${logs.length} study sessions`}
+            style={styles.viewAllButton}
           >
-            <Text style={[styles.viewAllButtonText, { color: theme.cyan }]}>
-              View all →
+            <Text style={[styles.viewAllButtonText, { color: theme.textMuted }]}>
+              View all ({logs.length}) →
             </Text>
           </Pressable>
         ) : null}
       </View>
 
-      {/* Logs Feed or Empty State */}
-      {logs.length > 0 ? (
+      {/* 2. Unified Recent Sessions Card or Empty State */}
+      {top3Logs.length > 0 ? (
         <View
           style={[
-            styles.logsContainer,
+            styles.unifiedCard,
             {
               backgroundColor: isDark ? "#121216" : theme.surface,
               borderColor: isDark ? "#1f1f25" : theme.border,
             },
           ]}
         >
-          {top3Logs.map((log, idx) => (
-            <Pressable
-              key={log.id || `log-${idx}`}
-              onPress={onViewAll}
-              accessibilityRole="button"
-              accessibilityLabel={`${log.subjectName}, ${log.hoursStudied} hours on ${formatLogDate(
-                log.logDate
-              )}${log.questionsSolved ? `, ${log.questionsSolved} questions solved` : ""}`}
-              style={({ pressed }) => [
-                styles.logItemRow,
-                idx > 0 && [
-                  styles.logRowDivider,
-                  {
-                    borderTopColor: isDark
-                      ? theme.borderMuted
-                      : theme.divider,
-                  },
-                ],
-                pressed && { opacity: 0.75 },
-              ]}
-            >
-              <View style={styles.logTextContainer}>
-                <Text
-                  style={[
-                    styles.logSubjectTitle,
-                    { color: isDark ? "#fafafa" : theme.text },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {log.subjectName}
-                </Text>
-
-                <Text
-                  style={[
-                    styles.logMetaSubtitle,
-                    { color: theme.textMuted },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {formatLogDate(log.logDate)}
-                  {log.timeBlock ? ` · ${log.timeBlock}` : ""}
-                  {log.questionsSolved > 0
-                    ? ` · ${log.questionsSolved} Q`
-                    : ""}
-                  {log.notes ? ` · ${log.notes}` : ""}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.durationBadge,
-                  {
-                    backgroundColor: isDark
-                      ? "rgba(6, 182, 212, 0.08)"
-                      : "rgba(2, 132, 199, 0.08)",
-                  },
+          {top3Logs.map((log, idx) => {
+            const hasQuestions =
+              typeof log.questionsSolved === "number" && log.questionsSolved > 0;
+            return (
+              <Pressable
+                key={log.id || `recent-${idx}`}
+                onPress={onViewAll}
+                accessibilityRole="button"
+                accessibilityLabel={`${log.subjectName || "Study session"} on ${formatLogDate(log.logDate)}, ${formatHours(log.hoursStudied)}, ${log.questionsSolved || 0} questions solved.`}
+                style={({ pressed }) => [
+                  styles.logItemRow,
+                  idx > 0 && [
+                    styles.hairlineDivider,
+                    {
+                      borderTopColor: isDark
+                        ? theme.borderMuted
+                        : theme.divider,
+                    },
+                  ],
+                  pressed && { opacity: 0.75 },
                 ]}
               >
-                <Text style={[styles.logDurationText, { color: theme.cyan }]}>
-                  {log.hoursStudied}h
-                </Text>
-              </View>
-            </Pressable>
-          ))}
+                {/* Left: Calm Neutral Glyph Badge */}
+                <View
+                  style={[
+                    styles.iconBadge,
+                    {
+                      backgroundColor: isDark
+                        ? theme.surfaceElevated
+                        : theme.surfaceSubtle,
+                      borderColor: isDark
+                        ? theme.borderMuted
+                        : theme.border,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="book-outline"
+                    size={14}
+                    color={theme.textMuted}
+                  />
+                </View>
+
+                {/* Middle: Subject Name & Metadata */}
+                <View style={styles.logDetailsContainer}>
+                  <Text
+                    style={[
+                      styles.logSubjectTitle,
+                      { color: isDark ? "#fafafa" : theme.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {log.subjectName || "Study Session"}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.logMetaSubtitle,
+                      { color: theme.textMuted },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {formatLogDate(log.logDate)}
+                    {log.timeBlock ? ` · ${log.timeBlock}` : ""}
+                    {log.notes ? ` · ${log.notes}` : ""}
+                  </Text>
+                </View>
+
+                {/* Right: Duration & Question Count Metrics */}
+                <View style={styles.metricsColumn}>
+                  <Text
+                    style={[
+                      styles.durationText,
+                      { color: isDark ? "#fafafa" : theme.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {formatHours(log.hoursStudied)}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.questionsMetaText,
+                      { color: theme.textMuted },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {hasQuestions
+                      ? `${log.questionsSolved.toLocaleString()} ${
+                          log.questionsSolved === 1 ? "Q" : "Qs"
+                        }`
+                      : "0 Qs"}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       ) : (
         <View
@@ -160,7 +202,7 @@ export function StudyRecentLogs({ logs, onViewAll }: StudyRecentLogsProps) {
           </Text>
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -176,20 +218,22 @@ const styles = StyleSheet.create({
   },
   sectionTitleText: {
     ...typography.subheading,
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: "700",
     letterSpacing: -0.2,
   },
   viewAllButton: {
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xxs,
+    minHeight: 28,
+    justifyContent: "center",
   },
   viewAllButtonText: {
     ...typography.caption,
     fontSize: 12,
     fontWeight: "700",
   },
-  logsContainer: {
+  unifiedCard: {
     borderRadius: radii.lg,
     borderWidth: 1,
     overflow: "hidden",
@@ -197,41 +241,54 @@ const styles = StyleSheet.create({
   logItemRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
     minHeight: 56,
   },
-  logRowDivider: {
+  hairlineDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  logTextContainer: {
+  iconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logDetailsContainer: {
     flex: 1,
-    gap: 3,
+    gap: 2,
   },
   logSubjectTitle: {
     ...typography.bodyMedium,
     fontSize: 13.5,
     fontWeight: "600",
+    lineHeight: 18,
   },
   logMetaSubtitle: {
     ...typography.caption,
     fontSize: 11.5,
+    lineHeight: 15,
   },
-  durationBadge: {
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 4,
-    borderRadius: radii.sm,
-    alignItems: "center",
-    justifyContent: "center",
+  metricsColumn: {
+    alignItems: "flex-end",
+    gap: 2,
+    minWidth: 70,
   },
-  logDurationText: {
+  durationText: {
     ...typography.metric,
-    fontSize: 13,
-    lineHeight: 16,
+    fontSize: 13.5,
+    lineHeight: 17,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
+  },
+  questionsMetaText: {
+    ...typography.caption,
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: "500",
   },
   emptyLogsCard: {
     padding: spacing.lg,
@@ -246,5 +303,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
     fontWeight: "500",
+    lineHeight: 16,
   },
 });
+

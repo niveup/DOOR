@@ -1,14 +1,48 @@
 import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { Platform, StyleSheet } from "react-native";
+import { Ionicons } from "@/src/components/app-icon";
+import { Platform, StyleSheet, View } from "react-native";
 import { useTheme } from "@/src/providers/theme-provider";
 
-const tabIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
-  index: "grid-outline",
-  finance: "wallet-outline",
-  study: "school-outline",
-  profile: "person-circle-outline",
+const tabIcons: Record<
+  string,
+  { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }
+> = {
+  index: { active: "checkbox", inactive: "checkbox-outline" },
+  finance: { active: "wallet", inactive: "wallet-outline" },
+  study: { active: "book", inactive: "book-outline" },
+  profile: { active: "person-circle", inactive: "person-circle-outline" },
 };
+
+function TabIcon({
+  routeName,
+  color,
+  focused,
+  isDark,
+}: {
+  routeName: string;
+  color: string;
+  focused: boolean;
+  isDark: boolean;
+}) {
+  const icons = tabIcons[routeName];
+
+  return (
+    <View
+      style={[
+        styles.tabIcon,
+        focused && [
+          styles.tabIconActive,
+          {
+            backgroundColor: isDark ? "rgba(24, 184, 135, 0.17)" : "#ECFDF5",
+            borderColor: isDark ? "rgba(78, 211, 166, 0.2)" : "#A7F3D0",
+          },
+        ],
+      ]}
+    >
+      <Ionicons name={focused ? icons.active : icons.inactive} color={color} size={20} />
+    </View>
+  );
+}
 
 export default function TabLayout() {
   const { theme, isDark } = useTheme();
@@ -34,17 +68,10 @@ export default function TabLayout() {
             elevation: 8,
           },
         ],
+        tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.tabLabel,
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons
-            name={
-              focused
-                ? (tabIcons[route.name].replace("-outline", "") as keyof typeof Ionicons.glyphMap)
-                : tabIcons[route.name]
-            }
-            color={color}
-            size={22}
-          />
+          <TabIcon routeName={route.name} color={color} focused={focused} isDark={isDark} />
         ),
       })}
     >
@@ -58,14 +85,34 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: Platform.select({ ios: 82, default: 62 }),
-    paddingTop: 6,
-    paddingBottom: Platform.select({ ios: 24, default: 8 }),
+    height: Platform.select({ ios: 86, default: 68 }),
+    paddingTop: 7,
+    paddingBottom: Platform.select({ ios: 25, default: 9 }),
     borderTopWidth: 1,
   },
+  tabItem: {
+    borderRadius: 14,
+  },
+  tabIcon: {
+    width: 34,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  tabIconActive: {
+    shadowColor: "#18B887",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    marginTop: 2,
+    fontSize: 10.5,
+    fontWeight: "700",
+    letterSpacing: 0.1,
+    marginTop: 3,
   },
 });

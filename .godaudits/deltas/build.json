@@ -1,0 +1,403 @@
+{
+  "domain": "build",
+  "dom": "BLD",
+  "checks": [
+    {
+      "id": "A-BUILD-1",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "PRD.md", "line": 1, "quote": "PRD.md v3.1 documents deliberate single-user free-tier scope (\"No complex auth... no RLS... no compliance\") per digest; entities, stack, persistence, auth model, route map and deploy targets (render.yaml, Vercel, wrangler) all reconstructable from repo." }
+      ],
+      "finding_titles": [],
+      "strengths_note": "All 12 pre-flight answers yield from PRD + manifests + schema."
+    },
+    {
+      "id": "A-BUILD-2",
+      "outcome": "fail",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "prisma/schema.prisma", "line": 213, "quote": "model FinanceExpense {\n  id        String   @id @default(uuid())\n  ...\n  amount    Float" },
+        { "type": "source", "path": "prisma/schema.prisma", "line": 237, "quote": "model FinanceBill {\n  ...\n  amount    Float" },
+        { "type": "source", "path": "prisma/schema.prisma", "line": 225, "quote": "model FinanceBudget {\n  allowance Float    @default(0)" }
+      ],
+      "finding_titles": ["F-BLD-7"]
+    },
+    {
+      "id": "A-BUILD-3",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "frontend/app/api/backend/[...path]/route.ts", "line": 10, "quote": "const prisma = globalForPrisma.prisma || new PrismaClient();" },
+        { "type": "source", "path": "backend/src/server.ts", "line": 24, "quote": "const prisma = new PrismaClient();" },
+        { "type": "absence", "command": "rg -n \"let users = \\[|new Map\\(\" backend/src frontend/lib --glob '!node_modules'", "scope": "backend/src frontend/lib", "quote": "0 hits: no module-scope in-memory store serving CRUD. Demo fixtures (lib/demoData.ts via DemoContext) are opt-in only: localStorage flag 'jujum-demo-mode' set solely from passcode demo entry (frontend/app/passcode/page.tsx:18), and proxy.ts:34-37 blocks demo cookies from /api/backend." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-4",
+      "outcome": "fail",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "backend/src/server.ts", "line": 1605, "quote": "const dailyScore = Math.round(\n  (studyScore * weights.study + ...) / 100\n);\nconsole.log(`[Cron 04:00] Calculated score for yesterday: ${dailyScore}/100`);" },
+        { "type": "source", "path": "backend/src/server.ts", "line": 1615, "quote": "return res.json({ job: \"finalize_yesterday\", status: \"completed\" }); — computed dailyScore is never persisted anywhere; job reports success while writing nothing." },
+        { "type": "absence", "command": "rg -n \"weeklyReport|topicStatus|conceptExplanation.findMany|conceptExplanation.findFirst\" backend/src frontend/app frontend/lib mobile/src cloudflare -i --glob '!node_modules'", "scope": "all product code", "quote": "WeeklyReport: 0 code refs outside schema/migration (schema.prisma:121). TopicStatus: only deleteMany cascades (server.ts:2168). ConceptExplanation: created server.ts:2008 but never read by any GET route or page." },
+        { "type": "source", "path": "prisma/schema.prisma", "line": 121, "quote": "model WeeklyReport {\n reportId String @id @default(uuid())\n weekStartDate DateTime @unique @db.Date\n avgDailyScore Float\n ..." }
+      ],
+      "finding_titles": ["F-BLD-1"]
+    },
+    {
+      "id": "A-BUILD-5",
+      "outcome": "warn",
+      "confidence": "medium",
+      "evidence": [
+        { "type": "source", "path": "frontend/app/api/backend/[...path]/route.ts", "line": 43, "quote": "async function handleNativeTrackerRoute(safePath: string, ...) — Next relay natively re-implements tracker status/log/goal/reset, subjects CRUD, routine today/tasks CRUD and all finance routes (lines 43-709) that Express server.ts also implements." },
+        { "type": "source", "path": "frontend/app/api/backend/[...path]/route.ts", "line": 742, "quote": "// Try direct native Prisma database execution first for 100% reliable cloud sync" }
+      ],
+      "finding_titles": ["F-BLD-2"],
+      "question": "Is the Next-native handler set the intended primary path with Express as fallback, or vice versa? Both are live and can drift silently."
+    },
+    {
+      "id": "A-BUILD-6",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "frontend/app/interview/page.tsx", "line": 60, "quote": "const response = await appFetch(`${backendUrl}/api/interview/skip`, { ... body: JSON.stringify({ sessionId, questionIndex, sessionLength, company, mode, question: currentQuestion }) }); — Skip button completes its chain to a persisted row (gateway.ts:33 upsert skipped:true)." },
+        { "type": "absence", "command": "rg -n \"onClick=\\{\\(\\) => \\{\\}\\}|<form(?![^>]*onSubmit)\" frontend/app frontend/components --glob '!node_modules'", "scope": "frontend", "quote": "0 empty-handler hits. Mobile api.routine.generate (mobile/src/services/api.ts:59) has zero UI callers — dead client method, not a dead button." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-7",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "frontend/components/AppShell.tsx", "line": 11, "quote": "const primaryNavItems = [\n  { href: \"/dashboard\", ... },\n  { href: \"/tracker\", ... },\n  { href: \"/finance\", ... },\n  { href: \"/journal\", ... },\n  { href: \"/chat\", ... };\n\nconst progressNavItems = [ { href: \"/interview\" }, { href: \"/explainer\" }, { href: \"/settings/ai\" } ];" },
+        { "type": "absence", "command": "rg -n \"Coming soon|Not implemented|WIP\" frontend/app frontend/components mobile/app mobile/src --glob '!node_modules' -i", "scope": "frontend+mobile pages", "quote": "0 hits. All 8 nav hrefs resolve to existing app-router directories under frontend/app." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-8",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "backend/src/server.ts", "line": 272, "quote": "const expected = process.env.APP_PASSCODE;\nif (!expected || expected.length < 8) return res.status(503).json({ error: \"Backend authentication is not configured.\" });\n... crypto.timingSafeEqual(...)" },
+        { "type": "source", "path": "frontend/app/api/auth/route.ts", "line": 17, "quote": "if (!passcode || passcode.length > 256 || !safeEqual(passcode, appPasscode())) return NextResponse.json({ success: false, error: \"Incorrect passcode.\", demo: true }, { status: 401 ... }); — safeEqual = sha256 + timingSafeEqual." },
+        { "type": "source", "path": "frontend/proxy.ts", "line": 40, "quote": "return NextResponse.redirect(new URL(\"/passcode\", request.url)); — every non-public route gated server-side on signed iron-session cookie." }
+      ],
+      "finding_titles": [],
+      "strengths_note": "Prior audit's fail-open default '1234' (server.ts:236 old) replaced by fail-closed 503 at server.ts:273."
+    },
+    {
+      "id": "A-BUILD-9",
+      "outcome": "warn",
+      "confidence": "high",
+      "evidence": [
+        { "type": "absence", "command": "rg -n \"role|isAdmin|permission\" backend/src prisma/schema.prisma --glob '!node_modules' -i", "scope": "backend + schema", "quote": "0 role-model hits: no User model, no roles. Single shared passcode is the documented deliberate stance (PRD.md v3.1: \"No complex auth\")." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-10",
+      "outcome": "pass",
+      "confidence": "medium",
+      "evidence": [
+        { "type": "source", "path": "backend/src/server.ts", "line": 269, "quote": "const expectedCron = process.env.CRON_SHARED_SECRET;\n... req.path.startsWith(\"/cron\") && expectedCron && cronHeader && crypto.timingSafeEqual(...) — cron trust boundary enforced via header secret, distinct from passcode boundary." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-11",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "frontend/app/globals.css", "line": 449, "quote": ".app-input::placeholder { color: var(--text-faint); } — custom token system (--bg-page/--text-primary/--border etc.) wired globally; frontend/AGENTS.md registers brand-fixed elements (.btn-ai-custom gold/black, .brand-mark)." },
+        { "type": "source", "path": "frontend/components/AppShell.tsx", "line": 49, "quote": "if (name === \"home\") return <svg {...common}>... — hand-drawn inline SVG icon set, not emoji icons." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-12",
+      "outcome": "unknown",
+      "confidence": "low",
+      "evidence": [
+        { "type": "source", "path": "frontend/app/interview/page.tsx", "line": 126, "quote": "{sessionSummary?.completed ? <EmptyState mark=\"✓\" title=\"Session complete\" description={`${sessionSummary.answered} answered, ${sessionSummary.skipped} skipped...`} ... — empty/success states present; sonner toasts used across sandbox/dashboard forms (spot-checked statically only)." }
+      ],
+      "finding_titles": [],
+      "question": "54 dirty uncommitted entries are mostly the redesigned mobile finance/study screens (mobile/src/components/finance|study) — components look complete statically (forms, modals, validation props present), but runtime behavior against the live API contracts cannot be verified in static mode. Do they behave identically to the web contract paths?"
+    },
+    {
+      "id": "A-BUILD-13",
+      "outcome": "fail",
+      "confidence": "high",
+      "evidence": [
+        { "type": "absence", "command": "rg --files backend frontend mobile cloudflare -g \"*.test.*\" -g \"*.spec.*\" -g '!node_modules'", "scope": "all four workspaces", "quote": "0 test files. mobile/package.json:11 configures \"test\": \"jest --watchAll\" with jest-expo preset but ships zero test files. No feature carries integration or permission tests. CI wiring is repo domain (cross-ref F-REPO); per-feature coverage scored here." }
+      ],
+      "finding_titles": ["F-BLD-5"]
+    },
+    {
+      "id": "A-BUILD-14",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": ".", "line": 1, "quote": "Lockfiles exist for all four workspaces: package-lock.json (root), backend/, frontend/, mobile/ (+ vendored LibreChat). No typo-shaped dependency names observed in any manifest." },
+        { "type": "source", "path": "package.json", "line": 2, "quote": "\"devDependencies\": { \"prisma\": \"^5.22.0\" } vs backend/package.json:17 \"@prisma/client\": \"^5.10.2\" — version skew noted, both resolve in their own lockfiles (see F-BLD-9)." }
+      ],
+      "finding_titles": ["F-BLD-9"]
+    },
+    {
+      "id": "A-BUILD-15",
+      "outcome": "fail",
+      "confidence": "high",
+      "evidence": [
+        { "type": "absence", "command": "rg -n -i \"rate.?limit|helmet\" backend/src frontend/app frontend/lib --glob '!node_modules'", "scope": "backend+frontend", "quote": "0 hits: no rate limiting on POST /api/auth (passcode login), AI mutations, or any write path, on internet-deployed Render/Vercel hosts." },
+        { "type": "source", "path": "frontend/app/api/backend/[...path]/route.ts", "line": 782, "quote": "const responseHeaders = new Headers({ \"x-content-type-options\": \"nosniff\" }); — nosniff present on relay; CSP/HSTS/X-Frame-Options/Referrer-Policy absent globally (journal route adds Referrer-Policy: no-referrer only for private payloads)." }
+      ],
+      "finding_titles": ["F-BLD-6"]
+    },
+    {
+      "id": "A-BUILD-16",
+      "outcome": "warn",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "backend/src/server.ts", "line": 14, "quote": "// Stub types for initial compilation prior to running 'prisma generate'\ntype Journal = any;\ntype ProgressRating = any;\ntype Subject = any;\ntype Task = any;" },
+        { "type": "source", "path": "backend/src/debug_logs.ts", "line": 1, "quote": "File still exists with console.log lines (prior audit flagged lines 12-19); rg shows zero imports of debug_logs anywhere in backend/src — orphaned file compiled into dist by tsc." },
+        { "type": "source", "path": "frontend/app/sandbox-chat/page.tsx", "line": 29, "quote": "// Sample templates to showcase UI layout instantly\nconst MOCK_DRAFTS: Record<string, PlanChatTask[]> = { \"One focused subject\": [...], ... } — fake data confined to sandbox-chat page (orphaned, see A-BUILD-22); not rendered in product flows." },
+        { "type": "absence", "command": "rg -n \"TODO|FIXME|XXX|HACK|PLACEHOLDER|coming soon|not implemented\" backend/src frontend/app frontend/components frontend/lib mobile/app mobile/src cloudflare --glob '!node_modules'", "scope": "all product code", "quote": "Only false positives: JSX placeholder attributes, TodoTag/PersonalTodoItem feature naming, StudyWeeklyInsight 'placeholderCard' empty-state styles. Zero genuine implement-later markers." }
+      ],
+      "finding_titles": ["F-BLD-3", "F-BLD-8"]
+    },
+    {
+      "id": "A-BUILD-17",
+      "outcome": "warn",
+      "confidence": "medium",
+      "evidence": [
+        { "type": "absence", "command": "Get-ChildItem .godplans,.production-ready,adr", "scope": "repo root", "quote": "None exist: no STATE.md, no adr/ directory. Mitigated: single human contributor (niveup) + bot per digest; rubric's Medium targets multi-contributor repos." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-18",
+      "outcome": "warn",
+      "confidence": "medium",
+      "evidence": [
+        { "type": "source", "path": "AUDIT_REPORT.md", "line": 22, "quote": "- [ ] **Concept Explainer promotes off-scope computer-science topics** ... (checkboxes remain unticked even where findings are now fixed in code — closure ledger contradicts shipped state)" },
+        { "type": "absence", "command": "rg -n \"deferred-cta.md\" . --glob '!node_modules' -l", "scope": "repo root", "quote": "No deferred-cta.md exists; repo presents as shipped (render.yaml, Vercel workflows, wrangler) so open-question closure gates cannot be demonstrated." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-19",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "source", "path": "frontend/app/api/backend/[...path]/route.ts", "line": 467, "quote": "const [expenses, budgetRecord, bills] = await Promise.all([ expense?.findMany ? expense.findMany({...})..., ]); — finance search/filter runs over live Prisma reads, not hardcoded arrays." },
+        { "type": "source", "path": "backend/src/gateway.ts", "line": 32, "quote": "await prisma.aiCallLog.create({data:{surface:\"interview\",latencyMs:...}}) — audit-log surface written with real telemetry on both success and failure paths." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-20",
+      "outcome": "skip",
+      "confidence": "high",
+      "evidence": [
+        { "type": "absence", "command": "rg --files -g \"legacy/**\" -g \"old/**\" -g \"*-v1/**\" -g '!node_modules'", "scope": "repo root", "quote": "No legacy trees; plan_aware=false per intake, brownfield inventory check not applicable. Vendored LibreChat/ excluded as third-party upstream per digest." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-21",
+      "outcome": "pass",
+      "confidence": "high",
+      "evidence": [
+        { "type": "absence", "command": "rg -n \"migrate reset|accept-data-loss|rm -rf|--force\" package.json backend/package.json frontend/package.json mobile/package.json run_all.bat", "scope": "all scripts", "quote": "0 destructive commands. run_all.bat merely npm-installs missing node_modules and starts dev servers in separate windows — sane, local-only." },
+        { "type": "source", "path": "run_all.bat", "line": 8, "quote": ":: Verify node_modules in backend\nif not exist \"backend\\node_modules\\\" (\n    echo [ERROR] backend/node_modules not found. Running npm install..." }
+      ],
+      "finding_titles": []
+    },
+    {
+      "id": "A-BUILD-22",
+      "outcome": "fail",
+      "confidence": "high",
+      "evidence": [
+        { "type": "absence", "command": "rg -n \"sandbox-chat\" frontend/components/AppShell.tsx frontend/app frontend/components mobile/app mobile/src --glob '!node_modules'", "scope": "nav + all link sources", "quote": "sandbox-chat appears only as its own page file (frontend/app/sandbox-chat/page.tsx): zero Link/href/router.push references anywhere — orphaned scaffold page reachable only by typed URL (session-gated by proxy.ts, so no data exposure)." },
+        { "type": "source", "path": "frontend/app/journal/unlock/page.tsx", "line": 29, "quote": "const response = await fetch(\"/api/journal-auth\", { — journal/unlock IS reachable via proxy.ts redirect logic; contrast confirms sandbox-chat orphaning is real, not a grep artifact." }
+      ],
+      "finding_titles": ["F-BLD-8"]
+    }
+  ],
+  "findings": [
+    {
+      "title": "Progress-score loop persists nothing: cron finalize_yesterday is a silent no-op while WeeklyReport stays dead",
+      "severity": "medium",
+      "confidence": "high",
+      "effort": "m",
+      "impact": "The 04:00 IST cron computes dailyScore from yesterday's tasks then discards it (server.ts:1605-1612, only a console.log) yet returns status:\"completed\" (server.ts:1615), so operators and CronJobMonitor believe finalization ran. WeeklyReport (schema.prisma:121, migration table exists) has zero code readers/writers; ConceptExplanation is write-only (created server.ts:2008, never served); TopicStatus is touched only by delete cascades (server.ts:2168). Streaks/comeback scoring promised by the job name lands nowhere.",
+      "fix": "In the 04:00 block, upsert dailyScore onto RoutinePlan (or create the WeeklyReport row aggregating Mon-Sun scores) before returning success; either wire ConceptExplanation/TopicStatus into an explainer history view or drop them from the schema; make the endpoint 509/no-op-explicit if intentionally deferred.",
+      "verify": "rg -n \"weeklyReport.create|weeklyReport.upsert|score:\" backend/src returns >=1 persistence call inside the currentHour === 4 block; GET /cron/tick during hour 4 then shows a non-null stored score for yesterday.",
+      "checks": ["A-BUILD-4", "A-BUILD-5"],
+      "evidence": [
+        { "type": "source", "path": "backend/src/server.ts", "line": 1612, "quote": "console.log(`[Cron 04:00] Calculated score for yesterday: ${dailyScore}/100`);\n      }\n\n      return res.json({ job: \"finalize_yesterday\", status: \"completed\" });" },
+        { "type": "absence", "command": "rg -n \"weeklyReport|topicStatus|conceptExplanation.(findMany|findFirst)\" backend/src frontend/app mobile/src cloudflare -i --glob '!node_modules'", "scope": "all product code", "quote": "WeeklyReport 0 refs; conceptExplanation reads 0; topicStatus only deleteMany cascade." }
+      ]
+    },
+    {
+      "title": "Same API surface implemented twice (Next relay native handlers vs Express) plus unreachable duplicate finance registrations with stale Supabase messaging",
+      "severity": "medium",
+      "confidence": "high",
+      "effort": "l",
+      "impact": "frontend/app/api/backend/[...path]/route.ts:43-709 natively re-implements tracker/routine/subjects/finance handlers that backend/src/server.ts also serves; the relay tries native-first (comment line 742) and falls back to relaying to Express, so two codebases own one contract and will drift independently (already each carries its own copy of bill-pay expense-upsert logic). Inside server.ts itself, DELETE /api/finance/bill/:id, DELETE /api/finance/bill and POST /api/finance/reset are each registered twice (2802+2842, 2816+2853, 2830+2864); Express keeps the first, so the second trio is dead weight that still references raw `(prisma as any).financeBill` and answers \"reset successfully in Supabase\" — a stale message from the pre-Prisma era. Dead-code remediation cross-ref F-CODE.",
+      "fix": "Pick one owner per path: keep the Next-native handlers and strip those routes from server.ts (or invert). Delete the second registrations at server.ts:2842-2873 outright and correct the surviving reset message.",
+      "verify": "rg -n 'app.(delete|post)(\"/api/finance/(bill|reset)' backend/src/server.ts returns exactly one registration per path; rg -n Supabase backend/src returns 0 hits.",
+      "checks": ["A-BUILD-5", "A-BUILD-16"],
+      "evidence": [
+        { "type": "source", "path": "backend/src/server.ts", "line": 2864, "quote": "app.post(\"/api/finance/reset\", async (_req: Request, res: Response) => {\n  try {\n    await (prisma as any).financeExpense.deleteMany({});\n...\n    res.json({ success: true, message: \"Finance data reset successfully in Supabase.\" });" },
+        { "type": "source", "path": "frontend/app/api/backend/[...path]/route.ts", "line": 744, "quote": "const nativeTrackerRes = await handleNativeTrackerRoute(safePath, request.method, parsedBody, request.nextUrl);\n    if (nativeTrackerRes) return nativeTrackerRes;\n\n    const nativeFinanceRes = await handleNativeFinanceRoute(...);\n    if (nativeFinanceRes) return nativeFinanceRes;" }
+      ]
+    },
+    {
+      "title": "Scaffold `any` stub types and dual model-name casts blind compile-time checking of core entities",
+      "severity": "medium",
+      "confidence": "high",
+      "effort": "s",
+      "impact": "server.ts:14-18 declares type Journal = any; ProgressRating = any; Subject = any; Task = any — scaffolding for 'prior to running prisma generate', left in place even though the build script always runs prisma generate first. Every task filter callback typed (t: Task) is compile-time unchecked. The same uncertainty leaks as defensive dual-name casts ((prisma as any).task || (prisma as any).Task, .routinePlan || .RoutinePlan, .financeExpense || .FinanceExpense) throughout server.ts and the Next relay, so a schema rename would fail silently at runtime instead of at tsc.",
+      "fix": "Delete the four stub aliases and import generated types from @prisma/client; settle canonical camelCase delegate names once and remove the || fallback casts (or gate them behind one typed accessor helper).",
+      "verify": "rg -n \"type Journal = any|= any;\" backend/src/server.ts returns 0; rg -n \"as any\\)\\.task \\|\\|\" backend/src frontend returns 0; npx tsc --noEmit clean in backend.",
+      "checks": ["A-BUILD-16"],
+      "evidence": [
+        { "type": "source", "path": "backend/src/server.ts", "line": 14, "quote": "// Stub types for initial compilation prior to running 'prisma generate'\ntype Journal = any;\ntype ProgressRating = any;\ntype Subject = any;\ntype Task = any;" },
+        { "type": "source", "path": "frontend/app/api/backend/[...path]/route.ts", "line": 377, "quote": "const taskModel = (prisma as any).task || (prisma as any).Task;" }
+      ]
+    },
+    {
+      "title": "backend/.env.example omits the three D1-store variables the private journal and tracker require",
+      "severity": "medium",
+      "confidence": "high",
+      "effort": "xs",
+      "impact": "backend/src/lib/private-journal-store.ts reads JOURNAL_ENCRYPTION_KEY, CF_JOURNAL_STORE_URL, CF_JOURNAL_STORE_SECRET (lines 39/43/46) and private-tracker-store.ts reads CF_JOURNAL_STORE_URL/SECRET (lines 19-20), but backend/.env.example lists none of the three. An operator provisioning Render from the example gets a booting backend whose mobile journal save/history and D1 tracker sync fail at call time — and these are exactly the endpoints the Expo app depends on (mobile/src/services/api.ts:98-102 hit the Render host directly). Frontend and mobile example files are complete by contrast.",
+      "fix": "Append JOURNAL_ENCRYPTION_KEY=, CF_JOURNAL_STORE_URL=, CF_JOURNAL_STORE_SECRET= with the same comment style used in frontend/.env.example (32+ char key, HTTPS worker URL, HMAC secret).",
+      "verify": "diff <(rg -o 'process\\.env\\.[A-Z_0-9]+' backend/src -N | sort -u | sed 's/process.env.//') <(rg -o '^[A-Z_0-9]+=' backend/.env.example | tr -d '=') shows no backend-only leftovers.",
+      "checks": ["A-BUILD-1", "A-BUILD-4"],
+      "evidence": [
+        { "type": "source", "path": "backend/src/lib/private-journal-store.ts", "line": 39, "quote": "process.env.JOURNAL_ENCRYPTION_KEY ... process.env.CF_JOURNAL_STORE_URL ... process.env.CF_JOURNAL_STORE_SECRET (lines 39/43/46)" },
+        { "type": "absence", "command": "rg -n \"JOURNAL_ENCRYPTION_KEY|CF_JOURNAL_STORE\" backend/.env.example", "scope": "backend/.env.example", "quote": "0 hits — example ends at AI_MODEL after DATABASE_URL/DIRECT_URL/AI provider keys." }
+      ]
+    },
+    {
+      "title": "Zero automated tests across backend, frontend, mobile and worker despite CI and jest tooling being present",
+      "severity": "high",
+      "confidence": "high",
+      "effort": "m",
+      "impact": "No *.test.* or *.spec.* file exists in any workspace; mobile/package.json wires jest-expo (scripts.test, jest preset) yet ships zero test files. Every shipped vertical (auth verify, routine tasks, tracker log upsert, finance bill-pay double-entry, interview session summary, journal encryption) has no integration or permission test, so the 54-file dirty redesign can regress contracts undetected. Whole-suite existence/CI wiring belongs to repo (cross-ref F-REPO); this records the per-feature coverage gap this module owns.",
+      "fix": "Start in-slice: gateway interview evaluate/skip summary test (skips counted, completed gating), tracker log upsert accumulation test against a throwaway Postgres, finance bill-pay creating matching expense test, journal payload validation bounds test; add one jest-expo smoke test so mobile's configured runner stops being decorative.",
+      "verify": "rg --files backend frontend mobile cloudflare -g \"*.test.*\" -g \"*.spec.*\" returns >=4 files covering the listed flows; npm test passes locally in backend and mobile.",
+      "checks": ["A-BUILD-13"],
+      "evidence": [
+        { "type": "absence", "command": "rg --files backend frontend mobile cloudflare -g \"*.test.*\" -g \"*.spec.*\" -g '!node_modules'", "scope": "all four workspaces", "quote": "0 files returned." },
+        { "type": "source", "path": "mobile/package.json", "line": 11, "quote": "\"test\": \"jest --watchAll\",\n  ...\n  \"jest\": {\n    \"preset\": \"jest-expo\"\n  }" }
+      ]
+    },
+    {
+      "title": "No rate limiting on passcode auth or mutations, and the hardening header set is partial",
+      "severity": "high",
+      "confidence": "high",
+      "effort": "s",
+      "impact": "The single passcode gates everything (backend x-passcode middleware server.ts:267-279; web POST /api/auth timing-safe compare), yet zero rate-limit code exists anywhere (rg rate-limit|helmet: 0 hits) on internet-exposed Render/Vercel hosts — unlimited online brute-force against an 8+-char shared secret is possible, and every AI mutation can be hammered through the relay. Headers: x-content-type-options nosniff on relay responses and Referrer-Policy on journal payloads only; no CSP/HSTS/X-Frame-Options/Referrer-Policy baseline. Secrets themselves stay security's (cross-ref F-SEC); pipeline placement of limits cross-ref F-DEPLOY when CI runs one.",
+      "fix": "Add express-rate-limit (strict window on /api/auth/verify and POST /api/auth, looser global bucket) and set the five headers via Next config/proxy.ts for web plus helmet-equivalent for Express; exempt /health.",
+      "verify": "rg -n \"rateLimit|helmet|Content-Security-Policy\" backend/src frontend returns hits on the auth paths; repeated failed POST /api/auth returns 429 after threshold.",
+      "checks": ["A-BUILD-15"],
+      "evidence": [
+        { "type": "absence", "command": "rg -n -i \"rate.?limit|helmet|Content-Security-Policy|Strict-Transport\" backend/src frontend/app frontend/lib next.config* --glob '!node_modules'", "scope": "backend + frontend", "quote": "0 hits." },
+        { "type": "source", "path": "frontend/app/api/auth/route.ts", "line": 21, "quote": "if (!passcode || passcode.length > 256 || !safeEqual(passcode, appPasscode())) {\n      return NextResponse.json({ success: false, error: \"Incorrect passcode.\", demo: true }, { status: 401," }
+      ]
+    },
+    {
+      "title": "Money columns are Float across the finance schema",
+      "severity": "high",
+      "confidence": "high",
+      "effort": "s",
+      "impact": "FinanceExpense.amount (schema.prisma:213), FinanceBill.amount (:237) and FinanceBudget.allowance (:225) are Float. No live payment flow exists (personal ledger, UPI tracking only) so this is not Critical, but rupee-and-paise values summed in JS floats can accumulate cent-level drift against caps and the bill-pay double-entry copy. If the database pass carries the identical root cause, cross-reference F-DB instead of double-billing this fix.",
+      "fix": "Migrate the three columns to Decimal(12,2) (or integer paise) with one migration; convert at the form boundary only.",
+      "verify": "rg -n \"amount\\s+Float|allowance\\s+Float\" prisma/schema.prisma backend/prisma/schema.prisma returns 0 hits after migration.",
+      "checks": ["A-BUILD-2"],
+      "evidence": [
+        { "type": "source", "path": "prisma/schema.prisma", "line": 211, "quote": "model FinanceExpense {\n  id        String   @id @default(uuid())\n  title     String\n  category  String\n  amount    Float" },
+        { "type": "source", "path": "prisma/schema.prisma", "line": 224, "quote": "model FinanceBudget {\n  id        String   @id @default(\"default\")\n  allowance Float    @default(0)" }
+      ]
+    },
+    {
+      "title": "Orphaned sandbox-chat scaffold page and unused debug_logs.ts ship in the tree",
+      "severity": "medium",
+      "confidence": "high",
+      "effort": "xs",
+      "impact": "sandbox-chat (frontend/app/sandbox-chat/page.tsx) renders MOCK_DRAFTS sample templates ('One focused subject', etc.) but no nav item, Link, or router.push anywhere references it — an orphaned scaffold page reachable only by typed URL. backend/src/debug_logs.ts survives from the prior audit with its console.log lines and compiles into dist even though nothing imports it. Neither exposes data beyond the logged-in user's own (proxy.ts gates the page), but both are dead surface area contradicting the shipped posture. Dead-code specifics cross-ref F-CODE.",
+      "fix": "Delete sandbox-chat/page.tsx (its plan-chat playground duplicates dashboard functionality) and remove backend/src/debug_logs.ts; if the sandbox is kept as a design lab, move it under a /dev prefix documented in AGENTS.md.",
+      "verify": "Test-Path frontend/app/sandbox-chat, backend/src/debug_logs.ts both False; next build succeeds.",
+      "checks": ["A-BUILD-22", "A-BUILD-16"],
+      "evidence": [
+        { "type": "absence", "command": "rg -n \"sandbox-chat\" frontend/components frontend/app --glob '!node_modules' -l", "scope": "link sources vs page file", "quote": "Only frontend/app/sandbox-chat/page.tsx itself matches; zero inbound links." },
+        { "type": "absence", "command": "rg -n \"debug_logs\" backend/src --glob '!node_modules'", "scope": "backend/src", "quote": "0 import references to debug_logs anywhere; file exists with flagged console.log lines." },
+        { "type": "source", "path": "frontend/app/sandbox-chat/page.tsx", "line": 29, "quote": "// Sample templates to showcase UI layout instantly\nconst MOCK_DRAFTS: Record<string, PlanChatTask[]> = {" }
+      ]
+    },
+    {
+      "title": "Prisma schema triplicated across three packages with CLI version skew — drift waiting to happen",
+      "severity": "medium",
+      "confidence": "high",
+      "effort": "s",
+      "impact": "Three content-synced copies of schema.prisma exist: prisma/schema.prisma (root, owns migrations), backend/prisma/schema.prisma (backend build + migrate target), frontend/prisma/schema.prisma (frontend `npx prisma generate` target). Today they match except a trailing blank line (git diff --no-index: 1 deletion between root and each other; backend==frontend byte-identical), but nothing enforces sync — commit af6a1bc already moved one copy for Render, proving copies diverge by edit location. Root pins prisma ^5.22.0 while backend pins ^5.10.2, so generators can emit differently-versioned clients from 'the same' schema.",
+      "fix": "Keep backend/prisma/schema.prisma as the single source (it owns runtime + migrations); make root and frontend thin consumers via a sync script or prisma folder field, and align the three prisma/* versions to ^5.22.0.",
+      "verify": "After wiring: editing backend/prisma/schema.prisma and running root+frontend builds fails loudly if out of sync (or hash-compare step in CI passes); lockfiles show one resolved prisma version family.",
+      "checks": ["A-BUILD-14", "A-BUILD-1"],
+      "evidence": [
+        { "type": "tool", "command": "Get-FileHash prisma/schema.prisma, backend/prisma/schema.prisma", "quote": "root 5BE43BF3... vs backend 26316BE1... differ; git diff --no-index shows the sole delta is one trailing blank line (root has extra newline); backend vs frontend diff empty — currently synced, mechanically fragile." },
+        { "type": "source", "path": "backend/package.json", "line": 7, "quote": "\"build\": \"prisma generate --schema=./prisma/schema.prisma && tsc\",\n    \"start\": \"node dist/gateway.js\",\n    ...\"@prisma/client\": \"^5.10.2\"" },
+        { "type": "source", "path": "package.json", "line": 2, "quote": "\"devDependencies\": {\n    \"prisma\": \"^5.22.0\"\n  }" }
+      ]
+    }
+  ],
+  "strengths": [
+    {
+      "title": "Auth fails closed with timing-safe comparison on both edges",
+      "evidence": [
+        { "type": "source", "path": "backend/src/server.ts", "line": 273, "quote": "if (!expected || expected.length < 8) return res.status(503).json({ error: \"Backend authentication is not configured.\" });" },
+        { "type": "source", "path": "frontend/app/api/auth/route.ts", "line": 13, "quote": "function safeEqual(left: string, right: string) {\n  const a = crypto.createHash(\"sha256\").update(left).digest();\n  const b = crypto.createHash(\"sha256\").update(right).digest();\n  return crypto.timingSafeEqual(a, b);\n}" }
+      ],
+      "preserve": "Keep the min-length fail-closed guard and sha256+timingSafeEqual pattern when adding rate limiting; do not reintroduce any default passcode."
+    },
+    {
+      "title": "Server-side gating is layered: proxy session check, relay 401, and a second time-boxed journal lock enforced in the API handler",
+      "evidence": [
+        { "type": "source", "path": "frontend/proxy.ts", "line": 11, "quote": "// verifies the signed, httpOnly session cookie and never calls a database.\n... if (!session.isLoggedIn) { ... return NextResponse.redirect(new URL(\"/passcode\", request.url)); }" },
+        { "type": "source", "path": "frontend/app/api/journal/route.ts", "line": 46, "quote": "if (entryText.length < 20 || entryText.length > 5000 || !tags || ...) return null; — PRD 5000-char cap now enforced server-side, closing the prior audit finding." },
+        { "type": "source", "path": "frontend/app/api/backend/[...path]/route.ts", "line": 716, "quote": "if (path[0] === \"api\" && path[1] === \"journal\") {\n    return NextResponse.json({ error: \"Use the private journal route.\" }, { status: 404," }
+      ],
+      "preserve": "The retired legacy POST /api/journal is correctly unreachable from the web app (dedicated encrypted-D1 route handles it; relay blocks the path; backend middleware 410s it) — preserve this triple fence."
+    },
+    {
+      "title": "Demo mode is opt-in and fenced away from production data paths",
+      "evidence": [
+        { "type": "source", "path": "frontend/app/passcode/page.tsx", "line": 18, "quote": "localStorage.setItem(\"jujum-demo-mode\", \"true\"); ... document.cookie = \"jujum_demo=1; path=/; max-age=\" + 60 * 60 * 24 * 7;" },
+        { "type": "source", "path": "frontend/proxy.ts", "line": 34, "quote": "if (pathname.startsWith(\"/api/backend\")) {\n        return NextResponse.json({ error: \"Demo mode\" }, { status: 403 });\n      }" }
+      ],
+      "preserve": "Demo fixtures (DemoContext/demoData) never touch Prisma or D1 and demo cookies are rejected at the relay — keep the fence if the sandbox page is repurposed."
+    },
+    {
+      "title": "Every manifest script resolves to a real file and all four workspaces carry lockfiles",
+      "evidence": [
+        { "type": "tool", "command": "Test-Path backend/prisma/schema.prisma, backend/src/seed.ts, mobile/scripts/reset-project.js, frontend/prisma/schema.prisma", "quote": "All True: backend build/generate/migrate schema paths, prisma seed ts-node src/seed.ts, expo reset-project.js and frontend npx prisma generate default-schema target all resolve; run_all.bat sanity-checked." }
+      ],
+      "preserve": "Script integrity is complete today — protect it when consolidating the schema copies (F-BLD-9) so no script loses its target."
+    },
+    {
+      "title": "All four prior-audit focus findings verified fixed in current HEAD",
+      "evidence": [
+        { "type": "source", "path": "frontend/app/explainer/page.tsx", "line": 57, "quote": "\"Explain entropy and irreversibility\",\n  \"Mohr’s circle for plane stress\", — suggestions now GATE-ME scoped (Thermal & Fluid Sciences catalog at :929-959); no CS-topic remnants." },
+        { "type": "source", "path": "backend/src/gateway.ts", "line": 33, "quote": "app.post(\"/api/interview/skip\",...) ... upsert({where:{sessionId_questionIndex:{...}}, update:{skipped:true,...}}) — skips persist; page.tsx:25 mints one stable crypto.randomUUID sessionId reused across evaluate(:95) and skip(:63), grouped via @@unique([sessionId, questionIndex])." },
+        { "type": "source", "path": "backend/src/server.ts", "line": 2466, "quote": "const aiResponse = await aiChat(sysPrompt, `Review my last 7-day study logs...`);\n...\n  settings = await (prisma.settings as any).update({ ... data: { weeklyAnalysis, analysisWeekOf ..., analysisStale: false } }); — tracker seven-section AI analysis implemented and cached daily (fixed prior finding #4)." }
+      ],
+      "preserve": "Regression-guard these three fixes once F-BLD-5 lands tests — they are exactly the flows a redesign would break first."
+    }
+  ]
+}

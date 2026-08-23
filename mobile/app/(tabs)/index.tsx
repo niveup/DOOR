@@ -11,7 +11,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import { AppScreen } from "@/src/components/screen";
 import { SectionTitle } from "@/src/components/ui";
 import { FullScreenGlitterOverlay } from "@/src/components/glitter-overlay";

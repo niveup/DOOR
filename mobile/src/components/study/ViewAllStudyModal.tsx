@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
@@ -28,6 +28,15 @@ export function formatLogDate(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+function formatHours(hours: number): string {
+  if (!hours || hours <= 0) return "0h";
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 export interface ViewAllStudyModalProps {
@@ -327,7 +336,7 @@ export function AllLogsContent({
           >
             HOURS LOGGED
           </Text>
-          <Text style={[styles.metricNumber, { color: theme.accent }]}>
+          <Text style={[styles.metricNumber, { color: theme.emerald }]}>
             {totalHours.toFixed(1)}h
           </Text>
         </View>
@@ -346,7 +355,12 @@ export function AllLogsContent({
           >
             QUESTIONS
           </Text>
-          <Text style={[styles.metricNumber, { color: theme.amber }]}>
+          <Text
+            style={[
+              styles.metricNumber,
+              { color: isDark ? "#fafafa" : theme.text },
+            ]}
+          >
             {totalQuestions.toLocaleString()}
           </Text>
         </View>
@@ -356,7 +370,7 @@ export function AllLogsContent({
       {subjectBreakdown.length > 0 ? (
         <View style={styles.sectionGroup}>
           <Text style={[styles.fieldLabel, { color: theme.textFaint }]}>
-            HEAD-TO-HEAD SUBJECT BREAKDOWN
+            SUBJECT BREAKDOWN
           </Text>
           <View
             style={[
@@ -389,6 +403,7 @@ export function AllLogsContent({
                         styles.subjectBreakdownTitle,
                         { color: isDark ? "#fafafa" : theme.text },
                       ]}
+                      numberOfLines={1}
                     >
                       {item.name}
                     </Text>
@@ -406,24 +421,15 @@ export function AllLogsContent({
                   <Text
                     style={[
                       styles.subjectBreakdownHours,
-                      { color: theme.cyan },
+                      { color: isDark ? "#fafafa" : theme.text },
                     ]}
                   >
-                    {item.hours.toFixed(1)}h{" "}
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: theme.textMuted,
-                        fontWeight: "500",
-                      }}
-                    >
-                      ({item.share}%)
-                    </Text>
+                    {item.hours.toFixed(1)}h
                   </Text>
                 </View>
                 <ProgressBar
                   value={item.share}
-                  height={4}
+                  height={3}
                   tone={theme.cyan}
                 />
               </View>
@@ -447,56 +453,105 @@ export function AllLogsContent({
               },
             ]}
           >
-            {logs.map((log, idx) => (
-              <View
-                key={log.id || `hist-${idx}`}
-                style={[
-                  styles.logHistoryRow,
-                  idx > 0 && [
-                    styles.hairlineDivider,
-                    {
-                      borderTopColor: isDark
-                        ? theme.borderMuted
-                        : theme.divider,
-                    },
-                  ],
-                ]}
-              >
-                <View style={styles.logTextContainer}>
-                  <Text
+            {logs.map((log, idx) => {
+              const hasQuestions = typeof log.questionsSolved === "number" && log.questionsSolved > 0;
+              return (
+                <View
+                  key={log.id || `hist-${idx}`}
+                  style={[
+                    styles.logHistoryRow,
+                    idx > 0 && [
+                      styles.hairlineDivider,
+                      {
+                        borderTopColor: isDark
+                          ? theme.borderMuted
+                          : theme.divider,
+                      },
+                    ],
+                  ]}
+                >
+                  {/* Left: Calm Neutral Glyph Badge */}
+                  <View
                     style={[
-                      styles.logSubjectTitle,
-                      { color: isDark ? "#fafafa" : theme.text },
+                      styles.iconBadge,
+                      {
+                        backgroundColor: isDark
+                          ? theme.surfaceElevated
+                          : theme.surfaceSubtle,
+                        borderColor: isDark
+                          ? theme.borderMuted
+                          : theme.border,
+                      },
                     ]}
                   >
-                    {log.subjectName}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.logMetaSubtitle,
-                      { color: theme.textMuted },
-                    ]}
-                  >
-                    {formatLogDate(log.logDate)}
-                    {log.timeBlock ? ` · ${log.timeBlock}` : ""} ·{" "}
-                    {log.questionsSolved} questions
-                  </Text>
-                  {log.notes ? (
+                    <Ionicons
+                      name="book-outline"
+                      size={14}
+                      color={theme.textMuted}
+                    />
+                  </View>
+
+                  {/* Middle: Details */}
+                  <View style={styles.logTextContainer}>
                     <Text
                       style={[
-                        styles.logNotes,
+                        styles.logSubjectTitle,
+                        { color: isDark ? "#fafafa" : theme.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {log.subjectName || "Study Session"}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.logMetaSubtitle,
                         { color: theme.textMuted },
                       ]}
+                      numberOfLines={1}
                     >
-                      "{log.notes}"
+                      {formatLogDate(log.logDate)}
+                      {log.timeBlock ? ` · ${log.timeBlock}` : ""}
                     </Text>
-                  ) : null}
+                    {log.notes ? (
+                      <Text
+                        style={[
+                          styles.logNotes,
+                          { color: theme.textMuted },
+                        ]}
+                      >
+                        "{log.notes}"
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Right: Metrics */}
+                  <View style={styles.metricsColumn}>
+                    <Text
+                      style={[
+                        styles.logDurationText,
+                        { color: isDark ? "#fafafa" : theme.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {formatHours(log.hoursStudied)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.questionsMetaText,
+                        { color: theme.textMuted },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {hasQuestions
+                        ? `${log.questionsSolved} ${
+                            log.questionsSolved === 1 ? "Q" : "Qs"
+                          }`
+                        : "0 Qs"}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={[styles.logDurationText, { color: theme.cyan }]}>
-                  {log.hoursStudied}h
-                </Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
         ) : (
           <Card>
@@ -522,13 +577,27 @@ export function AllLogsContent({
             }}
           >
             <View style={styles.analysisHeader}>
-              <Ionicons
-                name="sparkles"
-                size={13}
-                color={theme.violet}
-              />
+              <View
+                style={[
+                  styles.iconMiniBadge,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(124, 58, 237, 0.12)"
+                      : "rgba(124, 58, 237, 0.08)",
+                    borderColor: isDark
+                      ? "rgba(124, 58, 237, 0.25)"
+                      : "rgba(124, 58, 237, 0.15)",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="sparkles"
+                  size={12}
+                  color={theme.violet}
+                />
+              </View>
               <Text style={[styles.analysisLabel, { color: theme.violet }]}>
-                WEEKLY JUJUM READ
+                WEEKLY MENTOR READ
               </Text>
             </View>
             <Text
@@ -579,16 +648,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    minHeight: 32,
   },
   detailHeaderTitle: {
     ...typography.subheading,
-    fontSize: 17,
+    fontSize: 16.5,
     fontWeight: "800",
     letterSpacing: -0.3,
   },
   detailHeaderSubtitle: {
     ...typography.caption,
-    fontSize: 12,
+    fontSize: 11.5,
     paddingLeft: 26,
   },
   detailScrollBody: {
@@ -603,19 +673,21 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     padding: spacing.xs,
-    borderRadius: radii.sm,
+    borderRadius: radii.md,
     borderWidth: 1,
     gap: spacing.xxs,
   },
   metricLabelText: {
     ...typography.label,
-    fontSize: 9,
+    fontSize: 8.5,
     letterSpacing: 0.8,
+    fontWeight: "700",
   },
   metricNumber: {
     ...typography.metric,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: "800",
     fontVariant: ["tabular-nums"],
   },
   sectionGroup: {
@@ -623,8 +695,9 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...typography.label,
-    fontSize: 10,
+    fontSize: 9.5,
     letterSpacing: 0.8,
+    fontWeight: "700",
   },
   unifiedCard: {
     borderRadius: radii.lg,
@@ -646,24 +719,42 @@ const styles = StyleSheet.create({
   },
   subjectBreakdownTitle: {
     ...typography.bodyMedium,
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: "700",
   },
   subjectBreakdownSubtext: {
     ...typography.caption,
-    fontSize: 11.5,
+    fontSize: 11,
   },
   subjectBreakdownHours: {
     ...typography.metric,
-    fontSize: 13.5,
-    fontWeight: "800",
+    fontSize: 12.5,
+    fontWeight: "700",
     fontVariant: ["tabular-nums"],
   },
   logHistoryRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    padding: spacing.sm,
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     gap: spacing.sm,
+    minHeight: 56,
+  },
+  iconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconMiniBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: radii.xs,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   logTextContainer: {
     flex: 1,
@@ -672,24 +763,36 @@ const styles = StyleSheet.create({
   logSubjectTitle: {
     ...typography.bodyMedium,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   logMetaSubtitle: {
     ...typography.caption,
-    fontSize: 11.5,
+    fontSize: 11,
   },
   logNotes: {
     ...typography.caption,
-    fontSize: 11.5,
+    fontSize: 11,
     fontStyle: "italic",
     marginTop: 2,
-    lineHeight: 16,
+    lineHeight: 15,
+  },
+  metricsColumn: {
+    alignItems: "flex-end",
+    gap: 2,
+    minWidth: 55,
   },
   logDurationText: {
     ...typography.metric,
-    fontSize: 13.5,
+    fontSize: 13,
+    lineHeight: 16,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
+  },
+  questionsMetaText: {
+    ...typography.caption,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "500",
   },
   analysisHeader: {
     flexDirection: "row",
@@ -699,12 +802,14 @@ const styles = StyleSheet.create({
   },
   analysisLabel: {
     ...typography.label,
-    fontSize: 10,
+    fontSize: 9.5,
     letterSpacing: 0.8,
+    fontWeight: "700",
   },
   analysis: {
     ...typography.body,
     fontSize: 12.5,
-    lineHeight: 19,
+    lineHeight: 18,
   },
 });
+

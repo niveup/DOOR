@@ -23,7 +23,7 @@ import Animated, {
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import Svg, { Circle, Path } from "react-native-svg";
 import { api, ApiError } from "@/src/services/api";
 import { useAuth } from "@/src/providers/auth-provider";

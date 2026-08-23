@@ -1,0 +1,183 @@
+---
+name: "PROJECT-SLUG"
+schema_version: "2.0"
+audit_version: 1
+status: reported
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+mode: fresh
+plan_aware: false
+commit: "COMMIT-SHA"
+archetype: ARCHETYPE
+project_form: PROJECT-FORM
+evidence_fingerprint_sha256: "SHA-256"
+evidence_commit: "COMMIT-SHA"
+scale: SCALE
+risk_profile: balanced
+budget: medium
+engine_version: "2.1.0"
+pack_version: "2.1.0"
+overall: 0
+verdict: "critical condition"
+coverage: 0
+findings_total: 0
+tasks_total: 1
+---
+
+# PROJECT-NAME audit
+
+This file is a generated view. `.godaudits/AUDIT.json` is the machine source of
+truth. Run `godaudits validate` and `godaudits render`; do not author this view
+by hand.
+
+One verdict paragraph under 120 words: score, verdict, coverage, biggest risk,
+and biggest evidence-backed strength.
+
+## Scope and method
+
+Commit, date, mode, archetype, scale, budget, capability list, tool and pack
+versions, assumptions, what was examined, and what was not. Static-mode
+statement: no application code, tests, live systems, network requests, or
+product models ran.
+
+Coverage: evaluated checks divided by applicable checks. Unknown checks are
+reported and cap the verdict.
+
+Assumptions are listed explicitly. No assumptions means `none`.
+
+## Compliance gate
+
+Result, policy pack and version, checked date, authorization context when
+relevant, and injected compliance finding ids.
+
+## Applicability matrix
+
+| Domain | Status | Reason |
+|---|---|---|
+| DOMAIN | applicable-or-excluded | repository-specific reason |
+
+All 18 domains appear. Excluded domains appear nowhere else.
+
+## Scorecard
+
+| Domain | Depth | Score | Cap | Evaluated |
+|---|---|---:|---|---:|
+| DOMAIN | screening-or-deep-capable | 0 | none-or-cap | 0/0 |
+| Overall | mixed | 0 | coverage, critical, weak-domain caps | 0/0 |
+
+## Depth and escalation
+
+| Domain | Label | Deep-trace state | Escalation criterion | Up to three current finding leads |
+|---|---|---|---|---|
+| DOMAIN | screening-or-deep-capable | unknown-or-evaluated | specialist threshold | F-DOM-n or A-DOM-n |
+
+## Standards coverage
+
+| Framework | Category | Disposition | Checks | Evidence | Findings |
+|---|---|---|---|---|---|
+| owasp-web-2025 | A01:2025 Broken Access Control | pass-fail-unknown-not-applicable | A-SEC-n | E-n or none for unknown | F-SEC-n or none |
+
+All ten OWASP Web Top 10:2025 categories appear in a 2.1 initialized audit.
+Standards coverage routes to owning checks and adds no score weight.
+
+## Check ledger
+
+| Check | Cost tier | Outcome | Confidence | Weight | Evidence |
+|---|---|---|---|---:|---|
+| A-DOM-1 | screening-or-deep-trace | pass-fail-unknown-not-applicable | Certain-Firm-Tentative | 0 | E-1 |
+
+Every selected catalog check appears exactly once. A pass without evidence and
+an uninspected pass are validation defects.
+
+## Evidence ledger
+
+| Evidence | Type | Location or scope | Provenance | Quote or result | SHA-256 | Redacted |
+|---|---|---|---|---|---|---|
+| E-1 | source-absence-tool-runtime-human | exact location | command, tool version, or recorder | normalized secret-safe evidence | content hash or none | yes-or-no |
+
+Every evidence id referenced by a check, finding, strength, or task is expanded
+here. Pass and not-applicable support remains inspectable without opening chat.
+
+## Strengths
+
+- Evidence-backed strength, evidence id and source location, plus the pattern
+  nearby remediation must preserve.
+
+## Findings
+
+### DOMAIN-NAME
+
+#### F-DOM-1 Specific root-cause statement [Severity | Confidence | Effort]
+
+- Where: exact/path.ext:LINE
+- Evidence: stable evidence ids, quotes, hashes, and second path when available
+- Impact: concrete user, operator, security, reliability, or business failure
+- Fix: specific safe change at real locations
+- Verify the fix: `exact command` or exact manual path
+- Checks: A-DOM-n
+- Status: open
+- Remediation: GA-101
+
+## Remediation plan
+
+### Destination
+
+One or two sentences naming what reaching the end of this plan looks like, so a
+remediating session orients to it before choosing a task.
+
+Final gate: Re-run godaudits at the remediated commit (GA-N01) [open].
+Gate acceptance: expected score and coverage movement, no open Critical findings.
+Gate verify: `godaudits validate .godaudits/AUDIT.json`
+
+### Frontier: N takeable now
+
+Closed N of M remediation tasks; claimed N; blocked N. A task is takeable when
+every task it depends on is closed. Claim a task before starting work so a
+concurrent session skips it, and re-derive this list with `godaudits wayfind`
+rather than reading it from a report that may be older than the task state.
+
+| Order | Task | Phase and wave | Concurrency | Unblocks |
+|---:|---|---|---|---:|
+| 1 | Imperative root-cause fix (GA-101) | 1 / 1.1 | serial | 2 |
+
+## Phase 1: Stop the bleeding
+
+### Wave 1.1
+
+- [ ] GA-101 [W1.1] Imperative root-cause fix
+  - Files: exact existing paths and explicitly named new test path
+  - Depends on: none
+  - Reuses: an existing control or pattern
+  - Fixes: Root-cause finding title (F-DOM-1)
+  - Acceptance: 2 to 4 observable conditions
+  - Verify: `exact command`
+  - Checks: A-DOM-n
+
+## Phase N: Re-audit
+
+### Wave N.1
+
+- [ ] GA-N01 [WN.1] Re-run godaudits at the remediated commit
+  - Files: none
+  - Depends on: every active non-final task
+  - Reuses: the current catalog and evidence fingerprint
+  - Fixes: none (final gate)
+  - Acceptance: expected score and coverage movement, no open Critical findings
+  - Verify: `godaudits validate .godaudits/AUDIT.json`
+  - Checks: none
+
+## Accepted risks and open questions
+
+Accepted risks name finding, owner, acceptance date, expiry, and review command.
+Open questions name owner, due date, and recommended default.
+
+## Rules for remediating agents
+
+> [!IMPORTANT]
+> AUDIT.json is the machine source of truth. AUDIT.mdx is generated.
+> Run Verify before changing task or finding state, preserve ids and reciprocal
+> links, regenerate derived views, and finish with the re-audit gate.
+
+## Session log
+
+- YYYY-MM-DD summary under 140 characters

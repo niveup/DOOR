@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/src/providers/theme-provider";
 import { radii, spacing, typography } from "@/src/theme/tokens";
 
@@ -13,8 +14,11 @@ export function StudyWeeklyInsight({ weeklyAnalysis }: StudyWeeklyInsightProps) 
   const hasAnalysis = Boolean(weeklyAnalysis && weeklyAnalysis.trim().length > 0);
 
   return (
-    <View style={styles.sectionGroup}>
-      {/* Section Header */}
+    <Animated.View
+      entering={FadeInDown.delay(120).duration(300)}
+      style={styles.sectionGroup}
+    >
+      {/* 1. Section Header */}
       <View style={styles.sectionHeaderRow}>
         <Text
           style={[
@@ -26,11 +30,12 @@ export function StudyWeeklyInsight({ weeklyAnalysis }: StudyWeeklyInsightProps) 
         </Text>
       </View>
 
+      {/* 2. Insight Card or Calm Profile-Building Placeholder */}
       {hasAnalysis ? (
         <View
           accessible={true}
           accessibilityRole="text"
-          accessibilityLabel={`Weekly Jujum Read: ${weeklyAnalysis}`}
+          accessibilityLabel={`Weekly Study Insight: ${weeklyAnalysis}`}
           style={[
             styles.insightCard,
             {
@@ -39,17 +44,33 @@ export function StudyWeeklyInsight({ weeklyAnalysis }: StudyWeeklyInsightProps) 
             },
           ]}
         >
+          {/* Overline Badge Row */}
           <View style={styles.insightHeader}>
-            <Ionicons
-              name="sparkles"
-              size={13}
-              color={theme.violet}
-            />
+            <View
+              style={[
+                styles.iconMiniBadge,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(124, 58, 237, 0.12)"
+                    : "rgba(124, 58, 237, 0.08)",
+                  borderColor: isDark
+                    ? "rgba(124, 58, 237, 0.25)"
+                    : "rgba(124, 58, 237, 0.15)",
+                },
+              ]}
+            >
+              <Ionicons
+                name="sparkles"
+                size={12}
+                color={theme.violet}
+              />
+            </View>
             <Text style={[styles.insightOverline, { color: theme.violet }]}>
-              WEEKLY JUJUM READ
+              WEEKLY MENTOR READ
             </Text>
           </View>
 
+          {/* Main Coaching Analysis Body */}
           <Text
             style={[
               styles.insightBody,
@@ -79,13 +100,13 @@ export function StudyWeeklyInsight({ weeklyAnalysis }: StudyWeeklyInsightProps) 
                 backgroundColor: isDark
                   ? theme.surfaceElevated
                   : theme.surfaceSubtle,
-                borderColor: isDark ? theme.borderMuted : theme.borderMuted,
+                borderColor: isDark ? theme.borderMuted : theme.border,
               },
             ]}
           >
             <Ionicons
               name="bulb-outline"
-              size={16}
+              size={15}
               color={theme.textFaint}
             />
           </View>
@@ -96,6 +117,7 @@ export function StudyWeeklyInsight({ weeklyAnalysis }: StudyWeeklyInsightProps) 
                 styles.placeholderTitle,
                 { color: isDark ? "#fafafa" : theme.text },
               ]}
+              numberOfLines={1}
             >
               Building your study profile
             </Text>
@@ -105,12 +127,12 @@ export function StudyWeeklyInsight({ weeklyAnalysis }: StudyWeeklyInsightProps) 
                 { color: theme.textMuted },
               ]}
             >
-              Your weekly analysis will appear here as your study history builds.
+              Weekly AI analysis will appear as your study logs build.
             </Text>
           </View>
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -123,7 +145,7 @@ const styles = StyleSheet.create({
   },
   sectionTitleText: {
     ...typography.subheading,
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: "700",
     letterSpacing: -0.2,
   },
@@ -138,10 +160,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.xs,
   },
+  iconMiniBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: radii.xs,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   insightOverline: {
     ...typography.label,
     fontSize: 10,
     letterSpacing: 0.8,
+    fontWeight: "700",
   },
   insightBody: {
     ...typography.body,
@@ -160,23 +191,25 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 32,
     height: 32,
-    borderRadius: radii.sm,
+    borderRadius: radii.md,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   placeholderTextBlock: {
     flex: 1,
-    gap: 3,
+    gap: 2,
   },
   placeholderTitle: {
     ...typography.bodyMedium,
     fontSize: 13.5,
     fontWeight: "600",
+    lineHeight: 18,
   },
   placeholderDesc: {
     ...typography.caption,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11.5,
+    lineHeight: 16,
   },
 });
+

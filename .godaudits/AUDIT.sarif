@@ -1,0 +1,3776 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "godaudits",
+          "version": "2.18.0",
+          "informationUri": "https://github.com/hannsxpeter/godaudits",
+          "rules": [
+            {
+              "id": "A-SEC-2",
+              "name": "A-SEC-2",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-2"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-2"
+            },
+            {
+              "id": "A-SEC-9",
+              "name": "A-SEC-9",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-9"
+            },
+            {
+              "id": "A-SEC-23",
+              "name": "A-SEC-23",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-23"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-23"
+            },
+            {
+              "id": "A-SEC-24",
+              "name": "A-SEC-24",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-24"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-24"
+            },
+            {
+              "id": "A-LLM-4",
+              "name": "A-LLM-4",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-4"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-4"
+            },
+            {
+              "id": "A-SEC-6",
+              "name": "A-SEC-6",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-6"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-6"
+            },
+            {
+              "id": "A-SEC-16",
+              "name": "A-SEC-16",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-16"
+            },
+            {
+              "id": "A-SEC-11",
+              "name": "A-SEC-11",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-11"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-11"
+            },
+            {
+              "id": "A-SEC-12",
+              "name": "A-SEC-12",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-12"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-12"
+            },
+            {
+              "id": "A-SEC-14",
+              "name": "A-SEC-14",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-14"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-14"
+            },
+            {
+              "id": "A-SEC-15",
+              "name": "A-SEC-15",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-15"
+            },
+            {
+              "id": "A-SEC-17",
+              "name": "A-SEC-17",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-17"
+            },
+            {
+              "id": "A-CODE-17",
+              "name": "A-CODE-17",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-17"
+            },
+            {
+              "id": "A-SEC-20",
+              "name": "A-SEC-20",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-20"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-20"
+            },
+            {
+              "id": "A-OBS-10",
+              "name": "A-OBS-10",
+              "shortDescription": {
+                "text": "godaudits check A-OBS-10"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-OBS-10"
+            },
+            {
+              "id": "A-SEC-25",
+              "name": "A-SEC-25",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-25"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-25"
+            },
+            {
+              "id": "A-SEC-30",
+              "name": "A-SEC-30",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-30"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-30"
+            },
+            {
+              "id": "A-SEC-4",
+              "name": "A-SEC-4",
+              "shortDescription": {
+                "text": "godaudits check A-SEC-4"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-SEC-4"
+            },
+            {
+              "id": "A-CODE-25",
+              "name": "A-CODE-25",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-25"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-25"
+            },
+            {
+              "id": "A-BUILD-9",
+              "name": "A-BUILD-9",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-9"
+            },
+            {
+              "id": "A-BUILD-18",
+              "name": "A-BUILD-18",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-18"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-18"
+            },
+            {
+              "id": "A-BUILD-13",
+              "name": "A-BUILD-13",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-13"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-13"
+            },
+            {
+              "id": "A-BUILD-4",
+              "name": "A-BUILD-4",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-4"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-4"
+            },
+            {
+              "id": "A-ARCH-2",
+              "name": "A-ARCH-2",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-2"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-2"
+            },
+            {
+              "id": "A-ARCH-18",
+              "name": "A-ARCH-18",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-18"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-18"
+            },
+            {
+              "id": "A-ARCH-20",
+              "name": "A-ARCH-20",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-20"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-20"
+            },
+            {
+              "id": "A-ARCH-22",
+              "name": "A-ARCH-22",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-22"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-22"
+            },
+            {
+              "id": "A-ARCH-23",
+              "name": "A-ARCH-23",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-23"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-23"
+            },
+            {
+              "id": "A-CODE-3",
+              "name": "A-CODE-3",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-3"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-3"
+            },
+            {
+              "id": "A-BUILD-2",
+              "name": "A-BUILD-2",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-2"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-2"
+            },
+            {
+              "id": "A-ARCH-3",
+              "name": "A-ARCH-3",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-3"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-3"
+            },
+            {
+              "id": "A-ARCH-26",
+              "name": "A-ARCH-26",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-26"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-26"
+            },
+            {
+              "id": "A-PRD-18",
+              "name": "A-PRD-18",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-18"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-18"
+            },
+            {
+              "id": "A-ARCH-4",
+              "name": "A-ARCH-4",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-4"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-4"
+            },
+            {
+              "id": "A-ARCH-14",
+              "name": "A-ARCH-14",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-14"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-14"
+            },
+            {
+              "id": "A-ARCH-15",
+              "name": "A-ARCH-15",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-15"
+            },
+            {
+              "id": "A-LLM-1",
+              "name": "A-LLM-1",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-1"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-1"
+            },
+            {
+              "id": "A-LLM-2",
+              "name": "A-LLM-2",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-2"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-2"
+            },
+            {
+              "id": "A-LLM-14",
+              "name": "A-LLM-14",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-14"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-14"
+            },
+            {
+              "id": "A-LLM-15",
+              "name": "A-LLM-15",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-15"
+            },
+            {
+              "id": "A-LLM-19",
+              "name": "A-LLM-19",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-19"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-19"
+            },
+            {
+              "id": "A-LLM-23",
+              "name": "A-LLM-23",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-23"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-23"
+            },
+            {
+              "id": "A-LLM-10",
+              "name": "A-LLM-10",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-10"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-10"
+            },
+            {
+              "id": "A-LLM-11",
+              "name": "A-LLM-11",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-11"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-11"
+            },
+            {
+              "id": "A-LLM-6",
+              "name": "A-LLM-6",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-6"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-6"
+            },
+            {
+              "id": "A-CODE-8",
+              "name": "A-CODE-8",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-8"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-8"
+            },
+            {
+              "id": "A-REPO-22",
+              "name": "A-REPO-22",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-22"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-22"
+            },
+            {
+              "id": "A-LLM-17",
+              "name": "A-LLM-17",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-17"
+            },
+            {
+              "id": "A-BUILD-15",
+              "name": "A-BUILD-15",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-15"
+            },
+            {
+              "id": "A-BUILD-5",
+              "name": "A-BUILD-5",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-5"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-5"
+            },
+            {
+              "id": "A-CODE-6",
+              "name": "A-CODE-6",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-6"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-6"
+            },
+            {
+              "id": "A-DNA-8",
+              "name": "A-DNA-8",
+              "shortDescription": {
+                "text": "godaudits check A-DNA-8"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DNA-8"
+            },
+            {
+              "id": "A-CODE-2",
+              "name": "A-CODE-2",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-2"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-2"
+            },
+            {
+              "id": "A-CODE-4",
+              "name": "A-CODE-4",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-4"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-4"
+            },
+            {
+              "id": "A-DNA-11",
+              "name": "A-DNA-11",
+              "shortDescription": {
+                "text": "godaudits check A-DNA-11"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DNA-11"
+            },
+            {
+              "id": "A-CODE-16",
+              "name": "A-CODE-16",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-16"
+            },
+            {
+              "id": "A-DB-3",
+              "name": "A-DB-3",
+              "shortDescription": {
+                "text": "godaudits check A-DB-3"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-3"
+            },
+            {
+              "id": "A-DB-8",
+              "name": "A-DB-8",
+              "shortDescription": {
+                "text": "godaudits check A-DB-8"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-8"
+            },
+            {
+              "id": "A-DB-4",
+              "name": "A-DB-4",
+              "shortDescription": {
+                "text": "godaudits check A-DB-4"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-4"
+            },
+            {
+              "id": "A-DB-10",
+              "name": "A-DB-10",
+              "shortDescription": {
+                "text": "godaudits check A-DB-10"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-10"
+            },
+            {
+              "id": "A-DB-13",
+              "name": "A-DB-13",
+              "shortDescription": {
+                "text": "godaudits check A-DB-13"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-13"
+            },
+            {
+              "id": "A-DB-14",
+              "name": "A-DB-14",
+              "shortDescription": {
+                "text": "godaudits check A-DB-14"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-14"
+            },
+            {
+              "id": "A-CODE-14",
+              "name": "A-CODE-14",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-14"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-14"
+            },
+            {
+              "id": "A-DB-18",
+              "name": "A-DB-18",
+              "shortDescription": {
+                "text": "godaudits check A-DB-18"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-18"
+            },
+            {
+              "id": "A-STACK-4",
+              "name": "A-STACK-4",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-4"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-4"
+            },
+            {
+              "id": "A-STACK-22",
+              "name": "A-STACK-22",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-22"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-22"
+            },
+            {
+              "id": "A-STACK-24",
+              "name": "A-STACK-24",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-24"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-24"
+            },
+            {
+              "id": "A-STACK-21",
+              "name": "A-STACK-21",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-21"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-21"
+            },
+            {
+              "id": "A-BUILD-22",
+              "name": "A-BUILD-22",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-22"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-22"
+            },
+            {
+              "id": "A-STACK-5",
+              "name": "A-STACK-5",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-5"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-5"
+            },
+            {
+              "id": "A-STACK-9",
+              "name": "A-STACK-9",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-9"
+            },
+            {
+              "id": "A-STACK-10",
+              "name": "A-STACK-10",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-10"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-10"
+            },
+            {
+              "id": "A-STACK-11",
+              "name": "A-STACK-11",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-11"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-11"
+            },
+            {
+              "id": "A-STACK-17",
+              "name": "A-STACK-17",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-17"
+            },
+            {
+              "id": "A-STACK-16",
+              "name": "A-STACK-16",
+              "shortDescription": {
+                "text": "godaudits check A-STACK-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-STACK-16"
+            },
+            {
+              "id": "A-PRD-5",
+              "name": "A-PRD-5",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-5"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-5"
+            },
+            {
+              "id": "A-PRD-6",
+              "name": "A-PRD-6",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-6"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-6"
+            },
+            {
+              "id": "A-PRD-7",
+              "name": "A-PRD-7",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-7"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-7"
+            },
+            {
+              "id": "A-UX-3",
+              "name": "A-UX-3",
+              "shortDescription": {
+                "text": "godaudits check A-UX-3"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-UX-3"
+            },
+            {
+              "id": "A-UX-16",
+              "name": "A-UX-16",
+              "shortDescription": {
+                "text": "godaudits check A-UX-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-UX-16"
+            },
+            {
+              "id": "A-UI-11",
+              "name": "A-UI-11",
+              "shortDescription": {
+                "text": "godaudits check A-UI-11"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-UI-11"
+            },
+            {
+              "id": "A-UX-5",
+              "name": "A-UX-5",
+              "shortDescription": {
+                "text": "godaudits check A-UX-5"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-UX-5"
+            },
+            {
+              "id": "A-UI-14",
+              "name": "A-UI-14",
+              "shortDescription": {
+                "text": "godaudits check A-UI-14"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-UI-14"
+            },
+            {
+              "id": "A-REPO-9",
+              "name": "A-REPO-9",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-9"
+            },
+            {
+              "id": "A-REPO-7",
+              "name": "A-REPO-7",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-7"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-7"
+            },
+            {
+              "id": "A-REPO-8",
+              "name": "A-REPO-8",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-8"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-8"
+            },
+            {
+              "id": "A-REPO-24",
+              "name": "A-REPO-24",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-24"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-24"
+            },
+            {
+              "id": "A-DEPLOY-17",
+              "name": "A-DEPLOY-17",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-17"
+            },
+            {
+              "id": "A-REPO-19",
+              "name": "A-REPO-19",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-19"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-19"
+            },
+            {
+              "id": "A-CODE-18",
+              "name": "A-CODE-18",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-18"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-18"
+            },
+            {
+              "id": "A-REPO-10",
+              "name": "A-REPO-10",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-10"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-10"
+            },
+            {
+              "id": "A-DEPLOY-8",
+              "name": "A-DEPLOY-8",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-8"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-8"
+            },
+            {
+              "id": "A-DEPLOY-9",
+              "name": "A-DEPLOY-9",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-9"
+            },
+            {
+              "id": "A-OBS-1",
+              "name": "A-OBS-1",
+              "shortDescription": {
+                "text": "godaudits check A-OBS-1"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-OBS-1"
+            },
+            {
+              "id": "A-OBS-9",
+              "name": "A-OBS-9",
+              "shortDescription": {
+                "text": "godaudits check A-OBS-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-OBS-9"
+            },
+            {
+              "id": "A-OBS-2",
+              "name": "A-OBS-2",
+              "shortDescription": {
+                "text": "godaudits check A-OBS-2"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-OBS-2"
+            },
+            {
+              "id": "A-OBS-12",
+              "name": "A-OBS-12",
+              "shortDescription": {
+                "text": "godaudits check A-OBS-12"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-OBS-12"
+            },
+            {
+              "id": "A-OBS-23",
+              "name": "A-OBS-23",
+              "shortDescription": {
+                "text": "godaudits check A-OBS-23"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-OBS-23"
+            },
+            {
+              "id": "A-OBS-18",
+              "name": "A-OBS-18",
+              "shortDescription": {
+                "text": "godaudits check A-OBS-18"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-OBS-18"
+            },
+            {
+              "id": "A-ROAD-15",
+              "name": "A-ROAD-15",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-15"
+            },
+            {
+              "id": "A-ROAD-21",
+              "name": "A-ROAD-21",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-21"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-21"
+            },
+            {
+              "id": "A-MEM-9",
+              "name": "A-MEM-9",
+              "shortDescription": {
+                "text": "godaudits check A-MEM-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-MEM-9"
+            },
+            {
+              "id": "A-MEM-11",
+              "name": "A-MEM-11",
+              "shortDescription": {
+                "text": "godaudits check A-MEM-11"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-MEM-11"
+            },
+            {
+              "id": "A-MEM-16",
+              "name": "A-MEM-16",
+              "shortDescription": {
+                "text": "godaudits check A-MEM-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-MEM-16"
+            },
+            {
+              "id": "A-MEM-17",
+              "name": "A-MEM-17",
+              "shortDescription": {
+                "text": "godaudits check A-MEM-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-MEM-17"
+            },
+            {
+              "id": "A-CODE-12",
+              "name": "A-CODE-12",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-12"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-12"
+            },
+            {
+              "id": "A-DNA-7",
+              "name": "A-DNA-7",
+              "shortDescription": {
+                "text": "godaudits check A-DNA-7"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DNA-7"
+            },
+            {
+              "id": "A-CODE-5",
+              "name": "A-CODE-5",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-5"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-5"
+            },
+            {
+              "id": "A-DNA-1",
+              "name": "A-DNA-1",
+              "shortDescription": {
+                "text": "godaudits check A-DNA-1"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DNA-1"
+            },
+            {
+              "id": "A-DNA-14",
+              "name": "A-DNA-14",
+              "shortDescription": {
+                "text": "godaudits check A-DNA-14"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DNA-14"
+            },
+            {
+              "id": "A-DNA-18",
+              "name": "A-DNA-18",
+              "shortDescription": {
+                "text": "godaudits check A-DNA-18"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DNA-18"
+            },
+            {
+              "id": "A-CODE-19",
+              "name": "A-CODE-19",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-19"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-19"
+            },
+            {
+              "id": "A-DEPLOY-13",
+              "name": "A-DEPLOY-13",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-13"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-13"
+            },
+            {
+              "id": "A-CODE-21",
+              "name": "A-CODE-21",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-21"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-21"
+            },
+            {
+              "id": "A-CODE-22",
+              "name": "A-CODE-22",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-22"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-22"
+            },
+            {
+              "id": "A-REPO-15",
+              "name": "A-REPO-15",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-15"
+            },
+            {
+              "id": "A-CODE-23",
+              "name": "A-CODE-23",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-23"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-23"
+            },
+            {
+              "id": "A-ARCH-5",
+              "name": "A-ARCH-5",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-5"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-5"
+            },
+            {
+              "id": "A-ARCH-8",
+              "name": "A-ARCH-8",
+              "shortDescription": {
+                "text": "godaudits check A-ARCH-8"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ARCH-8"
+            },
+            {
+              "id": "A-PRD-9",
+              "name": "A-PRD-9",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-9"
+            },
+            {
+              "id": "A-PRD-12",
+              "name": "A-PRD-12",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-12"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-12"
+            },
+            {
+              "id": "A-PRD-15",
+              "name": "A-PRD-15",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-15"
+            },
+            {
+              "id": "A-PRD-16",
+              "name": "A-PRD-16",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-16"
+            },
+            {
+              "id": "A-PRD-17",
+              "name": "A-PRD-17",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-17"
+            },
+            {
+              "id": "A-PRD-21",
+              "name": "A-PRD-21",
+              "shortDescription": {
+                "text": "godaudits check A-PRD-21"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-PRD-21"
+            },
+            {
+              "id": "A-DB-7",
+              "name": "A-DB-7",
+              "shortDescription": {
+                "text": "godaudits check A-DB-7"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-7"
+            },
+            {
+              "id": "A-DB-12",
+              "name": "A-DB-12",
+              "shortDescription": {
+                "text": "godaudits check A-DB-12"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-12"
+            },
+            {
+              "id": "A-CODE-15",
+              "name": "A-CODE-15",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-15"
+            },
+            {
+              "id": "A-DB-21",
+              "name": "A-DB-21",
+              "shortDescription": {
+                "text": "godaudits check A-DB-21"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-21"
+            },
+            {
+              "id": "A-DB-24",
+              "name": "A-DB-24",
+              "shortDescription": {
+                "text": "godaudits check A-DB-24"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DB-24"
+            },
+            {
+              "id": "A-LLM-3",
+              "name": "A-LLM-3",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-3"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-3"
+            },
+            {
+              "id": "A-LLM-7",
+              "name": "A-LLM-7",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-7"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-7"
+            },
+            {
+              "id": "A-LLM-16",
+              "name": "A-LLM-16",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-16"
+            },
+            {
+              "id": "A-LLM-25",
+              "name": "A-LLM-25",
+              "shortDescription": {
+                "text": "godaudits check A-LLM-25"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-LLM-25"
+            },
+            {
+              "id": "A-MEM-2",
+              "name": "A-MEM-2",
+              "shortDescription": {
+                "text": "godaudits check A-MEM-2"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-MEM-2"
+            },
+            {
+              "id": "A-MEM-3",
+              "name": "A-MEM-3",
+              "shortDescription": {
+                "text": "godaudits check A-MEM-3"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-MEM-3"
+            },
+            {
+              "id": "A-MEM-5",
+              "name": "A-MEM-5",
+              "shortDescription": {
+                "text": "godaudits check A-MEM-5"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-MEM-5"
+            },
+            {
+              "id": "A-MEM-6",
+              "name": "A-MEM-6",
+              "shortDescription": {
+                "text": "godaudits check A-MEM-6"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-MEM-6"
+            },
+            {
+              "id": "A-REPO-12",
+              "name": "A-REPO-12",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-12"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-12"
+            },
+            {
+              "id": "A-REPO-13",
+              "name": "A-REPO-13",
+              "shortDescription": {
+                "text": "godaudits check A-REPO-13"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-REPO-13"
+            },
+            {
+              "id": "A-DNA-5",
+              "name": "A-DNA-5",
+              "shortDescription": {
+                "text": "godaudits check A-DNA-5"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DNA-5"
+            },
+            {
+              "id": "A-ROAD-1",
+              "name": "A-ROAD-1",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-1"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-1"
+            },
+            {
+              "id": "A-ROAD-2",
+              "name": "A-ROAD-2",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-2"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-2"
+            },
+            {
+              "id": "A-ROAD-9",
+              "name": "A-ROAD-9",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-9"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-9"
+            },
+            {
+              "id": "A-ROAD-10",
+              "name": "A-ROAD-10",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-10"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-10"
+            },
+            {
+              "id": "A-ROAD-12",
+              "name": "A-ROAD-12",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-12"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-12"
+            },
+            {
+              "id": "A-ROAD-13",
+              "name": "A-ROAD-13",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-13"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-13"
+            },
+            {
+              "id": "A-ROAD-14",
+              "name": "A-ROAD-14",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-14"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-14"
+            },
+            {
+              "id": "A-ROAD-7",
+              "name": "A-ROAD-7",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-7"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-7"
+            },
+            {
+              "id": "A-ROAD-17",
+              "name": "A-ROAD-17",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-17"
+            },
+            {
+              "id": "A-ROAD-18",
+              "name": "A-ROAD-18",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-18"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-18"
+            },
+            {
+              "id": "A-ROAD-22",
+              "name": "A-ROAD-22",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-22"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-22"
+            },
+            {
+              "id": "A-ROAD-23",
+              "name": "A-ROAD-23",
+              "shortDescription": {
+                "text": "godaudits check A-ROAD-23"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-ROAD-23"
+            },
+            {
+              "id": "A-CODE-13",
+              "name": "A-CODE-13",
+              "shortDescription": {
+                "text": "godaudits check A-CODE-13"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-CODE-13"
+            },
+            {
+              "id": "A-BUILD-16",
+              "name": "A-BUILD-16",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-16"
+            },
+            {
+              "id": "A-BUILD-17",
+              "name": "A-BUILD-17",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-17"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-17"
+            },
+            {
+              "id": "A-BUILD-20",
+              "name": "A-BUILD-20",
+              "shortDescription": {
+                "text": "godaudits check A-BUILD-20"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-BUILD-20"
+            },
+            {
+              "id": "A-DEPLOY-3",
+              "name": "A-DEPLOY-3",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-3"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-3"
+            },
+            {
+              "id": "A-DEPLOY-4",
+              "name": "A-DEPLOY-4",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-4"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-4"
+            },
+            {
+              "id": "A-DEPLOY-7",
+              "name": "A-DEPLOY-7",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-7"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-7"
+            },
+            {
+              "id": "A-DEPLOY-12",
+              "name": "A-DEPLOY-12",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-12"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-12"
+            },
+            {
+              "id": "A-DEPLOY-15",
+              "name": "A-DEPLOY-15",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-15"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-15"
+            },
+            {
+              "id": "A-DEPLOY-16",
+              "name": "A-DEPLOY-16",
+              "shortDescription": {
+                "text": "godaudits check A-DEPLOY-16"
+              },
+              "helpUri": "https://github.com/hannsxpeter/godaudits/search?q=A-DEPLOY-16"
+            }
+          ]
+        }
+      },
+      "automationDetails": {
+        "id": "jujum-ai/d826add"
+      },
+      "properties": {
+        "grade_method": "static-read",
+        "grade_scope": "an arithmetic roll-up of model-assigned pass/fail from a source read, not a test result, scan, or certification",
+        "confidence_basis": "Result confidence is the auditor's own label from a source read, not a measured detection rate."
+      },
+      "results": [
+        {
+          "ruleId": "A-SEC-2",
+          "level": "error",
+          "message": {
+            "text": "F-SEC-1: AI-generated output is executed with new Function and injected as raw SVG in the renderer. Any content that steers the explainer model (a crafted topic, OCR text from an uploaded image, or a compromised/malicious free-tier model) can make the browser execute arbitrary JavaScript in the logged-in session via the function-graph block, or inject script-bearing SVG. The payload persists in ConceptExplanation.explanationText and re-executes on every future render of that explanation."
+          },
+          "properties": {
+            "finding_id": "F-SEC-1",
+            "severity": "Critical",
+            "confidence": "Certain",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-SEC-2",
+              "A-SEC-9",
+              "A-SEC-23",
+              "A-SEC-24",
+              "A-LLM-4"
+            ],
+            "remediation": [
+              "GA-101"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "frontend/components/AiMarkdown.tsx"
+                },
+                "region": {
+                  "startLine": 613
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-SEC-6",
+          "level": "error",
+          "message": {
+            "text": "F-SEC-2: No rate limiting or brute-force throttling exists on any endpoint including passcode verification. The internet-facing Render URL accepts unlimited guesses against the single shared APP_PASSCODE that guards every endpoint, and unlimited invocations of paid AI endpoints once any caller holds the passcode. A leaked passcode cannot be contained by lockout because no counter exists."
+          },
+          "properties": {
+            "finding_id": "F-SEC-2",
+            "severity": "High",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-SEC-6",
+              "A-SEC-16"
+            ],
+            "remediation": [
+              "GA-102"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 273
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-SEC-11",
+          "level": "warning",
+          "message": {
+            "text": "F-SEC-3: AI credential encryption has no rotation path and falls back to SESSION_SECRET. Rotating SESSION_SECRET (the documented session-signing secret) silently breaks decryption of every stored provider API key, taking AI features down until keys are re-entered; there is no versioned key id to perform a controlled re-encryption rotation after suspected compromise."
+          },
+          "properties": {
+            "finding_id": "F-SEC-3",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-SEC-11"
+            ],
+            "remediation": [
+              "GA-122"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/lib/ai/credentials.ts"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-SEC-12",
+          "level": "warning",
+          "message": {
+            "text": "F-SEC-4: Sensitive-data protection is inconsistent across stores and AI logs retain full prompt text. Personal study notes and topics sit plaintext in Cloudflare D1 while journals get encryption, so the privacy guarantee documented for the journal does not extend to sibling personal data; unbounded prompt/response previews grow AiCallLog rows forever and embed user content (topics, notes, names) in Postgres with no retention or truncation policy."
+          },
+          "properties": {
+            "finding_id": "F-SEC-4",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-SEC-12"
+            ],
+            "remediation": [
+              "GA-121"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/lib/private-tracker-store.ts"
+                },
+                "region": {
+                  "startLine": 63
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-SEC-14",
+          "level": "warning",
+          "message": {
+            "text": "F-SEC-5: No secret scanning is wired into pre-commit or CI. A future commit carrying a provider key (the repo keeps live .env files locally beside the working tree) would reach GitHub unnoticed; nothing fails the build on credential shapes."
+          },
+          "properties": {
+            "finding_id": "F-SEC-5",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-SEC-14"
+            ],
+            "remediation": [
+              "GA-109"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-SEC-15",
+          "level": "warning",
+          "message": {
+            "text": "F-SEC-6: API responses ship without security headers and internal error messages reach clients. Prisma/driver error strings returned to clients disclose internals (table and query details) useful for probing, and missing nosniff/HSTS on direct API responses weaken the browser posture for anyone hitting the Render origin directly instead of through the relay."
+          },
+          "properties": {
+            "finding_id": "F-SEC-6",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-SEC-15"
+            ],
+            "remediation": [
+              "GA-108"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 720
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-SEC-17",
+          "level": "warning",
+          "message": {
+            "text": "F-SEC-7: CI installs with npm install despite lockfiles, uses floating action tags, and has no SCA gate. Builds do not verify the committed dependency graph (install can drift from package-lock.json), third-party actions float on mutable major tags, and no automated vulnerability gate exists, so a compromised or vulnerable release can ship silently."
+          },
+          "properties": {
+            "finding_id": "F-SEC-7",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-SEC-17",
+              "A-CODE-17"
+            ],
+            "remediation": [
+              "GA-109"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/vercel-production-check.yml"
+                },
+                "region": {
+                  "startLine": 27
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-SEC-20",
+          "level": "warning",
+          "message": {
+            "text": "F-SEC-8: Redacting logger exists but is never wired; security events go through raw console calls. Passcode-shaped values or origins reaching logs are never redacted (paper control), and failed-auth events leave no trace, making brute-force attempts invisible until cost anomalies appear."
+          },
+          "properties": {
+            "finding_id": "F-SEC-8",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-SEC-20",
+              "A-SEC-24",
+              "A-OBS-10"
+            ],
+            "remediation": [
+              "GA-110"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/lib/logger.ts"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-SEC-25",
+          "level": "note",
+          "message": {
+            "text": "F-SEC-9: Deployed app ships no security disclosure baseline (SECURITY.md / security.txt). A researcher who finds the brute-forceable shared-passcode design has no contact channel, increasing the chance of public disclosure rather than a report."
+          },
+          "properties": {
+            "finding_id": "F-SEC-9",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-SEC-25",
+              "A-SEC-15"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-SEC-30",
+          "level": "error",
+          "message": {
+            "text": "F-SEC-10: Bill-pay endpoint pays an arbitrary unpaid bill when the requested bill id does not exist. POST /api/finance/bill/pay with a stale or wrong id marks the newest unpaid bill paid and books an expense for it, silently corrupting finance records instead of returning 404; the same operation behaves differently depending on which of the two backends handles it."
+          },
+          "properties": {
+            "finding_id": "F-SEC-10",
+            "severity": "High",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-SEC-30",
+              "A-SEC-4"
+            ],
+            "remediation": [
+              "GA-103"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 2748
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-25",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-1: Progress-score loop persists nothing: cron finalize_yesterday is a silent no-op while WeeklyReport stays dead. The 04:00 IST cron computes dailyScore from yesterday's tasks then discards it (server.ts:1605-1612, only a console.log) yet returns status:\"completed\" (server.ts:1615), so operators and CronJobMonitor believe finalization ran. WeeklyReport (schema.prisma:121, migration table exists) has zero code readers/writers; ConceptExplanation is write-only (created server.ts:2008, never served); TopicStatus is touched only by delete cascades (server.ts:2168). Streaks/comeback scoring promised by the job name lands nowhere."
+          },
+          "properties": {
+            "finding_id": "F-BLD-1",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-CODE-25",
+              "A-BUILD-9"
+            ],
+            "remediation": [
+              "GA-114"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1612
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-BUILD-18",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-4: backend/.env.example omits the three D1-store variables the private journal and tracker require. backend/src/lib/private-journal-store.ts reads JOURNAL_ENCRYPTION_KEY, CF_JOURNAL_STORE_URL, CF_JOURNAL_STORE_SECRET (lines 39/43/46) and private-tracker-store.ts reads CF_JOURNAL_STORE_URL/SECRET (lines 19-20), but backend/.env.example lists none of the three. An operator provisioning Render from the example gets a booting backend whose mobile journal save/history and D1 tracker sync fail at call time — and these are exactly the endpoints the Expo app depends on (mobile/src/services/api.ts:98-102 hit the Render host directly). Frontend and mobile example files are complete by contrast."
+          },
+          "properties": {
+            "finding_id": "F-BLD-4",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-BUILD-18"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/lib/private-journal-store.ts"
+                },
+                "region": {
+                  "startLine": 39
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-BUILD-13",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-8: Orphaned sandbox-chat scaffold page and unused debug_logs.ts ship in the tree. sandbox-chat (frontend/app/sandbox-chat/page.tsx) renders MOCK_DRAFTS sample templates ('One focused subject', etc.) but no nav item, Link, or router.push anywhere references it — an orphaned scaffold page reachable only by typed URL. backend/src/debug_logs.ts survives from the prior audit with its console.log lines and compiles into dist even though nothing imports it. Neither exposes data beyond the logged-in user's own (proxy.ts gates the page), but both are dead surface area contradicting the shipped posture. Dead-code specifics cross-ref F-CODE."
+          },
+          "properties": {
+            "finding_id": "F-BLD-8",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-BUILD-13"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "frontend/app/sandbox-chat/page.tsx"
+                },
+                "region": {
+                  "startLine": 29
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-BUILD-4",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-9: Prisma schema triplicated across three packages with CLI version skew — drift waiting to happen. Three content-synced copies of schema.prisma exist: prisma/schema.prisma (root, owns migrations), backend/prisma/schema.prisma (backend build + migrate target), frontend/prisma/schema.prisma (frontend `npx prisma generate` target). Today they match except a trailing blank line (git diff --no-index: 1 deletion between root and each other; backend==frontend byte-identical), but nothing enforces sync — commit af6a1bc already moved one copy for Render, proving copies diverge by edit location. Root pins prisma ^5.22.0 while backend pins ^5.10.2, so generators can emit differently-versioned clients from 'the same' schema."
+          },
+          "properties": {
+            "finding_id": "F-BLD-9",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-BUILD-4"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/package.json"
+                },
+                "region": {
+                  "startLine": 7
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-ARCH-2",
+          "level": "error",
+          "message": {
+            "text": "F-ARC-1: A second backend implementation inside the Vercel relay duplicates Express domain logic with divergent semantics. The same operation behaves differently depending on which platform handles it: fixes applied to one copy silently miss the other, and the drift has already shipped a finance-mutation defect (arbitrary bill payment) that the relay copy does not have. Two platforms hold DATABASE_URL and write the same tables with different invariant enforcement."
+          },
+          "properties": {
+            "finding_id": "F-ARC-1",
+            "severity": "High",
+            "confidence": "Certain",
+            "effort": "L",
+            "status": "open",
+            "checks": [
+              "A-ARCH-2",
+              "A-ARCH-18",
+              "A-ARCH-20",
+              "A-ARCH-22",
+              "A-ARCH-23",
+              "A-CODE-3",
+              "A-BUILD-2"
+            ],
+            "remediation": [
+              "GA-104"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "frontend/app/api/backend/[...path]/route.ts"
+                },
+                "region": {
+                  "startLine": 43
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-ARCH-3",
+          "level": "error",
+          "message": {
+            "text": "F-ARC-2: No backup or restore path exists for the primary Postgres store. A bad deploy, accidental reset endpoint call (/api/tracker/reset and /api/finance/reset wipe tables irreversibly), or Supabase free-tier data loss destroys the user's entire history with no recovery; the PRD's durability promise is unmet."
+          },
+          "properties": {
+            "finding_id": "F-ARC-2",
+            "severity": "High",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-ARCH-3",
+              "A-ARCH-26",
+              "A-PRD-18"
+            ],
+            "remediation": [
+              "GA-112"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PRD.md"
+                },
+                "region": {
+                  "startLine": 25
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-ARCH-2",
+          "level": "warning",
+          "message": {
+            "text": "F-ARC-3: Vendored LibreChat tree is dead weight with no recorded role. Every clone, scan, grep, and future audit pays for 164k third-party files that no code path reaches; the audit fingerprint itself mis-signals product overlays (chatbot/marketplace/logistics matches come from LibreChat text), and a stale vendored chat server is a standing supply-chain liability if anyone ever wires it in."
+          },
+          "properties": {
+            "finding_id": "F-ARC-3",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-ARCH-2"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-ARCH-4",
+          "level": "note",
+          "message": {
+            "text": "F-ARC-4: No architecture decision records or diagrams exist for a three-deployable system. Pivots are recoverable only from code comments and commit messages; the next maintainer (or the owner in six months) cannot tell why the relay carries a second backend or why plan generation was removed."
+          },
+          "properties": {
+            "finding_id": "F-ARC-4",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-ARCH-4",
+              "A-ARCH-14",
+              "A-ARCH-15"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-LLM-1",
+          "level": "error",
+          "message": {
+            "text": "F-LLM-1: User content is interpolated into the system-role prompt without delimiters or isolation. Journal entries, OCR text from uploaded images, topics, tags, and conversation history are concatenated into the same channel the model treats as trusted instructions; crafted content can override the mentor's constraints and steer output toward downstream consumers, including the renderer sinks already filed as F-SEC-1."
+          },
+          "properties": {
+            "finding_id": "F-LLM-1",
+            "severity": "High",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-LLM-1",
+              "A-LLM-2"
+            ],
+            "remediation": [
+              "GA-116"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 122
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-LLM-14",
+          "level": "error",
+          "message": {
+            "text": "F-LLM-2: Parsed AI responses enter app state without schema validation outside the interview surface. Malformed or hostile model output shapes propagate into Postgres and back to the browser renderer (the F-SEC-1 execution sink), producing runtime TypeErrors on odd shapes today and a persistent injection channel tomorrow; zod is already a backend dependency but is unused on these paths."
+          },
+          "properties": {
+            "finding_id": "F-LLM-2",
+            "severity": "High",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-LLM-14"
+            ],
+            "remediation": [
+              "GA-115"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 2011
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-LLM-15",
+          "level": "error",
+          "message": {
+            "text": "F-LLM-3: AI spend is unbounded: no quota layer and no usage accounting. One leaked passcode converts directly into an open wallet: explainer vision calls and long generations can be invoked at unlimited rate with zero token attribution, and cost anomalies are invisible because usage is never recorded."
+          },
+          "properties": {
+            "finding_id": "F-LLM-3",
+            "severity": "High",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-LLM-15",
+              "A-LLM-19"
+            ],
+            "remediation": [
+              "GA-117"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "prisma/schema.prisma"
+                },
+                "region": {
+                  "startLine": 135
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-LLM-23",
+          "level": "warning",
+          "message": {
+            "text": "F-LLM-4: System prompt is writable at runtime through the API and lost on redeploy. The mentor personality edited through settings silently reverts on every Render deploy, and the write path lets any passcode holder mutate the instruction file that every AI surface loads, with no version history."
+          },
+          "properties": {
+            "finding_id": "F-LLM-4",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-LLM-23",
+              "A-LLM-15"
+            ],
+            "remediation": [
+              "GA-116"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 592
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-LLM-10",
+          "level": "warning",
+          "message": {
+            "text": "F-LLM-5: Model responses are consumed without checking finish_reason or truncation. Length-truncated completions enter the JSON repair pipeline as if complete, burning the fallback retry and degrading answer quality; a fresh OpenAI client per request adds connection churn on every mentor interaction."
+          },
+          "properties": {
+            "finding_id": "F-LLM-5",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-LLM-10",
+              "A-LLM-11"
+            ],
+            "remediation": [
+              "GA-117"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/lib/ai/provider.ts"
+                },
+                "region": {
+                  "startLine": 63
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-LLM-6",
+          "level": "warning",
+          "message": {
+            "text": "F-LLM-6: Personal journal and study content is sent to LLM providers unminimized with no data-control configuration. The product documents journals as private enough to encrypt at rest and isolate in D1, then transmits their plaintext (plus name, mood, study notes) to third-party model providers over ordinary API terms; the privacy posture is inconsistent between storage and inference."
+          },
+          "properties": {
+            "finding_id": "F-LLM-6",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-LLM-6"
+            ],
+            "remediation": [
+              "GA-117"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 338
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-8",
+          "level": "error",
+          "message": {
+            "text": "F-CODE-1: Zero tests exist for critical paths including AI feature quality. Every regression class this audit found (arbitrary bill payment, retired journal endpoint still called by web clients, drift between two backends) ships silently; auth, money mutations, and AI parsing have no failure-case coverage."
+          },
+          "properties": {
+            "finding_id": "F-CODE-1",
+            "severity": "High",
+            "confidence": "Certain",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-CODE-8",
+              "A-REPO-22",
+              "A-LLM-17",
+              "A-BUILD-15",
+              "A-BUILD-5"
+            ],
+            "remediation": [
+              "GA-118"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/package.json"
+                },
+                "region": {
+                  "startLine": 6
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-6",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-2: Strict TypeScript is undermined by stub entity types and pervasive unexplained any escapes. The compiler cannot catch field renames or shape drift on Journal/Task/Subject flows - exactly the drift class that broke parity between the two backends; generated Prisma types would remove the risk for free."
+          },
+          "properties": {
+            "finding_id": "F-CODE-2",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-6",
+              "A-DNA-8",
+              "A-CODE-2"
+            ],
+            "remediation": [
+              "GA-114"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-4",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-3: Shared helpers are re-implemented per surface instead of extracted to one module. Three timing-safe compares, two JSON extractors, and duplicated timezone math behave subtly differently per surface; fixes to one copy never reach siblings."
+          },
+          "properties": {
+            "finding_id": "F-CODE-3",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-4",
+              "A-DNA-11"
+            ],
+            "remediation": [
+              "GA-114"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/gateway.ts"
+                },
+                "region": {
+                  "startLine": 26
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-16",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-4: In-memory tracker fallback store grows without bound and silently diverges from D1. A long-running process accumulates study logs twice, memory creeps toward free-tier caps, and after restart the fallback is empty so reads depend entirely on D1 - inverted fallback semantics."
+          },
+          "properties": {
+            "finding_id": "F-CODE-4",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-16"
+            ],
+            "remediation": [
+              "GA-123"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/lib/private-tracker-store.ts"
+                },
+                "region": {
+                  "startLine": 16
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-DB-3",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-1: State and enum columns are unconstrained free text at the database layer. Any client bug or manual write can persist invalid states (status=COMPLEETD, payment=Bitcoin, selfRating=9) that the UI and cron scoring then misinterpret silently; the constraint lives only in scattered runtime checks."
+          },
+          "properties": {
+            "finding_id": "F-DB-1",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-3",
+              "A-DB-8"
+            ],
+            "remediation": [
+              "GA-119"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "prisma/schema.prisma"
+                },
+                "region": {
+                  "startLine": 86
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-DB-4",
+          "level": "error",
+          "message": {
+            "text": "F-DB-2: Money columns use Float instead of integer minor units or Decimal. Currency sums accumulate binary floating-point error (0.1+0.2 class) in exactly the budget-vs-spending comparisons the finance module exists for; the check catalog marks floating-point money a hard-cap defect, calibrated here to High because the flows are display-grade single-user records with no settlement or reconciliation against external money."
+          },
+          "properties": {
+            "finding_id": "F-DB-2",
+            "severity": "High",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-DB-4"
+            ],
+            "remediation": [
+              "GA-119"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "prisma/schema.prisma"
+                },
+                "region": {
+                  "startLine": 214
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-DB-10",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-3: Task and AiCallLog tables lack indexes their query patterns need. Task lookups by planId and date devolve to full scans as history grows, and AiCallLog grows on every AI call with no index for surface/time pruning; negligible today at personal scale, compounding yearly."
+          },
+          "properties": {
+            "finding_id": "F-DB-3",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-10"
+            ],
+            "remediation": [
+              "GA-119"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "prisma/schema.prisma"
+                },
+                "region": {
+                  "startLine": 75
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-DB-13",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-4: No database statement or idle timeouts are configured anywhere. One pathological query (e.g. the unbounded finance scan) or a crashed request mid-transaction can pin connections and stall every other route on a small Supabase pool."
+          },
+          "properties": {
+            "finding_id": "F-DB-4",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-13"
+            ],
+            "remediation": [
+              "GA-119"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-DB-14",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-5: Cumulative counters and bill-payment pairs update non-atomically. Two overlapping tracker submissions lose hours (read-modify-write race), and a failure between bill payment and expense booking leaves a paid bill with no expense row - silent money-record corruption."
+          },
+          "properties": {
+            "finding_id": "F-DB-5",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-14",
+              "A-CODE-14"
+            ],
+            "remediation": [
+              "GA-120"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 2084
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-DB-18",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-6: Migrations are never applied by the deploy pipeline and the app role posture is unverified. The next schema change silently diverges the running database from the repo history (the two schema copies already invite this), and the app role's privilege level and TLS posture are undocumented."
+          },
+          "properties": {
+            "finding_id": "F-DB-6",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-18"
+            ],
+            "remediation": [
+              "GA-124"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "render.yaml"
+                },
+                "region": {
+                  "startLine": 11
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-STACK-4",
+          "level": "warning",
+          "message": {
+            "text": "F-STK-1: Node runtime is unpinned and CI builds on an EOL version. Three environments resolve three different Node versions (CI 20 - past EOL April 2026, local 24, Render default), so build-time behavior differs per surface and security patches for the CI toolchain have stopped arriving."
+          },
+          "properties": {
+            "finding_id": "F-STK-1",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-STACK-4",
+              "A-STACK-22",
+              "A-STACK-24"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/vercel-production-check.yml"
+                },
+                "region": {
+                  "startLine": 24
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-STACK-21",
+          "level": "warning",
+          "message": {
+            "text": "F-STK-2: Phantom dependencies: backend iron-session unused; root manifest vestigial with version skew. Unused dependencies expand the audit surface, confuse install contexts (which manifest wins depends on invocation directory), and invite wrong-package imports later."
+          },
+          "properties": {
+            "finding_id": "F-STK-2",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-STACK-21",
+              "A-BUILD-22"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/package.json"
+                },
+                "region": {
+                  "startLine": 21
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-STACK-5",
+          "level": "note",
+          "message": {
+            "text": "F-STK-3: No stack decision record exists (alternatives, flip points, switching cost). The bundle works today, but future churn (AI provider changes, Supabase pricing cliffs) will be decided from memory rather than criteria; cheap to fix given the PRD already holds half the content."
+          },
+          "properties": {
+            "finding_id": "F-STK-3",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-STACK-5",
+              "A-STACK-9",
+              "A-STACK-10",
+              "A-STACK-11",
+              "A-STACK-17",
+              "A-STACK-16"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-PRD-5",
+          "level": "note",
+          "message": {
+            "text": "F-PRD-1: Success metrics lack thresholds, deadlines, and named sources. The product's own headline bet (the daily loop is the moat) cannot be verified or refuted because engagement is never operationalized; two of three recorded metrics prove the author can write testable metrics."
+          },
+          "properties": {
+            "finding_id": "F-PRD-1",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-PRD-5"
+            ],
+            "remediation": [
+              "GA-127"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PRD.md"
+                },
+                "region": {
+                  "startLine": 27
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-PRD-6",
+          "level": "note",
+          "message": {
+            "text": "F-PRD-2: Requirements are not priority-ranked and NFR thresholds are incomplete. Scope cuts under time pressure happen by intuition rather than by rank; only one of ten NFR dimensions has a number, so regressions against intent are undetectable."
+          },
+          "properties": {
+            "finding_id": "F-PRD-2",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-PRD-6",
+              "A-PRD-7"
+            ],
+            "remediation": [
+              "GA-127"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PRD.md"
+                },
+                "region": {
+                  "startLine": 80
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-UX-3",
+          "level": "warning",
+          "message": {
+            "text": "F-UX-1: No route-level loading or error boundaries exist in the web app. Any render-time exception blanks the entire route with Next's default crash screen instead of an in-context recovery message, and slow AI-backed navigations (90-second provider timeouts) leave users on stale screens with only per-page spinners as a cue."
+          },
+          "properties": {
+            "finding_id": "F-UX-1",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-UX-3",
+              "A-UX-16",
+              "A-UI-11"
+            ],
+            "remediation": [
+              "GA-105"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-UX-5",
+          "level": "warning",
+          "message": {
+            "text": "F-UX-2: Destructive reset endpoints wipe data irreversibly with no undo or confirmation artifact. One accidental tap (or one leaked passcode) erases months of finance and study history instantly; combined with the absent backups this is unrecoverable data loss by design."
+          },
+          "properties": {
+            "finding_id": "F-UX-2",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-UX-5"
+            ],
+            "remediation": [
+              "GA-106"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 2864
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-UI-14",
+          "level": "note",
+          "message": {
+            "text": "F-UI-1: Arbitrary Tailwind values bypass the design-token scale. Hardcoded px sizes and raw palette colors drift from the token system that dark mode depends on, producing off-theme patches exactly where AI content renders most often; the project's own AGENTS.md rule declares tokens authoritative."
+          },
+          "properties": {
+            "finding_id": "F-UI-1",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-UI-14"
+            ],
+            "remediation": [
+              "GA-127"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "frontend/components/AiMarkdown.tsx"
+                },
+                "region": {
+                  "startLine": 454
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-REPO-9",
+          "level": "warning",
+          "message": {
+            "text": "F-REPO-1: CI triggers only on two stale side branches and executes no tests. Commits to the default branch run zero verification - no typecheck, no build, nothing - so the main line can break while CI sits green on side branches; the verify-audit-fixes workflow's security assertions (no hardcoded passcode, no console.log) never execute on current code."
+          },
+          "properties": {
+            "finding_id": "F-REPO-1",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-REPO-9"
+            ],
+            "remediation": [
+              "GA-107",
+              "GA-125"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/vercel-production-check.yml"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-REPO-7",
+          "level": "note",
+          "message": {
+            "text": "F-REPO-2: Root README is absent; repo-level docs set is incomplete for the tier. A returning maintainer or agent session must reverse-engineer startup order (Render, Vercel, wrangler, migrations) from four scattered documents; the deployment docs are strong but unanchored."
+          },
+          "properties": {
+            "finding_id": "F-REPO-2",
+            "severity": "Low",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-REPO-7",
+              "A-REPO-8",
+              "A-REPO-24",
+              "A-DEPLOY-17",
+              "A-REPO-19",
+              "A-CODE-18"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-REPO-10",
+          "level": "note",
+          "message": {
+            "text": "F-REPO-3: Quality tooling set is incomplete (no formatter, hooks, editorconfig). Formatting drift between the three packages and the uncommitted redesign work accumulates as review noise; nothing gates a broken commit at the developer's machine."
+          },
+          "properties": {
+            "finding_id": "F-REPO-3",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-REPO-10"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-DEPLOY-8",
+          "level": "warning",
+          "message": {
+            "text": "F-DEP-1: Deployments fire on git push with no test, scan, or approval gate. Any push - including the current 53-file uncommitted redesign landing in one commit - reaches production users without typecheck, build proof, tests (none exist), or a human decision; combined with no rollback doc this makes every deploy irreversible-by-vibe."
+          },
+          "properties": {
+            "finding_id": "F-DEP-1",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DEPLOY-8",
+              "A-DEPLOY-9"
+            ],
+            "remediation": [
+              "GA-107"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/vercel-production-check.yml"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-OBS-1",
+          "level": "warning",
+          "message": {
+            "text": "F-OBS-1: No observability surface exists beyond console logs and the AiCallLog table. The operator learns about failures from the app misbehaving: a D1 outage, expired provider key, or crashed cron produces no signal anywhere; AiCallLog captures AI latency but nothing watches it, and the journal store is completely dark."
+          },
+          "properties": {
+            "finding_id": "F-OBS-1",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-OBS-1",
+              "A-OBS-9",
+              "A-OBS-2",
+              "A-OBS-12",
+              "A-OBS-23"
+            ],
+            "remediation": [
+              "GA-113"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "cloudflare/journal-store/src/index.ts"
+                },
+                "region": {
+                  "startLine": 156
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-OBS-18",
+          "level": "note",
+          "message": {
+            "text": "F-OBS-2: No incident loop is recorded for a live internet-facing deployment. When (not if) the free-tier database pauses or a provider key dies, recovery depends on memory; a five-line personal runbook prevents an hour of rediscovery at 2am."
+          },
+          "properties": {
+            "finding_id": "F-OBS-2",
+            "severity": "Low",
+            "confidence": "Tentative",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-OBS-18"
+            ],
+            "remediation": [
+              "GA-113"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-ROAD-15",
+          "level": "warning",
+          "message": {
+            "text": "F-RDM-1: Plan drifts from code: promised Resend backups unbuilt and plan-generation removal undocumented. The plan's durability promise (weekly backups) reads as delivered because Phase 3 elapsed, while the code silently dropped another planned capability (morning generation) without recording the decision - exactly how future-you mistrusts the document."
+          },
+          "properties": {
+            "finding_id": "F-RDM-1",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-ROAD-15",
+              "A-ROAD-21"
+            ],
+            "remediation": [
+              "GA-127"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PRD.md"
+                },
+                "region": {
+                  "startLine": 222
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-MEM-9",
+          "level": "note",
+          "message": {
+            "text": "F-MEM-1: Mobile agent memory points at Expo v52 docs while the app runs Expo 54. Every agent session working on mobile is directed two SDK majors behind the installed one, so generated code targets deprecated APIs; the exact failure mode the file was written to prevent."
+          },
+          "properties": {
+            "finding_id": "F-MEM-1",
+            "severity": "Low",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-MEM-9",
+              "A-MEM-11",
+              "A-MEM-16",
+              "A-MEM-17"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mobile/package.json"
+                },
+                "region": {
+                  "startLine": 27
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-12",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-5: Error handling is improvised per handler and several failures are swallowed silently. Failures surface as raw 500s at ~30 improvised catch sites while backup writes are swallowed by empty catches, so users see misleading errors and operators see nothing."
+          },
+          "properties": {
+            "finding_id": "F-CODE-5",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-12",
+              "A-DNA-7"
+            ],
+            "remediation": [
+              "GA-114"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-5",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-6: No lint tooling or quality budgets exist for the backend. The largest module in the repo (2880 lines) has zero automated style or complexity enforcement, so drift accumulates invisibly."
+          },
+          "properties": {
+            "finding_id": "F-CODE-6",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-5",
+              "A-DNA-1",
+              "A-DNA-14",
+              "A-DNA-18"
+            ],
+            "remediation": [
+              "GA-118"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-CODE-19",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-7: Health check reports healthy unconditionally without probing dependencies. Render traffic-shifts and uptime monitors treat the service as healthy while Postgres or the D1 worker is down, masking real outages."
+          },
+          "properties": {
+            "finding_id": "F-CODE-7",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-19",
+              "A-DEPLOY-13"
+            ],
+            "remediation": [
+              "GA-111"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-21",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-8: Backend provides no one-command verify path (test/lint/typecheck scripts absent). Contributors and agents cannot verify changes on the backend without hand-assembling commands, so verification does not happen."
+          },
+          "properties": {
+            "finding_id": "F-CODE-8",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-21"
+            ],
+            "remediation": [
+              "GA-118"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/package.json"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-22",
+          "level": "note",
+          "message": {
+            "text": "F-CODE-9: Agent conventions are stated in AGENTS.md files but enforced by nothing. Stated rules (dark-mode tokens, brand-fixed registry, Expo doc versions) rely on memory; violations ship unnoticed."
+          },
+          "properties": {
+            "finding_id": "F-CODE-9",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-22",
+              "A-REPO-15"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".agents/AGENTS.md"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-23",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-10: Complexity hotspots sit on load-bearing request paths. explainConcept and tracker/status each span ~200 lines mixing fetch, caching, AI orchestration and response shaping, raising the cost and risk of every change to flagship features."
+          },
+          "properties": {
+            "finding_id": "F-CODE-10",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-CODE-23"
+            ],
+            "remediation": [
+              "GA-114"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-ARCH-5",
+          "level": "warning",
+          "message": {
+            "text": "F-ARC-5: server.ts concentrates every domain context in one 2880-line transport file. Settings, journal, routine, tracker, finance, explainer, cron and JSON-repair logic share one module, so every change risks unrelated behavior and review scope is the whole file."
+          },
+          "properties": {
+            "finding_id": "F-ARC-5",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "L",
+            "status": "open",
+            "checks": [
+              "A-ARCH-5"
+            ],
+            "remediation": [
+              "GA-114"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-ARCH-8",
+          "level": "warning",
+          "message": {
+            "text": "F-ARC-6: Tracker study-log backup to D1 is a silent dual write with no reconciliation. Postgres write succeeds, D1 mirror write fails silently (.catch empty), and reads merge from both stores - counts drift between stores with nothing detecting it."
+          },
+          "properties": {
+            "finding_id": "F-ARC-6",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-ARCH-8"
+            ],
+            "remediation": [
+              "GA-123"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-PRD-9",
+          "level": "note",
+          "message": {
+            "text": "F-PRD-3: PRD completeness gaps: risk/assumption registers, prior art, change control, visual direction, closure plan, traceability. Six product-record sections are missing, weakening future planning and making this audit's requirement mapping partial."
+          },
+          "properties": {
+            "finding_id": "F-PRD-3",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-PRD-9",
+              "A-PRD-12",
+              "A-PRD-15",
+              "A-PRD-16",
+              "A-PRD-17",
+              "A-PRD-21"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-DB-7",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-7: D1 tracker rows reference Postgres subject ids with no cross-store integrity rule. Deleting a subject in Postgres leaves D1 tracker rows pointing at a ghost id; merged reads then show phantom subjects."
+          },
+          "properties": {
+            "finding_id": "F-DB-7",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-7"
+            ],
+            "remediation": [
+              "GA-123"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "cloudflare/journal-store/migrations/0002_create_tracker_study_logs.sql"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-DB-12",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-8: Finance data endpoint returns an unbounded list. /api/finance/data returns every expense forever; response size grows yearly and slows the finance screen on mobile networks."
+          },
+          "properties": {
+            "finding_id": "F-DB-8",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-12",
+              "A-CODE-15"
+            ],
+            "remediation": [
+              "GA-119"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-DB-21",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-9: Growth tables accumulate forever with no retention mechanism. AiCallLog, ConceptExplanation, InterviewAttempt and daily Journal/RoutinePlan/Task tables grow without bound; free-tier storage eventually throttles writes."
+          },
+          "properties": {
+            "finding_id": "F-DB-9",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-21"
+            ],
+            "remediation": [
+              "GA-121"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-DB-24",
+          "level": "warning",
+          "message": {
+            "text": "F-DB-10: Bill-to-expense booking substitutes today's date and can diverge from the bill record. Paying a bill books the expense under today's date while the bill keeps its due date, so month-boundary payments distort spending analytics and reconciliation."
+          },
+          "properties": {
+            "finding_id": "F-DB-10",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DB-24",
+              "A-DB-14"
+            ],
+            "remediation": [
+              "GA-120"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-LLM-3",
+          "level": "warning",
+          "message": {
+            "text": "F-LLM-7: Context assembly has no token budget across chat surfaces. Plan-chat and coach prompts stack seven journals, seven plans, subject tables and conversation history with no byte/token ceiling, wasting context and risking provider rejections on long histories."
+          },
+          "properties": {
+            "finding_id": "F-LLM-7",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-LLM-3"
+            ],
+            "remediation": [
+              "GA-115"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-LLM-7",
+          "level": "warning",
+          "message": {
+            "text": "F-LLM-8: Model selection accepts arbitrary caller strings and floats on unpinned aliases. Any passcode holder can pass aiModel up to 160 chars to seven endpoints; defaults are floating aliases like openrouter/free, so quality and cost silently shift when providers re-point aliases."
+          },
+          "properties": {
+            "finding_id": "F-LLM-8",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-LLM-7"
+            ],
+            "remediation": [
+              "GA-117"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-LLM-16",
+          "level": "note",
+          "message": {
+            "text": "F-LLM-9: No streaming on user-facing chat and explainer paths. Users wait up to 90 seconds staring at a spinner for long mentor responses because completions buffer fully before first byte reaches the client."
+          },
+          "properties": {
+            "finding_id": "F-LLM-9",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-LLM-16"
+            ],
+            "remediation": [
+              "GA-117",
+              "GA-201"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-LLM-25",
+          "level": "note",
+          "message": {
+            "text": "F-LLM-10: Prompt-wording claims lack mechanical enforcement for scope control and syllabus gating. Prompts promise GATE-ME-only scope and JSON-only output; JSON has mechanical backup but syllabus scope relies on wording, and off_syllabus flags are stored without consequence."
+          },
+          "properties": {
+            "finding_id": "F-LLM-10",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-LLM-25"
+            ],
+            "remediation": [
+              "GA-115"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-MEM-2",
+          "level": "note",
+          "message": {
+            "text": "F-MEM-2: Agent memory exists as scattered ad-hoc rules without a root protocol or pillar inventory. Three scoped files carry four useful rules total, but core concerns (stack, auth, deploy, data) are absent and one pointer is stale, so agents rediscover architecture every session."
+          },
+          "properties": {
+            "finding_id": "F-MEM-2",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-MEM-2",
+              "A-MEM-3",
+              "A-MEM-5",
+              "A-MEM-6"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mobile/AGENTS.md"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-REPO-12",
+          "level": "note",
+          "message": {
+            "text": "F-REPO-4: No repository automation bots exist (dependency updates, SAST). Dependencies move only when manually bumped; advisory and update automation is absent end to end."
+          },
+          "properties": {
+            "finding_id": "F-REPO-4",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-REPO-12"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-REPO-13",
+          "level": "note",
+          "message": {
+            "text": "F-REPO-5: No release machinery: conventional commits never produce versions. 193 conventional commits but zero tags/changelog, so rollback targets and change summaries must be reconstructed by hand."
+          },
+          "properties": {
+            "finding_id": "F-REPO-5",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-REPO-13"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          }
+        },
+        {
+          "ruleId": "A-DNA-5",
+          "level": "note",
+          "message": {
+            "text": "F-DNA-1: Formatting norms diverge between gateway and server modules. gateway.ts compresses entire handlers onto single 2000-character lines while server.ts uses expanded formatting, so diffs, reviews and grep line-numbers behave differently across the two entry files."
+          },
+          "properties": {
+            "finding_id": "F-DNA-1",
+            "severity": "Low",
+            "confidence": "Certain",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-DNA-5"
+            ],
+            "remediation": [
+              "GA-114"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/gateway.ts"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-ROAD-1",
+          "level": "note",
+          "message": {
+            "text": "F-RDM-2: Build-plan dates carry no capacity math and phases lack checkpoint gates. Week-bounded phases assume solo velocity without stating it, and no phase has a binary gate, so slipping weeks pass silently."
+          },
+          "properties": {
+            "finding_id": "F-RDM-2",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-ROAD-1",
+              "A-ROAD-2",
+              "A-ROAD-9",
+              "A-ROAD-10",
+              "A-ROAD-12",
+              "A-ROAD-13",
+              "A-ROAD-14"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PRD.md"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-ROAD-7",
+          "level": "note",
+          "message": {
+            "text": "F-RDM-3: The three product bets never received scheduled validation tasks. Section 1.3 stakes the product on three hypotheses but Section 7 schedules no measurement against them."
+          },
+          "properties": {
+            "finding_id": "F-RDM-3",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-ROAD-7"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PRD.md"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-ROAD-17",
+          "level": "note",
+          "message": {
+            "text": "F-RDM-4: No roadmap ledger tracks completion state. Delivery outran the June 30 plan with no ledger recording what shipped, slipped, or was deliberately dropped."
+          },
+          "properties": {
+            "finding_id": "F-RDM-4",
+            "severity": "Low",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-ROAD-17",
+              "A-ROAD-18",
+              "A-ROAD-22",
+              "A-ROAD-23"
+            ],
+            "remediation": [
+              "GA-126"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "PRD.md"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-CODE-13",
+          "level": "warning",
+          "message": {
+            "text": "F-CODE-11: Journal-store and tracker-store fetches run without timeouts. Defect recorded by check A-CODE-13: an outbound call with no timeout on a request path: High; retries without backoff: Medium."
+          },
+          "properties": {
+            "finding_id": "F-CODE-11",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-CODE-13"
+            ],
+            "remediation": [
+              "GA-123"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/lib/private-journal-store.ts"
+                },
+                "region": {
+                  "startLine": 85
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-BUILD-9",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-10: RBAC is server-enforced: at least two roles, every mutation checks its permission-matrix cell on the server; UI hiding is courtesy, not secu. Recorded by audit check A-BUILD-9; see check evidence."
+          },
+          "properties": {
+            "finding_id": "F-BLD-10",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-BUILD-9"
+            ],
+            "remediation": []
+          }
+        },
+        {
+          "ruleId": "A-BUILD-16",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-11: Production paths pass the hollow check: no TODO or implement-later markers, no raw `console.log` (logger calls in catch blocks excluded), no. Recorded by audit check A-BUILD-16; see check evidence."
+          },
+          "properties": {
+            "finding_id": "F-BLD-11",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-BUILD-16"
+            ],
+            "remediation": []
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "backend/src/server.ts"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-BUILD-17",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-12: Session-state artifacts exist and match the code: a STATE.md scoped to build facts, an ADR for each non-obvious architectural choice. Recorded by audit check A-BUILD-17; see check evidence."
+          },
+          "properties": {
+            "finding_id": "F-BLD-12",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-BUILD-17"
+            ],
+            "remediation": []
+          }
+        },
+        {
+          "ruleId": "A-BUILD-18",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-13: If the repo presents as shipped (deploy config, release tags), the closure gates hold: zero live deferred-CTA entries, zero open questions, . Recorded by audit check A-BUILD-18; see check evidence."
+          },
+          "properties": {
+            "finding_id": "F-BLD-13",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-BUILD-18"
+            ],
+            "remediation": []
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "AUDIT_REPORT.md"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "A-BUILD-20",
+          "level": "warning",
+          "message": {
+            "text": "F-BLD-14: In brownfield or replan mode, the keep-rewrite-discard inventory exists and every rewrite item shipped or was reclassified with a reason. Recorded by audit check A-BUILD-20; see check evidence."
+          },
+          "properties": {
+            "finding_id": "F-BLD-14",
+            "severity": "Medium",
+            "confidence": "Firm",
+            "effort": "S",
+            "status": "open",
+            "checks": [
+              "A-BUILD-20"
+            ],
+            "remediation": []
+          }
+        },
+        {
+          "ruleId": "A-DEPLOY-3",
+          "level": "warning",
+          "message": {
+            "text": "F-DEP-2: Deploy pipeline lacks gates, classification, and post-deploy verification. Every deploy ends at platform success with no smoke window, no rollback command per change class, and no cold-start checklist, so regressions reach daily use unnoticed."
+          },
+          "properties": {
+            "finding_id": "F-DEP-2",
+            "severity": "Medium",
+            "confidence": "Certain",
+            "effort": "M",
+            "status": "open",
+            "checks": [
+              "A-DEPLOY-3",
+              "A-DEPLOY-4",
+              "A-DEPLOY-7",
+              "A-DEPLOY-12",
+              "A-DEPLOY-15",
+              "A-DEPLOY-16"
+            ],
+            "remediation": [
+              "GA-125"
+            ]
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "VERCEL_DEPLOYMENT.md"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

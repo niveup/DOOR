@@ -12,17 +12,22 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ionicons } from "@/src/components/app-icon";
 import * as Haptics from "expo-haptics";
 import { AppScreen } from "@/src/components/screen";
 import { useAuth } from "@/src/providers/auth-provider";
 import { useTheme } from "@/src/providers/theme-provider";
 import { useNotify } from "@/src/providers/notification-provider";
-import { colors, radii } from "@/src/theme/tokens";
+import { colors } from "@/src/theme/tokens";
 import { queryPersister } from "@/src/services/query-client";
 import { api } from "@/src/services/api";
-import { AppSettings } from "@/src/types/domain";
+import { AppSettings, TrackerStatus } from "@/src/types/domain";
+import {
+  SettingsRow,
+  SettingsGroup,
+  SettingsDivider,
+} from "@/src/components/profile/settings-row";
 
 const backendUrl = process.env.EXPO_PUBLIC_API_URL || "https://api.door.app";
 
@@ -124,11 +129,13 @@ function InfoButton({
         notify.info(title, message);
       }}
       hitSlop={12}
+      accessibilityRole="button"
+      accessibilityLabel={`Info about ${title}`}
       style={styles.infoCircleBtn}
     >
       <Ionicons
         name="information-circle-outline"
-        size={15}
+        size={16}
         color={color || (isDark ? "#71717A" : "#94a3b8")}
       />
     </Pressable>
@@ -144,8 +151,9 @@ export default function ProfileScreen() {
   const [testingPing, setTestingPing] = useState(false);
   const [savingField, setSavingField] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
-  // Cockpit Form State
+  // Form State
   const [formName, setFormName] = useState("GATE Aspirant");
   const [formExam, setFormExam] = useState("GATE");
   const [formYear, setFormYear] = useState(2026);
@@ -192,7 +200,9 @@ export default function ProfileScreen() {
   const currentStream = settingsQuery.data?.otherGoals?.branch || "Mechanical";
   const currentStage = settingsQuery.data?.prepLevel || "Concept Building";
   const currentTargetRank = settingsQuery.data?.otherGoals?.targetRank || "AIR < 100";
-  const dailyGoal = Number(settingsQuery.data?.dailyAvailableHours ?? trackerQuery.data?.dailyAvailableHours ?? 4);
+  const dailyGoal = Number(
+    settingsQuery.data?.dailyAvailableHours ?? trackerQuery.data?.dailyAvailableHours ?? 4
+  );
   const currentWakeTime = settingsQuery.data?.wakeTime || "06:00";
   const currentSleepTime = settingsQuery.data?.sleepTime || "22:00";
   const currentExerciseGoal = settingsQuery.data?.exerciseGoal || "30 min Morning Workout";
@@ -219,7 +229,8 @@ export default function ProfileScreen() {
     autoTrigger: settingsQuery.data?.otherGoals?.comeback?.autoTrigger !== false,
   };
 
-  const totalWeights = formStudyWeight + formExerciseWeight + formReadingWeight + formRoutineWeight;
+  const totalWeights =
+    formStudyWeight + formExerciseWeight + formReadingWeight + formRoutineWeight;
 
   // Open focused sheet
   const openSheet = (sheet: ActiveSheet) => {
@@ -252,25 +263,35 @@ export default function ProfileScreen() {
   };
 
   // Quick adjust study hours (+/- 0.5h) directly from row
-  const adjustDailyHours = async (delta: number) => {
-    const nextHours = Math.max(1.0, Math.min(16.0, Number((dailyGoal + delta).toFixed(1))));
-    if (nextHours === dailyGoal) return;
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      await api.settings.save({
+  const adjustDailyHours = (delta: number) => {
+    const currentVal = Number(
+      settingsQuery.data?.dailyAvailableHours ?? trackerQuery.data?.dailyAvailableHours ?? 4
+    );
+    const nextHours = Math.max(1.0, Math.min(16.0, Number((currentVal + delta).toFixed(1))));
+    if (nextHours === currentVal) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+    // Instantly update React Query caches for 0ms UI lag
+    client.setQueryData<AppSettings>(["settings"], (old) =>
+      old ? { ...old, dailyAvailableHours: nextHours } : undefined
+    );
+    client.setQueryData<TrackerStatus>(["tracker"], (old) =>
+      old ? { ...old, dailyAvailableHours: nextHours } : undefined
+    );
+
+    // Persist to API in background without blocking UI or showing spam toasts
+    Promise.all([
+      api.settings.save({
         name: currentName || "GATE Aspirant",
         dailyAvailableHours: nextHours,
-      });
-      await api.tracker.goal(nextHours);
-      client.setQueryData<AppSettings>(["settings"], (old) =>
-        old ? { ...old, dailyAvailableHours: nextHours } : undefined
-      );
+      }),
+      api.tracker.goal(nextHours),
+    ]).catch(() => {
+      // Revert on failure
       client.invalidateQueries({ queryKey: ["settings"] });
       client.invalidateQueries({ queryKey: ["tracker"] });
-      notify.success("Daily Goal Updated", `Target set to ${nextHours}h / day`);
-    } catch {
-      notify.error("Update Failed", "Could not save daily study hours.");
-    }
+    });
   };
 
   // Quick trigger comeback routine
@@ -282,7 +303,10 @@ export default function ProfileScreen() {
         durationMin: 30,
       });
       client.invalidateQueries({ queryKey: ["routine"] });
-      notify.success("Comeback Plan Active", "30-min low-friction momentum task added to your dashboard.");
+      notify.success(
+        "Comeback Plan Active",
+        "30-min low-friction momentum task added to your dashboard."
+      );
       setActiveSheet(null);
     } catch (err: any) {
       notify.error("Trigger Failed", err?.message || "Could not add comeback task.");
@@ -333,7 +357,10 @@ export default function ProfileScreen() {
       // Engine sheets
       if (sheetType === "score_weights" || sheetType === "full_engine") {
         if (totalWeights !== 100) {
-          notify.error("Weights Total Must Be 100%", `Current total is ${totalWeights}%. Please adjust the sliders to equal 100%.`);
+          notify.error(
+            "Weights Total Must Be 100%",
+            `Current total is ${totalWeights}%. Please adjust the sliders to equal 100%.`
+          );
           setSavingField(false);
           return;
         }
@@ -378,7 +405,7 @@ export default function ProfileScreen() {
         };
       }
 
-      // Optimistically update React Query cache immediately for instant zero-lag UI response
+      // Optimistically update React Query cache immediately
       client.setQueryData<AppSettings>(["settings"], (old) => {
         if (!old) return old;
         return {
@@ -387,6 +414,15 @@ export default function ProfileScreen() {
           name: payload.name ?? old.name,
         };
       });
+      if (typeof payload.dailyAvailableHours === "number") {
+        client.setQueryData<TrackerStatus>(["tracker"], (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            dailyAvailableHours: payload.dailyAvailableHours!,
+          };
+        });
+      }
 
       await api.settings.save(payload);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -394,7 +430,6 @@ export default function ProfileScreen() {
       client.invalidateQueries({ queryKey: ["tracker"] });
       setActiveSheet(null);
 
-      // Only notify for rare/high-impact actions
       if (sheetType === "streak_freeze" && formStreakActive) {
         notify.info("Streak Freeze Active", `Protected for ${formStreakDurationDays} days.`);
       } else if (sheetType === "comeback_protocol") {
@@ -442,7 +477,8 @@ export default function ProfileScreen() {
   const handleLockDevice = () => {
     notify.confirm({
       title: "Lock DOOR?",
-      message: "This clears the active session and passcode from this device. Cloud data is safely preserved.",
+      message:
+        "This clears the active session and passcode from this device. Cloud data is safely preserved.",
       confirmLabel: "Lock Device",
       tone: "destructive",
       icon: "lock-closed-outline",
@@ -457,57 +493,65 @@ export default function ProfileScreen() {
 
   return (
     <AppScreen
-      title="Settings & Hub"
-      subtitle="Academic cockpit · Private & local"
+      title="More"
+      subtitle="Profile, preferences & app settings"
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Dynamic Hero Identity Card */}
+        {/* Compact Profile Summary Card */}
         <View
           style={[
-            styles.heroCard,
+            styles.profileCard,
             {
               backgroundColor: isDark ? "#121215" : "#ffffff",
               borderColor: isDark ? "#222226" : "#e2e8f0",
             },
           ]}
         >
-          <View style={styles.heroTopRow}>
-            {/* Tapping Avatar opens Name editor */}
+          <View style={styles.profileHeaderRow}>
+            {/* Neutral Avatar */}
             <Pressable
               onPress={() => openSheet("name")}
-              style={({ pressed }) => [styles.avatarGlowWrapper, pressed && { opacity: 0.8 }]}
-              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile name"
+              style={({ pressed }) => [styles.avatarPressable, pressed && { opacity: 0.8 }]}
+              hitSlop={8}
             >
               <View
                 style={[
                   styles.avatarCircle,
                   {
                     backgroundColor: isDark ? "#18181D" : "#f1f5f9",
-                    borderColor: colors.emerald,
+                    borderColor: isDark ? "#26262D" : "#e2e8f0",
                   },
                 ]}
               >
-                <Text style={styles.avatarInitials}>
+                <Text
+                  style={[
+                    styles.avatarInitials,
+                    { color: isDark ? "#FAFAFA" : theme.text },
+                  ]}
+                >
                   {getInitials(currentName)}
                 </Text>
               </View>
-              <View style={styles.onlineBadge} />
             </Pressable>
 
-            <View style={styles.heroDetails}>
-              <View style={styles.heroTitleRow}>
-                {/* Tapping Name opens Name editor */}
+            {/* Profile Identity Details */}
+            <View style={styles.profileInfo}>
+              <View style={styles.nameRow}>
                 <Pressable
                   onPress={() => openSheet("name")}
-                  style={({ pressed }) => [styles.heroNamePressable, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit name"
+                  style={({ pressed }) => [styles.namePressable, pressed && { opacity: 0.7 }]}
                   hitSlop={6}
                 >
                   <Text
                     style={[
-                      styles.heroName,
+                      styles.profileName,
                       { color: isDark ? "#FAFAFA" : theme.text },
                     ]}
                     numberOfLines={1}
@@ -515,65 +559,72 @@ export default function ProfileScreen() {
                     {currentName}
                   </Text>
                 </Pressable>
-
-                {/* Tapping Exam/Year pill opens Exam & Year editor */}
                 <Pressable
-                  onPress={() => openSheet("exam_year")}
-                  style={({ pressed }) => [
-                    styles.tierPill,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(16, 185, 129, 0.15)"
-                        : "rgba(5, 150, 105, 0.10)",
-                      borderColor: isDark
-                        ? "rgba(16, 185, 129, 0.3)"
-                        : "rgba(5, 150, 105, 0.25)",
-                    },
-                    pressed && { opacity: 0.7 },
-                  ]}
+                  onPress={() => openSheet("name")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit profile"
+                  style={({ pressed }) => [styles.editBadge, pressed && { opacity: 0.7 }]}
                   hitSlop={6}
                 >
-                  <Text style={styles.tierText}>
-                    {currentExam} {currentYear}
+                  <Text
+                    style={[
+                      styles.editText,
+                      { color: isDark ? "#A1A1AA" : theme.textMuted },
+                    ]}
+                  >
+                    Edit
                   </Text>
                 </Pressable>
               </View>
 
-              {/* Tapping Stream & Stage opens Discipline & Level editor */}
-              <Pressable
-                onPress={() => openSheet("stream_level")}
-                style={({ pressed }) => pressed && { opacity: 0.7 }}
-                hitSlop={6}
-              >
-                <Text
-                  style={[
-                    styles.heroSubtitle,
-                    { color: isDark ? "#A1A1AA" : theme.textMuted },
-                  ]}
-                  numberOfLines={1}
+              {/* Sub-identity row: Exam and Discipline */}
+              <View style={styles.metaRow}>
+                <Pressable
+                  onPress={() => openSheet("exam_year")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit exam and year"
+                  style={({ pressed }) => pressed && { opacity: 0.7 }}
+                  hitSlop={6}
                 >
-                  {currentStream} · {currentStage}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={[
+                      styles.metaText,
+                      { color: isDark ? "#A1A1AA" : theme.textMuted },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {currentExam} {currentYear} · {currentStream}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </View>
 
-          {/* Quick Metrics Bar - Direct Clickable Single-Purpose Targets */}
+          {/* 3-Column Neutral Metric Inset Bar */}
           <View
             style={[
               styles.metricsBar,
               {
-                backgroundColor: isDark ? "#0D0D10" : "#f8fafc",
+                backgroundColor: isDark ? "#0E0E11" : "#f8fafc",
                 borderColor: isDark ? "#1F1F24" : "#e2e8f0",
               },
             ]}
           >
-            {/* Tapping Daily Goal opens Daily Goal editor ONLY */}
+            {/* Daily Goal */}
             <Pressable
               onPress={() => openSheet("daily_goal")}
-              style={({ pressed }) => [styles.metricItem, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Daily goal: ${dailyGoal} hours`}
+              style={({ pressed }) => [styles.metricCol, pressed && { opacity: 0.7 }]}
             >
-              <Text style={styles.metricValue}>{dailyGoal}h</Text>
+              <Text
+                style={[
+                  styles.metricValue,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
+                {dailyGoal}h
+              </Text>
               <Text
                 style={[
                   styles.metricLabel,
@@ -591,12 +642,19 @@ export default function ProfileScreen() {
               ]}
             />
 
-            {/* Tapping Sleep Rest opens Sleep Routine editor ONLY */}
+            {/* Sleep Rest */}
             <Pressable
               onPress={() => openSheet("sleep_routine")}
-              style={({ pressed }) => [styles.metricItem, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Sleep rest: ${sleepWindow}`}
+              style={({ pressed }) => [styles.metricCol, pressed && { opacity: 0.7 }]}
             >
-              <Text style={[styles.metricValue, { color: colors.violet }]}>
+              <Text
+                style={[
+                  styles.metricValue,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+              >
                 {sleepWindow}
               </Text>
               <Text
@@ -616,12 +674,20 @@ export default function ProfileScreen() {
               ]}
             />
 
-            {/* Tapping Target Rank opens Target Rank editor ONLY */}
+            {/* Target Rank */}
             <Pressable
               onPress={() => openSheet("target_rank")}
-              style={({ pressed }) => [styles.metricItem, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Target benchmark: ${currentTargetRank}`}
+              style={({ pressed }) => [styles.metricCol, pressed && { opacity: 0.7 }]}
             >
-              <Text style={[styles.metricValue, { color: colors.cyan }]} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.metricValue,
+                  { color: isDark ? "#FAFAFA" : theme.text },
+                ]}
+                numberOfLines={1}
+              >
                 {currentTargetRank}
               </Text>
               <Text
@@ -636,170 +702,61 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Group 0: Academic Cockpit & Daily Discipline */}
-        <Text
-          style={[
-            styles.groupHeader,
-            { color: isDark ? "#71717A" : theme.textFaint },
-          ]}
-        >
-          ACADEMIC COCKPIT & DISCIPLINE
-        </Text>
-        <View
-          style={[
-            styles.insetGroup,
-            {
-              backgroundColor: isDark ? "#121215" : "#ffffff",
-              borderColor: isDark ? "#222226" : "#e2e8f0",
-            },
-          ]}
-        >
-          {/* Row 1: Exam & Year */}
-          <Pressable
+        {/* 1. Profile & Exam */}
+        <SettingsGroup title="PROFILE & EXAM">
+          <SettingsRow
+            icon="school-outline"
+            title="Target exam"
+            subtitle={`${currentExam} ${currentYear}`}
             onPress={() => openSheet("exam_year")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(16, 185, 129, 0.12)",
-                  borderColor: "rgba(16, 185, 129, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="school-outline" size={18} color={colors.emerald} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Target Exam
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                {currentExam} {currentYear}
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
+            accessibilityHint="Opens target exam and year picker"
           />
-
-          {/* Row 2: Discipline & Prep Level */}
-          <Pressable
+          <SettingsDivider />
+          <SettingsRow
+            icon="layers-outline"
+            title="Discipline & stage"
+            subtitle={`${currentStream} · ${currentStage}`}
             onPress={() => openSheet("stream_level")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(139, 92, 246, 0.12)",
-                  borderColor: "rgba(139, 92, 246, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="layers-outline" size={18} color={colors.violet} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Discipline & Stage
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                {currentStream} · {currentStage}
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
+            accessibilityHint="Opens branch and preparation stage picker"
           />
+          <SettingsDivider />
+          <SettingsRow
+            icon="trophy-outline"
+            title="Target benchmark"
+            subtitle={currentTargetRank}
+            onPress={() => openSheet("target_rank")}
+            accessibilityHint="Opens target rank and benchmark editor"
+          />
+          <SettingsDivider />
+          <SettingsRow
+            icon="person-outline"
+            title="Edit profile"
+            subtitle={currentName}
+            onPress={() => openSheet("name")}
+            accessibilityHint="Opens name editor"
+          />
+        </SettingsGroup>
 
-          {/* Row 3: Daily Study Goal with Stepper */}
-          <View style={styles.groupRow}>
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(245, 158, 11, 0.12)",
-                  borderColor: "rgba(245, 158, 11, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="time-outline" size={18} color={colors.amber} />
-            </View>
-            <Pressable
-              onPress={() => openSheet("daily_goal")}
-              style={[styles.rowContent, { flex: 1 }]}
-            >
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Daily Study Goal
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                Daily focus allocation
-              </Text>
-            </Pressable>
-
+        {/* 2. Study Plan */}
+        <SettingsGroup title="STUDY PLAN">
+          <SettingsRow
+            icon="time-outline"
+            title="Daily study goal"
+            subtitle="Daily focus allocation"
+            onPress={() => openSheet("daily_goal")}
+            accessory="none"
+          >
             {/* Inline Quick Stepper */}
             <View style={styles.quickStepperWrapper}>
               <Pressable
                 onPress={() => adjustDailyHours(-0.5)}
+                accessibilityRole="button"
+                accessibilityLabel="Decrease study goal by 30 minutes"
                 style={({ pressed }) => [
                   styles.stepperBtn,
                   {
-                    backgroundColor: isDark ? "#1A1A20" : "#f1f5f9",
-                    borderColor: isDark ? "#2A2A32" : "#e2e8f0",
+                    backgroundColor: isDark ? "#18181D" : "#f1f5f9",
+                    borderColor: isDark ? "#26262D" : "#e2e8f0",
                   },
                   pressed && { opacity: 0.6 },
                 ]}
@@ -808,19 +765,30 @@ export default function ProfileScreen() {
                 <Ionicons name="remove" size={15} color={isDark ? "#FAFAFA" : theme.text} />
               </Pressable>
 
-              <Pressable onPress={() => openSheet("daily_goal")}>
-                <Text style={[styles.stepperValueText, { color: colors.amber }]}>
+              <Pressable
+                onPress={() => openSheet("daily_goal")}
+                accessibilityRole="button"
+                accessibilityLabel={`Current goal: ${dailyGoal} hours. Tap to customize`}
+              >
+                <Text
+                  style={[
+                    styles.stepperValueText,
+                    { color: isDark ? "#FAFAFA" : theme.text },
+                  ]}
+                >
                   {dailyGoal}h
                 </Text>
               </Pressable>
 
               <Pressable
                 onPress={() => adjustDailyHours(0.5)}
+                accessibilityRole="button"
+                accessibilityLabel="Increase study goal by 30 minutes"
                 style={({ pressed }) => [
                   styles.stepperBtn,
                   {
-                    backgroundColor: isDark ? "#1A1A20" : "#f1f5f9",
-                    borderColor: isDark ? "#2A2A32" : "#e2e8f0",
+                    backgroundColor: isDark ? "#18181D" : "#f1f5f9",
+                    borderColor: isDark ? "#26262D" : "#e2e8f0",
                   },
                   pressed && { opacity: 0.6 },
                 ]}
@@ -829,910 +797,296 @@ export default function ProfileScreen() {
                 <Ionicons name="add" size={15} color={isDark ? "#FAFAFA" : theme.text} />
               </Pressable>
             </View>
-          </View>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
-          />
-
-          {/* Row 4: Sleep & Wake Schedule */}
-          <Pressable
+          </SettingsRow>
+          <SettingsDivider />
+          <SettingsRow
+            icon="alarm-outline"
+            title="Sleep & wake"
+            subtitle={`${currentWakeTime} – ${currentSleepTime} (${sleepWindow})`}
             onPress={() => openSheet("sleep_routine")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(139, 92, 246, 0.12)",
-                  borderColor: "rgba(139, 92, 246, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="alarm-outline" size={18} color={colors.violet} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Sleep & Wake
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                {currentWakeTime} – {currentSleepTime} ({sleepWindow})
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
+            accessibilityHint="Opens sleep and wake schedule settings"
           />
-
-          {/* Row 5: Target Goal & Rank */}
-          <Pressable
-            onPress={() => openSheet("target_rank")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(6, 182, 212, 0.12)",
-                  borderColor: "rgba(6, 182, 212, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="trophy-outline" size={18} color={colors.cyan} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Target Benchmark
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                {currentTargetRank}
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
-          />
-
-          {/* Row 6: Daily Fitness & Habit */}
-          <Pressable
+          <SettingsDivider />
+          <SettingsRow
+            icon="fitness-outline"
+            title="Daily fitness"
+            subtitle={currentExerciseGoal}
             onPress={() => openSheet("fitness")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(244, 63, 94, 0.12)",
-                  borderColor: "rgba(244, 63, 94, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="fitness-outline" size={18} color={colors.rose} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Daily Fitness
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-                numberOfLines={1}
-              >
-                {currentExerciseGoal}
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
+            accessibilityHint="Opens daily fitness habit settings"
           />
-
-          {/* Row 7: Comprehensive Setup at VERY BOTTOM of Academic Section */}
-          <Pressable
+          <SettingsDivider />
+          <SettingsRow
+            icon="options-outline"
+            title="Review study plan"
+            subtitle="Configure all study targets & discipline"
             onPress={() => openSheet("full_cockpit")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              {
-                backgroundColor: isDark
-                  ? "rgba(16, 185, 129, 0.04)"
-                  : "rgba(5, 150, 105, 0.03)",
-              },
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(16, 185, 129, 0.15)",
-                  borderColor: "rgba(16, 185, 129, 0.3)",
-                },
-              ]}
-            >
-              <Ionicons name="options-outline" size={18} color={colors.emerald} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: colors.emerald },
-                ]}
-              >
-                Full Cockpit Setup
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                Tune all targets, habits & routine
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={colors.emerald}
-            />
-          </Pressable>
-        </View>
+            accessibilityHint="Opens comprehensive study plan editor"
+          />
+        </SettingsGroup>
 
-        {/* Group 1: Exam Tracker & Routine Engine (Customizer) */}
-        <Text
-          style={[
-            styles.groupHeader,
-            { color: isDark ? "#71717A" : theme.textFaint },
-          ]}
-        >
-          EXAM TRACKER & ROUTINE ENGINE
-        </Text>
-        <View
-          style={[
-            styles.insetGroup,
-            {
-              backgroundColor: isDark ? "#121215" : "#ffffff",
-              borderColor: isDark ? "#222226" : "#e2e8f0",
-            },
-          ]}
-        >
-          {/* Row 1: Daily Score Formula / Weights */}
-          <Pressable
+        {/* 3. Routine & Progress */}
+        <SettingsGroup title="ROUTINE & PROGRESS">
+          <SettingsRow
+            icon="speedometer-outline"
+            title="Score formula"
+            titleExtra={
+              <InfoButton
+                title="Daily Score Formula"
+                message="Defines how your 100-point performance score is calculated nightly across Study (60%), Health (15%), Reading (10%), and Routine (15%)."
+                isDark={isDark}
+              />
+            }
+            subtitle={`${currentScoreWeights.study}% Study · ${currentScoreWeights.exercise}% Health · ${currentScoreWeights.reading}% Read · ${currentScoreWeights.routine}% Routine`}
             onPress={() => openSheet("score_weights")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(245, 158, 11, 0.12)",
-                  borderColor: "rgba(245, 158, 11, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="speedometer-outline" size={18} color={colors.amber} />
-            </View>
-            <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Score Formula
-                </Text>
-                <InfoButton
-                  title="Daily Score Formula"
-                  message="Defines how your 100-point performance score is calculated nightly across Study (60%), Health (15%), Reading (10%), and Routine (15%)."
-                  isDark={isDark}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                {currentScoreWeights.study}% Study · {currentScoreWeights.exercise}% Health · {currentScoreWeights.reading}% Read · {currentScoreWeights.routine}% Routine
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
           />
-
-          {/* Row 2: Streak Freeze & Vacation Mode */}
-          <Pressable
+          <SettingsDivider />
+          <SettingsRow
+            icon="snow-outline"
+            title="Streak freeze"
+            titleExtra={
+              <InfoButton
+                title="Streak Freeze Mode"
+                message="Freezes your streak without resetting to 0 during university semester exams, illness, or family travel."
+                isDark={isDark}
+              />
+            }
+            subtitle={
+              currentStreakFreeze.active
+                ? `Active · Until ${currentStreakFreeze.untilDate || "date"}`
+                : `Inactive · ${currentStreakFreeze.leftCount} Available`
+            }
+            status={currentStreakFreeze.active ? "success" : undefined}
+            value={currentStreakFreeze.active ? "Active" : undefined}
             onPress={() => openSheet("streak_freeze")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(6, 182, 212, 0.12)",
-                  borderColor: "rgba(6, 182, 212, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="snow-outline" size={18} color={colors.cyan} />
-            </View>
-            <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Streak Freeze
-                </Text>
-                <InfoButton
-                  title="Streak Freeze Mode"
-                  message="Freezes your streak without resetting to 0 during university semester exams, illness, or family travel."
-                  isDark={isDark}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                {currentStreakFreeze.active
-                  ? `Active · Until ${currentStreakFreeze.untilDate || "date"}`
-                  : `Inactive · ${currentStreakFreeze.leftCount} Available`}
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
           />
-
-          {/* Row 3: Comeback Protocol & Inactivity Sensitivity */}
-          <Pressable
+          <SettingsDivider />
+          <SettingsRow
+            icon="refresh-circle-outline"
+            title="Comeback mode"
+            titleExtra={
+              <InfoButton
+                title="Comeback Protocol"
+                message="Detects missed days and automatically prepares an easy 30-min momentum plan to eliminate friction and rebuild your streak."
+                isDark={isDark}
+              />
+            }
+            subtitle={`Trigger: ${currentComeback.thresholdDays}d inactive · ${
+              currentComeback.autoTrigger ? "Auto" : "Manual"
+            }`}
             onPress={() => openSheet("comeback_protocol")}
+          />
+          <SettingsDivider />
+          <SettingsRow
+            icon="hardware-chip-outline"
+            title="Review routine setup"
+            subtitle="Tune weights, freeze & sensitivity"
+            onPress={() => openSheet("full_engine")}
+          />
+        </SettingsGroup>
+
+        {/* 4. AI & Insights */}
+        <SettingsGroup title="AI & INSIGHTS">
+          <SettingsRow
+            icon="sparkles-outline"
+            title="AI assistant"
+            subtitle="Available"
+            status="success"
+            value="Active"
+            accessory="none"
+          />
+          <SettingsDivider />
+          <SettingsRow
+            icon="bulb-outline"
+            title="Weekly insights"
+            subtitle="Weekly performance summary"
+            value="Daily"
+            accessory="none"
+          />
+        </SettingsGroup>
+
+        {/* 5. App, Privacy & Data */}
+        <SettingsGroup title="APP, PRIVACY & DATA">
+          <SettingsRow
+            icon="server-outline"
+            title="Connection status"
+            subtitle="Connected"
+            accessory={
+              testingPing ? (
+                <ActivityIndicator size="small" color={colors.emerald} />
+              ) : (
+                <Pressable
+                  onPress={testBackendPing}
+                  accessibilityRole="button"
+                  accessibilityLabel="Test API connection"
+                  style={({ pressed }) => [
+                    styles.testActionBtn,
+                    {
+                      backgroundColor: isDark ? "#18181D" : "#f1f5f9",
+                      borderColor: isDark ? "#26262D" : "#e2e8f0",
+                    },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  hitSlop={6}
+                >
+                  <Text
+                    style={[
+                      styles.testActionText,
+                      { color: isDark ? "#FAFAFA" : theme.text },
+                    ]}
+                  >
+                    Test
+                  </Text>
+                </Pressable>
+              )
+            }
+          />
+          <SettingsDivider />
+          <SettingsRow
+            icon="shield-checkmark"
+            title="Privacy"
+            subtitle="Encrypted on this device · Zero tracking"
+            accessory="none"
+          />
+          <SettingsDivider />
+          <SettingsRow
+            icon="refresh-outline"
+            title="Clear offline cache"
+            subtitle="Purges local query persister store"
+            onPress={handleClearCache}
+          />
+        </SettingsGroup>
+
+        {/* 6. Danger Zone */}
+        <SettingsGroup title="DANGER ZONE">
+          <SettingsRow
+            icon="log-out-outline"
+            title="Lock & Sign Out"
+            subtitle="Flushes passcode session from this device"
+            destructive={true}
+            onPress={handleLockDevice}
+          />
+        </SettingsGroup>
+
+        {/* Diagnostics Collapsible Disclosure */}
+        <View style={styles.diagnosticsWrapper}>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              setDiagnosticsOpen(!diagnosticsOpen);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle diagnostics details"
             style={({ pressed }) => [
-              styles.groupRowPressable,
+              styles.diagnosticsToggle,
               pressed && { opacity: 0.7 },
             ]}
           >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(139, 92, 246, 0.12)",
-                  borderColor: "rgba(139, 92, 246, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="refresh-circle-outline" size={18} color={colors.violet} />
-            </View>
-            <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: isDark ? "#FAFAFA" : theme.text },
-                  ]}
-                >
-                  Comeback Mode
-                </Text>
-                <InfoButton
-                  title="Comeback Protocol"
-                  message="Detects missed days and automatically prepares an easy 30-min momentum plan to eliminate friction and rebuild your streak."
-                  isDark={isDark}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                Trigger: {currentComeback.thresholdDays}d inactive · {currentComeback.autoTrigger ? "Auto" : "Manual"}
-              </Text>
-            </View>
             <Ionicons
-              name="chevron-forward"
-              size={16}
+              name="server-outline"
+              size={14}
               color={isDark ? "#71717A" : theme.textFaint}
             />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
-          />
-
-          {/* Row 4: Comprehensive Engine Setup at Bottom */}
-          <Pressable
-            onPress={() => openSheet("full_engine")}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              {
-                backgroundColor: isDark
-                  ? "rgba(245, 158, 11, 0.04)"
-                  : "rgba(245, 158, 11, 0.03)",
-              },
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(245, 158, 11, 0.15)",
-                  borderColor: "rgba(245, 158, 11, 0.3)",
-                },
-              ]}
-            >
-              <Ionicons name="hardware-chip-outline" size={18} color={colors.amber} />
-            </View>
-            <View style={styles.rowContent}>
-              <View style={styles.titleWithInfoRow}>
-                <Text
-                  style={[
-                    styles.rowTitle,
-                    { color: colors.amber },
-                  ]}
-                >
-                  Full Engine Setup
-                </Text>
-                <InfoButton
-                  title="Routine & Tracker Engine"
-                  message="Complete customizer for score weights, streak freeze protection, and inactivity comeback sensitivity."
-                  isDark={isDark}
-                  color={colors.amber}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                Tune weights, freeze & sensitivity
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={colors.amber}
-            />
-          </Pressable>
-        </View>
-
-        {/* Group 2: Intelligence & AI Mentor */}
-        <Text
-          style={[
-            styles.groupHeader,
-            { color: isDark ? "#71717A" : theme.textFaint },
-          ]}
-        >
-          AI MENTOR & INTELLIGENCE
-        </Text>
-        <View
-          style={[
-            styles.insetGroup,
-            {
-              backgroundColor: isDark ? "#121215" : "#ffffff",
-              borderColor: isDark ? "#222226" : "#e2e8f0",
-            },
-          ]}
-        >
-          <View style={styles.groupRow}>
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(139, 92, 246, 0.12)",
-                  borderColor: "rgba(139, 92, 246, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="sparkles" size={18} color="#A78BFA" />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                AI Reasoning Engine
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                OpenRouter / Cerebras / NVIDIA
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.statusPill,
-                {
-                  backgroundColor: isDark
-                    ? "rgba(139, 92, 246, 0.12)"
-                    : "rgba(139, 92, 246, 0.08)",
-                },
-              ]}
-            >
-              <Text style={[styles.statusPillText, { color: "#A78BFA" }]}>
-                Active
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
-          />
-
-          <View style={styles.groupRow}>
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(6, 182, 212, 0.12)",
-                  borderColor: "rgba(6, 182, 212, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="bulb-outline" size={18} color="#22D3EE" />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Weekly Jujum Analysis
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                7-day rolling performance mentor
-              </Text>
-            </View>
             <Text
               style={[
-                styles.rowValueText,
+                styles.diagnosticsToggleText,
                 { color: isDark ? "#71717A" : theme.textFaint },
               ]}
             >
-              Daily Auto
+              Diagnostics
             </Text>
-          </View>
-        </View>
+            <Ionicons
+              name={diagnosticsOpen ? "chevron-up" : "chevron-down"}
+              size={14}
+              color={isDark ? "#71717A" : theme.textFaint}
+            />
+          </Pressable>
 
-        {/* Group 3: System Health & Connection */}
-        <Text
-          style={[
-            styles.groupHeader,
-            { color: isDark ? "#71717A" : theme.textFaint },
-          ]}
-        >
-          SYSTEM HEALTH & NETWORK
-        </Text>
-        <View
-          style={[
-            styles.insetGroup,
-            {
-              backgroundColor: isDark ? "#121215" : "#ffffff",
-              borderColor: isDark ? "#222226" : "#e2e8f0",
-            },
-          ]}
-        >
-          <Pressable
-            onPress={testBackendPing}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
+          {diagnosticsOpen && (
             <View
               style={[
-                styles.iconTile,
+                styles.diagnosticsCard,
                 {
-                  backgroundColor: "rgba(16, 185, 129, 0.12)",
-                  borderColor: "rgba(16, 185, 129, 0.25)",
+                  backgroundColor: isDark ? "#121215" : "#ffffff",
+                  borderColor: isDark ? "#222226" : "#e2e8f0",
                 },
               ]}
             >
-              <Ionicons name="server-outline" size={18} color={colors.emerald} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Express API Gateway
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-                numberOfLines={1}
-              >
-                {backendUrl}
-              </Text>
-            </View>
-            {testingPing ? (
-              <ActivityIndicator size="small" color={colors.emerald} />
-            ) : (
+              <View style={styles.diagRow}>
+                <Text
+                  style={[
+                    styles.diagLabel,
+                    { color: isDark ? "#71717A" : theme.textFaint },
+                  ]}
+                >
+                  API Gateway
+                </Text>
+                <Text
+                  style={[
+                    styles.diagValue,
+                    { color: isDark ? "#FAFAFA" : theme.text },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {backendUrl}
+                </Text>
+              </View>
+
               <View
                 style={[
-                  styles.statusPill,
-                  {
-                    backgroundColor: isDark
-                      ? "rgba(16, 185, 129, 0.12)"
-                      : "rgba(16, 185, 129, 0.08)",
-                  },
+                  styles.diagDivider,
+                  { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
                 ]}
-              >
-                <Text style={[styles.statusPillText, { color: colors.emerald }]}>
-                  Test Ping
+              />
+
+              <View style={styles.diagRow}>
+                <Text
+                  style={[
+                    styles.diagLabel,
+                    { color: isDark ? "#71717A" : theme.textFaint },
+                  ]}
+                >
+                  Primary Database
+                </Text>
+                <Text
+                  style={[
+                    styles.diagValue,
+                    { color: isDark ? "#FAFAFA" : theme.text },
+                  ]}
+                >
+                  PostgreSQL via Prisma ORM
                 </Text>
               </View>
-            )}
-          </Pressable>
 
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
-          />
+              <View
+                style={[
+                  styles.diagDivider,
+                  { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
+                ]}
+              />
 
-          <View style={styles.groupRow}>
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(245, 158, 11, 0.12)",
-                  borderColor: "rgba(245, 158, 11, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="cube-outline" size={18} color={colors.amber} />
+              <View style={styles.diagRow}>
+                <Text
+                  style={[
+                    styles.diagLabel,
+                    { color: isDark ? "#71717A" : theme.textFaint },
+                  ]}
+                >
+                  Framework
+                </Text>
+                <Text
+                  style={[
+                    styles.diagValue,
+                    { color: isDark ? "#FAFAFA" : theme.text },
+                  ]}
+                >
+                  React Native 0.76 · Expo SDK 54
+                </Text>
+              </View>
             </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Primary Database
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                PostgreSQL via Prisma ORM
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.rowValueText,
-                { color: isDark ? "#71717A" : theme.textFaint },
-              ]}
-            >
-              Online
-            </Text>
-          </View>
+          )}
         </View>
 
-        {/* Group 4: Security & Cryptography */}
-        <Text
-          style={[
-            styles.groupHeader,
-            { color: isDark ? "#71717A" : theme.textFaint },
-          ]}
-        >
-          SECURITY & PRIVACY
-        </Text>
-        <View
-          style={[
-            styles.insetGroup,
-            {
-              backgroundColor: isDark ? "#121215" : "#ffffff",
-              borderColor: isDark ? "#222226" : "#e2e8f0",
-            },
-          ]}
-        >
-          <View style={styles.groupRow}>
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(16, 185, 129, 0.12)",
-                  borderColor: "rgba(16, 185, 129, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="shield-checkmark" size={18} color={colors.emerald} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Encrypted Session
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                Android Keystore & Expo SecureStore
-              </Text>
-            </View>
-            <Ionicons
-              name="lock-closed"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </View>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
-          />
-
-          <View style={styles.groupRow}>
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(6, 182, 212, 0.12)",
-                  borderColor: "rgba(6, 182, 212, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="finger-print-outline" size={18} color={colors.cyan} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Minimal Permissions
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                Zero tracking, no location/camera sensors
-              </Text>
-            </View>
-            <Ionicons
-              name="checkmark-circle"
-              size={16}
-              color={colors.emerald}
-            />
-          </View>
-        </View>
-
-        {/* Group 5: Data & Maintenance Controls */}
-        <Text
-          style={[
-            styles.groupHeader,
-            { color: isDark ? "#71717A" : theme.textFaint },
-          ]}
-        >
-          DATA & ACTIONS
-        </Text>
-        <View
-          style={[
-            styles.insetGroup,
-            {
-              backgroundColor: isDark ? "#121215" : "#ffffff",
-              borderColor: isDark ? "#222226" : "#e2e8f0",
-            },
-          ]}
-        >
-          <Pressable
-            onPress={handleClearCache}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(245, 158, 11, 0.12)",
-                  borderColor: "rgba(245, 158, 11, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="refresh-outline" size={18} color={colors.amber} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text
-                style={[
-                  styles.rowTitle,
-                  { color: isDark ? "#FAFAFA" : theme.text },
-                ]}
-              >
-                Clear Offline Cache
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                Purges local query persister store
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={isDark ? "#71717A" : theme.textFaint}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.rowSeparator,
-              { backgroundColor: isDark ? "#1C1C22" : "#f1f5f9" },
-            ]}
-          />
-
-          <Pressable
-            onPress={handleLockDevice}
-            style={({ pressed }) => [
-              styles.groupRowPressable,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View
-              style={[
-                styles.iconTile,
-                {
-                  backgroundColor: "rgba(244, 63, 94, 0.12)",
-                  borderColor: "rgba(244, 63, 94, 0.25)",
-                },
-              ]}
-            >
-              <Ionicons name="log-out-outline" size={18} color={colors.rose} />
-            </View>
-            <View style={styles.rowContent}>
-              <Text style={[styles.rowTitle, { color: colors.rose }]}>
-                Lock & Sign Out
-              </Text>
-              <Text
-                style={[
-                  styles.rowSubtitle,
-                  { color: isDark ? "#A1A1AA" : theme.textMuted },
-                ]}
-              >
-                Flushes passcode session from this device
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.rose} />
-          </Pressable>
-        </View>
-
-        {/* Footer info */}
+        {/* Quiet Footer */}
         <View style={styles.footer}>
           <Text
             style={[
@@ -1740,7 +1094,7 @@ export default function ProfileScreen() {
               { color: isDark ? "#71717A" : theme.textFaint },
             ]}
           >
-            DOOR Mobile Suite · React Native 0.76 · Expo SDK 54
+            DOOR Mobile Suite · Private & Local
           </Text>
           <Text
             style={[
@@ -1795,16 +1149,16 @@ export default function ProfileScreen() {
                 >
                   {activeSheet === "name" && "Aspirant Name"}
                   {activeSheet === "exam_year" && "Target Exam & Year"}
-                  {activeSheet === "stream_level" && "Discipline & Level"}
+                  {activeSheet === "stream_level" && "Discipline & Stage"}
                   {activeSheet === "daily_goal" && "Daily Study Target"}
                   {activeSheet === "sleep_routine" && "Sleep & Wake Schedule"}
                   {activeSheet === "target_rank" && "Target Goal / Rank"}
                   {activeSheet === "fitness" && "Daily Fitness Target"}
-                  {activeSheet === "full_cockpit" && "Academic Cockpit Setup"}
+                  {activeSheet === "full_cockpit" && "Review Study Plan"}
                   {activeSheet === "score_weights" && "Daily Score Weights"}
                   {activeSheet === "streak_freeze" && "Streak Freeze & Vacation"}
                   {activeSheet === "comeback_protocol" && "Comeback Protocol"}
-                  {activeSheet === "full_engine" && "Routine & Tracker Engine"}
+                  {activeSheet === "full_engine" && "Review Routine Setup"}
                 </Text>
                 <Text
                   style={[
@@ -1828,6 +1182,8 @@ export default function ProfileScreen() {
               </View>
               <Pressable
                 onPress={() => setActiveSheet(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Close dialog"
                 style={({ pressed }) => [
                   styles.modalCloseBtn,
                   {
@@ -1914,6 +1270,8 @@ export default function ProfileScreen() {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                               setFormExam(exam);
                             }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
                             style={[
                               styles.chipPill,
                               {
@@ -1922,13 +1280,13 @@ export default function ProfileScreen() {
                                     ? "rgba(16, 185, 129, 0.2)"
                                     : "rgba(5, 150, 105, 0.12)"
                                   : isDark
-                                    ? "#18181D"
-                                    : "#f1f5f9",
+                                  ? "#18181D"
+                                  : "#f1f5f9",
                                 borderColor: isSelected
                                   ? colors.emerald
                                   : isDark
-                                    ? "#26262D"
-                                    : "#e2e8f0",
+                                  ? "#26262D"
+                                  : "#e2e8f0",
                               },
                             ]}
                           >
@@ -1939,9 +1297,9 @@ export default function ProfileScreen() {
                                   color: isSelected
                                     ? colors.emerald
                                     : isDark
-                                      ? "#A1A1AA"
-                                      : theme.textMuted,
-                                  fontWeight: isSelected ? "800" : "600",
+                                    ? "#A1A1AA"
+                                    : theme.textMuted,
+                                  fontWeight: isSelected ? "700" : "500",
                                 },
                               ]}
                             >
@@ -1972,21 +1330,23 @@ export default function ProfileScreen() {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                               setFormYear(yr);
                             }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
                             style={[
                               styles.chipPill,
                               {
                                 backgroundColor: isSelected
                                   ? isDark
-                                    ? "rgba(6, 182, 212, 0.2)"
-                                    : "rgba(6, 182, 212, 0.12)"
+                                    ? "rgba(16, 185, 129, 0.2)"
+                                    : "rgba(5, 150, 105, 0.12)"
                                   : isDark
-                                    ? "#18181D"
-                                    : "#f1f5f9",
+                                  ? "#18181D"
+                                  : "#f1f5f9",
                                 borderColor: isSelected
-                                  ? colors.cyan
+                                  ? colors.emerald
                                   : isDark
-                                    ? "#26262D"
-                                    : "#e2e8f0",
+                                  ? "#26262D"
+                                  : "#e2e8f0",
                               },
                             ]}
                           >
@@ -1995,11 +1355,11 @@ export default function ProfileScreen() {
                                 styles.chipText,
                                 {
                                   color: isSelected
-                                    ? colors.cyan
+                                    ? colors.emerald
                                     : isDark
-                                      ? "#A1A1AA"
-                                      : theme.textMuted,
-                                  fontWeight: isSelected ? "800" : "600",
+                                    ? "#A1A1AA"
+                                    : theme.textMuted,
+                                  fontWeight: isSelected ? "700" : "500",
                                 },
                               ]}
                             >
@@ -2035,21 +1395,23 @@ export default function ProfileScreen() {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                               setFormStream(stream);
                             }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
                             style={[
                               styles.chipPill,
                               {
                                 backgroundColor: isSelected
                                   ? isDark
-                                    ? "rgba(139, 92, 246, 0.2)"
-                                    : "rgba(139, 92, 246, 0.12)"
+                                    ? "rgba(16, 185, 129, 0.2)"
+                                    : "rgba(5, 150, 105, 0.12)"
                                   : isDark
-                                    ? "#18181D"
-                                    : "#f1f5f9",
+                                  ? "#18181D"
+                                  : "#f1f5f9",
                                 borderColor: isSelected
-                                  ? colors.violet
+                                  ? colors.emerald
                                   : isDark
-                                    ? "#26262D"
-                                    : "#e2e8f0",
+                                  ? "#26262D"
+                                  : "#e2e8f0",
                               },
                             ]}
                           >
@@ -2058,11 +1420,11 @@ export default function ProfileScreen() {
                                 styles.chipText,
                                 {
                                   color: isSelected
-                                    ? colors.violet
+                                    ? colors.emerald
                                     : isDark
-                                      ? "#A1A1AA"
-                                      : theme.textMuted,
-                                  fontWeight: isSelected ? "800" : "600",
+                                    ? "#A1A1AA"
+                                    : theme.textMuted,
+                                  fontWeight: isSelected ? "700" : "500",
                                 },
                               ]}
                             >
@@ -2093,6 +1455,8 @@ export default function ProfileScreen() {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                               setFormStage(stage);
                             }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
                             style={[
                               styles.chipPill,
                               {
@@ -2101,13 +1465,13 @@ export default function ProfileScreen() {
                                     ? "rgba(16, 185, 129, 0.2)"
                                     : "rgba(5, 150, 105, 0.12)"
                                   : isDark
-                                    ? "#18181D"
-                                    : "#f1f5f9",
+                                  ? "#18181D"
+                                  : "#f1f5f9",
                                 borderColor: isSelected
                                   ? colors.emerald
                                   : isDark
-                                    ? "#26262D"
-                                    : "#e2e8f0",
+                                  ? "#26262D"
+                                  : "#e2e8f0",
                               },
                             ]}
                           >
@@ -2118,9 +1482,9 @@ export default function ProfileScreen() {
                                   color: isSelected
                                     ? colors.emerald
                                     : isDark
-                                      ? "#A1A1AA"
-                                      : theme.textMuted,
-                                  fontWeight: isSelected ? "800" : "600",
+                                    ? "#A1A1AA"
+                                    : theme.textMuted,
+                                  fontWeight: isSelected ? "700" : "500",
                                 },
                               ]}
                             >
@@ -2157,7 +1521,7 @@ export default function ProfileScreen() {
                     <Ionicons
                       name="trophy-outline"
                       size={16}
-                      color={colors.cyan}
+                      color={colors.emerald}
                       style={styles.inputLeadingIcon}
                     />
                     <TextInput
@@ -2174,38 +1538,55 @@ export default function ProfileScreen() {
                   </View>
                   {/* Suggestion Chips */}
                   <View style={[styles.chipRow, { marginTop: 6 }]}>
-                    {["AIR < 50", "AIR < 100", "AIR < 500", "Marks: 85+", "PSU Direct"].map((r) => (
-                      <Pressable
-                        key={r}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                          setFormTargetRank(r);
-                        }}
-                        style={[
-                          styles.chipPill,
-                          {
-                            backgroundColor: formTargetRank === r
-                              ? isDark ? "rgba(6, 182, 212, 0.2)" : "rgba(6, 182, 212, 0.12)"
-                              : isDark ? "#18181D" : "#f1f5f9",
-                            borderColor: formTargetRank === r
-                              ? colors.cyan
-                              : isDark ? "#26262D" : "#e2e8f0",
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.chipText,
-                            {
-                              color: formTargetRank === r ? colors.cyan : isDark ? "#A1A1AA" : theme.textMuted,
-                              fontWeight: formTargetRank === r ? "800" : "600",
-                            },
-                          ]}
-                        >
-                          {r}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    {["AIR < 50", "AIR < 100", "AIR < 500", "Marks: 85+", "PSU Direct"].map(
+                      (r) => {
+                        const isMatch = formTargetRank === r;
+                        return (
+                          <Pressable
+                            key={r}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                              setFormTargetRank(r);
+                            }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isMatch }}
+                            style={[
+                              styles.chipPill,
+                              {
+                                backgroundColor: isMatch
+                                  ? isDark
+                                    ? "rgba(16, 185, 129, 0.2)"
+                                    : "rgba(5, 150, 105, 0.12)"
+                                  : isDark
+                                  ? "#18181D"
+                                  : "#f1f5f9",
+                                borderColor: isMatch
+                                  ? colors.emerald
+                                  : isDark
+                                  ? "#26262D"
+                                  : "#e2e8f0",
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.chipText,
+                                {
+                                  color: isMatch
+                                    ? colors.emerald
+                                    : isDark
+                                    ? "#A1A1AA"
+                                    : theme.textMuted,
+                                  fontWeight: isMatch ? "700" : "500",
+                                },
+                              ]}
+                            >
+                              {r}
+                            </Text>
+                          </Pressable>
+                        );
+                      }
+                    )}
                   </View>
                 </View>
               )}
@@ -2236,6 +1617,8 @@ export default function ProfileScreen() {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                         setFormHours((prev) => Math.max(1.0, Number((prev - 0.5).toFixed(1))));
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Decrease study hours by 0.5"
                       style={({ pressed }) => [
                         styles.modalStepperBtn,
                         {
@@ -2248,10 +1631,20 @@ export default function ProfileScreen() {
                     </Pressable>
 
                     <View style={styles.modalStepperCenter}>
-                      <Text style={[styles.modalStepperVal, { color: colors.amber }]}>
+                      <Text
+                        style={[
+                          styles.modalStepperVal,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
                         {formHours} hrs
                       </Text>
-                      <Text style={[styles.modalStepperSub, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      <Text
+                        style={[
+                          styles.modalStepperSub,
+                          { color: isDark ? "#71717A" : theme.textFaint },
+                        ]}
+                      >
                         per day target
                       </Text>
                     </View>
@@ -2261,6 +1654,8 @@ export default function ProfileScreen() {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                         setFormHours((prev) => Math.min(16.0, Number((prev + 0.5).toFixed(1))));
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Increase study hours by 0.5"
                       style={({ pressed }) => [
                         styles.modalStepperBtn,
                         {
@@ -2283,21 +1678,23 @@ export default function ProfileScreen() {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                             setFormHours(h);
                           }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isSelected }}
                           style={[
                             styles.chipPill,
                             {
                               backgroundColor: isSelected
                                 ? isDark
-                                  ? "rgba(245, 158, 11, 0.2)"
-                                  : "rgba(245, 158, 11, 0.12)"
+                                  ? "rgba(16, 185, 129, 0.2)"
+                                  : "rgba(5, 150, 105, 0.12)"
                                 : isDark
-                                  ? "#18181D"
-                                  : "#f1f5f9",
+                                ? "#18181D"
+                                : "#f1f5f9",
                               borderColor: isSelected
-                                ? colors.amber
+                                ? colors.emerald
                                 : isDark
-                                  ? "#26262D"
-                                  : "#e2e8f0",
+                                ? "#26262D"
+                                : "#e2e8f0",
                             },
                           ]}
                         >
@@ -2306,11 +1703,11 @@ export default function ProfileScreen() {
                               styles.chipText,
                               {
                                 color: isSelected
-                                  ? colors.amber
+                                  ? colors.emerald
                                   : isDark
-                                    ? "#A1A1AA"
-                                    : theme.textMuted,
-                                fontWeight: isSelected ? "800" : "600",
+                                  ? "#A1A1AA"
+                                  : theme.textMuted,
+                                fontWeight: isSelected ? "700" : "500",
                               },
                             ]}
                           >
@@ -2340,16 +1737,19 @@ export default function ProfileScreen() {
                         styles.sleepBadge,
                         {
                           backgroundColor: isDark
-                            ? "rgba(139, 92, 246, 0.15)"
-                            : "rgba(139, 92, 246, 0.10)",
-                          borderColor: isDark
-                            ? "rgba(139, 92, 246, 0.3)"
-                            : "rgba(139, 92, 246, 0.2)",
+                            ? "rgba(255, 255, 255, 0.05)"
+                            : "rgba(0, 0, 0, 0.04)",
+                          borderColor: isDark ? "#26262D" : "#e2e8f0",
                         },
                       ]}
                     >
-                      <Text style={[styles.sleepBadgeText, { color: colors.violet }]}>
-                        🌙 {calculateSleepDuration(formWakeTime, formSleepTime)} rest
+                      <Text
+                        style={[
+                          styles.sleepBadgeText,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
+                        {calculateSleepDuration(formWakeTime, formSleepTime)} rest
                       </Text>
                     </View>
                   </View>
@@ -2372,21 +1772,23 @@ export default function ProfileScreen() {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                             setFormWakeTime(t);
                           }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isSelected }}
                           style={[
                             styles.chipPill,
                             {
                               backgroundColor: isSelected
                                 ? isDark
-                                  ? "rgba(139, 92, 246, 0.2)"
-                                  : "rgba(139, 92, 246, 0.12)"
+                                  ? "rgba(16, 185, 129, 0.2)"
+                                  : "rgba(5, 150, 105, 0.12)"
                                 : isDark
-                                  ? "#18181D"
-                                  : "#f1f5f9",
+                                ? "#18181D"
+                                : "#f1f5f9",
                               borderColor: isSelected
-                                ? colors.violet
+                                ? colors.emerald
                                 : isDark
-                                  ? "#26262D"
-                                  : "#e2e8f0",
+                                ? "#26262D"
+                                : "#e2e8f0",
                             },
                           ]}
                         >
@@ -2395,11 +1797,11 @@ export default function ProfileScreen() {
                               styles.chipText,
                               {
                                 color: isSelected
-                                  ? colors.violet
+                                  ? colors.emerald
                                   : isDark
-                                    ? "#A1A1AA"
-                                    : theme.textMuted,
-                                fontWeight: isSelected ? "800" : "600",
+                                  ? "#A1A1AA"
+                                  : theme.textMuted,
+                                fontWeight: isSelected ? "700" : "500",
                               },
                             ]}
                           >
@@ -2428,21 +1830,23 @@ export default function ProfileScreen() {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                             setFormSleepTime(t);
                           }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isSelected }}
                           style={[
                             styles.chipPill,
                             {
                               backgroundColor: isSelected
                                 ? isDark
-                                  ? "rgba(139, 92, 246, 0.2)"
-                                  : "rgba(139, 92, 246, 0.12)"
+                                  ? "rgba(16, 185, 129, 0.2)"
+                                  : "rgba(5, 150, 105, 0.12)"
                                 : isDark
-                                  ? "#18181D"
-                                  : "#f1f5f9",
+                                ? "#18181D"
+                                : "#f1f5f9",
                               borderColor: isSelected
-                                ? colors.violet
+                                ? colors.emerald
                                 : isDark
-                                  ? "#26262D"
-                                  : "#e2e8f0",
+                                ? "#26262D"
+                                : "#e2e8f0",
                             },
                           ]}
                         >
@@ -2451,11 +1855,11 @@ export default function ProfileScreen() {
                               styles.chipText,
                               {
                                 color: isSelected
-                                  ? colors.violet
+                                  ? colors.emerald
                                   : isDark
-                                    ? "#A1A1AA"
-                                    : theme.textMuted,
-                                fontWeight: isSelected ? "800" : "600",
+                                  ? "#A1A1AA"
+                                  : theme.textMuted,
+                                fontWeight: isSelected ? "700" : "500",
                               },
                             ]}
                           >
@@ -2489,21 +1893,23 @@ export default function ProfileScreen() {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                             setFormExerciseGoal(item);
                           }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isSelected }}
                           style={[
                             styles.chipPill,
                             {
                               backgroundColor: isSelected
                                 ? isDark
-                                  ? "rgba(244, 63, 94, 0.2)"
-                                  : "rgba(244, 63, 94, 0.12)"
+                                  ? "rgba(16, 185, 129, 0.2)"
+                                  : "rgba(5, 150, 105, 0.12)"
                                 : isDark
-                                  ? "#18181D"
-                                  : "#f1f5f9",
+                                ? "#18181D"
+                                : "#f1f5f9",
                               borderColor: isSelected
-                                ? colors.rose
+                                ? colors.emerald
                                 : isDark
-                                  ? "#26262D"
-                                  : "#e2e8f0",
+                                ? "#26262D"
+                                : "#e2e8f0",
                             },
                           ]}
                         >
@@ -2512,11 +1918,11 @@ export default function ProfileScreen() {
                               styles.chipText,
                               {
                                 color: isSelected
-                                  ? colors.rose
+                                  ? colors.emerald
                                   : isDark
-                                    ? "#A1A1AA"
-                                    : theme.textMuted,
-                                fontWeight: isSelected ? "800" : "600",
+                                  ? "#A1A1AA"
+                                  : theme.textMuted,
+                                fontWeight: isSelected ? "700" : "500",
                               },
                             ]}
                           >
@@ -2538,9 +1944,9 @@ export default function ProfileScreen() {
                     ]}
                   >
                     <Ionicons
-                      name="barbell-outline"
+                      name="fitness-outline"
                       size={16}
-                      color={colors.rose}
+                      color={colors.emerald}
                       style={styles.inputLeadingIcon}
                     />
                     <TextInput
@@ -2560,23 +1966,39 @@ export default function ProfileScreen() {
               {/* 8. Daily Score Weights Form */}
               {(activeSheet === "score_weights" || activeSheet === "full_engine") && (
                 <View style={styles.formSection}>
-                  {/* Educational explanation banner for weights */}
                   <View
                     style={[
                       styles.infoBanner,
                       {
-                        backgroundColor: isDark ? "rgba(245, 158, 11, 0.08)" : "rgba(245, 158, 11, 0.08)",
-                        borderColor: isDark ? "rgba(245, 158, 11, 0.25)" : "rgba(245, 158, 11, 0.3)",
+                        backgroundColor: isDark ? "#18181D" : "#f8fafc",
+                        borderColor: isDark ? "#26262D" : "#e2e8f0",
                       },
                     ]}
                   >
-                    <Ionicons name="information-circle" size={18} color={colors.amber} style={{ marginTop: 2 }} />
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={18}
+                      color={isDark ? "#A1A1AA" : theme.textMuted}
+                      style={{ marginTop: 2 }}
+                    />
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[styles.infoBannerTitle, { color: isDark ? "#FAFAFA" : theme.text }]}>
+                      <Text
+                        style={[
+                          styles.infoBannerTitle,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
                         How Daily Score Formula Works
                       </Text>
-                      <Text style={[styles.infoBannerText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                        Every night, DOOR computes your 100-point performance score based on tasks you finished. Adjust these percentages to allocate more credit to the areas you want to prioritize. Total must equal 100%.
+                      <Text
+                        style={[
+                          styles.infoBannerText,
+                          { color: isDark ? "#A1A1AA" : theme.textMuted },
+                        ]}
+                      >
+                        Every night, DOOR computes your 100-point performance score based on tasks
+                        you finished. Adjust these percentages to allocate credit. Total must equal
+                        100%.
                       </Text>
                     </View>
                   </View>
@@ -2586,9 +2008,14 @@ export default function ProfileScreen() {
                     style={[
                       styles.totalWeightBadge,
                       {
-                        backgroundColor: totalWeights === 100
-                          ? isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(5, 150, 105, 0.12)"
-                          : isDark ? "rgba(244, 63, 94, 0.15)" : "rgba(244, 63, 94, 0.12)",
+                        backgroundColor:
+                          totalWeights === 100
+                            ? isDark
+                              ? "rgba(16, 185, 129, 0.15)"
+                              : "rgba(5, 150, 105, 0.12)"
+                            : isDark
+                            ? "rgba(244, 63, 94, 0.15)"
+                            : "rgba(244, 63, 94, 0.12)",
                         borderColor: totalWeights === 100 ? colors.emerald : colors.rose,
                       },
                     ]}
@@ -2621,10 +2048,20 @@ export default function ProfileScreen() {
                     ]}
                   >
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[styles.weightTunerTitle, { color: isDark ? "#FAFAFA" : theme.text }]}>
-                        📚 Study Focus Hours
+                      <Text
+                        style={[
+                          styles.weightTunerTitle,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
+                        Study Focus Hours
                       </Text>
-                      <Text style={[styles.weightTunerSubtitle, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      <Text
+                        style={[
+                          styles.weightTunerSubtitle,
+                          { color: isDark ? "#71717A" : theme.textFaint },
+                        ]}
+                      >
                         Deep work & problem solving
                       </Text>
                     </View>
@@ -2634,11 +2071,19 @@ export default function ProfileScreen() {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           setFormStudyWeight((prev) => Math.max(0, prev - 5));
                         }}
-                        style={[styles.smallStepBtn, { backgroundColor: isDark ? "#202026" : "#e2e8f0" }]}
+                        style={[
+                          styles.smallStepBtn,
+                          { backgroundColor: isDark ? "#202026" : "#e2e8f0" },
+                        ]}
                       >
                         <Ionicons name="remove" size={14} color={isDark ? "#FAFAFA" : theme.text} />
                       </Pressable>
-                      <Text style={[styles.weightValueText, { color: colors.emerald }]}>
+                      <Text
+                        style={[
+                          styles.weightValueText,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
                         {formStudyWeight}%
                       </Text>
                       <Pressable
@@ -2646,7 +2091,10 @@ export default function ProfileScreen() {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           setFormStudyWeight((prev) => Math.min(100, prev + 5));
                         }}
-                        style={[styles.smallStepBtn, { backgroundColor: isDark ? "#202026" : "#e2e8f0" }]}
+                        style={[
+                          styles.smallStepBtn,
+                          { backgroundColor: isDark ? "#202026" : "#e2e8f0" },
+                        ]}
                       >
                         <Ionicons name="add" size={14} color={isDark ? "#FAFAFA" : theme.text} />
                       </Pressable>
@@ -2664,10 +2112,20 @@ export default function ProfileScreen() {
                     ]}
                   >
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[styles.weightTunerTitle, { color: isDark ? "#FAFAFA" : theme.text }]}>
-                        🏃 Exercise & Health
+                      <Text
+                        style={[
+                          styles.weightTunerTitle,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
+                        Exercise & Health
                       </Text>
-                      <Text style={[styles.weightTunerSubtitle, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      <Text
+                        style={[
+                          styles.weightTunerSubtitle,
+                          { color: isDark ? "#71717A" : theme.textFaint },
+                        ]}
+                      >
                         Physical stamina & workout
                       </Text>
                     </View>
@@ -2677,11 +2135,19 @@ export default function ProfileScreen() {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           setFormExerciseWeight((prev) => Math.max(0, prev - 5));
                         }}
-                        style={[styles.smallStepBtn, { backgroundColor: isDark ? "#202026" : "#e2e8f0" }]}
+                        style={[
+                          styles.smallStepBtn,
+                          { backgroundColor: isDark ? "#202026" : "#e2e8f0" },
+                        ]}
                       >
                         <Ionicons name="remove" size={14} color={isDark ? "#FAFAFA" : theme.text} />
                       </Pressable>
-                      <Text style={[styles.weightValueText, { color: colors.rose }]}>
+                      <Text
+                        style={[
+                          styles.weightValueText,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
                         {formExerciseWeight}%
                       </Text>
                       <Pressable
@@ -2689,7 +2155,10 @@ export default function ProfileScreen() {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           setFormExerciseWeight((prev) => Math.min(100, prev + 5));
                         }}
-                        style={[styles.smallStepBtn, { backgroundColor: isDark ? "#202026" : "#e2e8f0" }]}
+                        style={[
+                          styles.smallStepBtn,
+                          { backgroundColor: isDark ? "#202026" : "#e2e8f0" },
+                        ]}
                       >
                         <Ionicons name="add" size={14} color={isDark ? "#FAFAFA" : theme.text} />
                       </Pressable>
@@ -2707,10 +2176,20 @@ export default function ProfileScreen() {
                     ]}
                   >
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[styles.weightTunerTitle, { color: isDark ? "#FAFAFA" : theme.text }]}>
-                        📖 Reading & Discipline
+                      <Text
+                        style={[
+                          styles.weightTunerTitle,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
+                        Reading & Discipline
                       </Text>
-                      <Text style={[styles.weightTunerSubtitle, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      <Text
+                        style={[
+                          styles.weightTunerSubtitle,
+                          { color: isDark ? "#71717A" : theme.textFaint },
+                        ]}
+                      >
                         Self-growth & mental discipline
                       </Text>
                     </View>
@@ -2720,11 +2199,19 @@ export default function ProfileScreen() {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           setFormReadingWeight((prev) => Math.max(0, prev - 5));
                         }}
-                        style={[styles.smallStepBtn, { backgroundColor: isDark ? "#202026" : "#e2e8f0" }]}
+                        style={[
+                          styles.smallStepBtn,
+                          { backgroundColor: isDark ? "#202026" : "#e2e8f0" },
+                        ]}
                       >
                         <Ionicons name="remove" size={14} color={isDark ? "#FAFAFA" : theme.text} />
                       </Pressable>
-                      <Text style={[styles.weightValueText, { color: colors.cyan }]}>
+                      <Text
+                        style={[
+                          styles.weightValueText,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
                         {formReadingWeight}%
                       </Text>
                       <Pressable
@@ -2732,7 +2219,10 @@ export default function ProfileScreen() {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           setFormReadingWeight((prev) => Math.min(100, prev + 5));
                         }}
-                        style={[styles.smallStepBtn, { backgroundColor: isDark ? "#202026" : "#e2e8f0" }]}
+                        style={[
+                          styles.smallStepBtn,
+                          { backgroundColor: isDark ? "#202026" : "#e2e8f0" },
+                        ]}
                       >
                         <Ionicons name="add" size={14} color={isDark ? "#FAFAFA" : theme.text} />
                       </Pressable>
@@ -2750,10 +2240,20 @@ export default function ProfileScreen() {
                     ]}
                   >
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[styles.weightTunerTitle, { color: isDark ? "#FAFAFA" : theme.text }]}>
-                        📋 Daily Routine Tasks
+                      <Text
+                        style={[
+                          styles.weightTunerTitle,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
+                        Daily Routine Tasks
                       </Text>
-                      <Text style={[styles.weightTunerSubtitle, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      <Text
+                        style={[
+                          styles.weightTunerSubtitle,
+                          { color: isDark ? "#71717A" : theme.textFaint },
+                        ]}
+                      >
                         Habits, review & admin tasks
                       </Text>
                     </View>
@@ -2763,11 +2263,19 @@ export default function ProfileScreen() {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           setFormRoutineWeight((prev) => Math.max(0, prev - 5));
                         }}
-                        style={[styles.smallStepBtn, { backgroundColor: isDark ? "#202026" : "#e2e8f0" }]}
+                        style={[
+                          styles.smallStepBtn,
+                          { backgroundColor: isDark ? "#202026" : "#e2e8f0" },
+                        ]}
                       >
                         <Ionicons name="remove" size={14} color={isDark ? "#FAFAFA" : theme.text} />
                       </Pressable>
-                      <Text style={[styles.weightValueText, { color: colors.violet }]}>
+                      <Text
+                        style={[
+                          styles.weightValueText,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
                         {formRoutineWeight}%
                       </Text>
                       <Pressable
@@ -2775,7 +2283,10 @@ export default function ProfileScreen() {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           setFormRoutineWeight((prev) => Math.min(100, prev + 5));
                         }}
-                        style={[styles.smallStepBtn, { backgroundColor: isDark ? "#202026" : "#e2e8f0" }]}
+                        style={[
+                          styles.smallStepBtn,
+                          { backgroundColor: isDark ? "#202026" : "#e2e8f0" },
+                        ]}
                       >
                         <Ionicons name="add" size={14} color={isDark ? "#FAFAFA" : theme.text} />
                       </Pressable>
@@ -2783,15 +2294,20 @@ export default function ProfileScreen() {
                   </View>
 
                   {/* Weight Presets */}
-                  <Text style={[styles.formSubLabel, { color: isDark ? "#A1A1AA" : theme.textMuted, marginTop: 4 }]}>
+                  <Text
+                    style={[
+                      styles.formSubLabel,
+                      { color: isDark ? "#A1A1AA" : theme.textMuted, marginTop: 4 },
+                    ]}
+                  >
                     Formula Presets:
                   </Text>
                   <View style={styles.chipRow}>
                     {[
-                      { name: "Standard Academic (60/15/10/15)", s: 60, e: 15, r: 10, ro: 15 },
+                      { name: "Standard (60/15/10/15)", s: 60, e: 15, r: 10, ro: 15 },
                       { name: "Study Intensive (75/10/5/10)", s: 75, e: 10, r: 5, ro: 10 },
-                      { name: "Balanced Wellness (50/20/15/15)", s: 50, e: 20, r: 15, ro: 15 },
-                      { name: "Exam Sprint (80/10/0/10)", s: 80, e: 10, r: 0, ro: 10 },
+                      { name: "Balanced (50/20/15/15)", s: 50, e: 20, r: 15, ro: 15 },
+                      { name: "Sprint (80/10/0/10)", s: 80, e: 10, r: 0, ro: 10 },
                     ].map((preset) => {
                       const isMatch =
                         formStudyWeight === preset.s &&
@@ -2808,15 +2324,23 @@ export default function ProfileScreen() {
                             setFormReadingWeight(preset.r);
                             setFormRoutineWeight(preset.ro);
                           }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isMatch }}
                           style={[
                             styles.chipPill,
                             {
                               backgroundColor: isMatch
-                                ? isDark ? "rgba(245, 158, 11, 0.2)" : "rgba(245, 158, 11, 0.12)"
-                                : isDark ? "#18181D" : "#f1f5f9",
+                                ? isDark
+                                  ? "rgba(16, 185, 129, 0.2)"
+                                  : "rgba(5, 150, 105, 0.12)"
+                                : isDark
+                                ? "#18181D"
+                                : "#f1f5f9",
                               borderColor: isMatch
-                                ? colors.amber
-                                : isDark ? "#26262D" : "#e2e8f0",
+                                ? colors.emerald
+                                : isDark
+                                ? "#26262D"
+                                : "#e2e8f0",
                             },
                           ]}
                         >
@@ -2824,8 +2348,12 @@ export default function ProfileScreen() {
                             style={[
                               styles.chipText,
                               {
-                                color: isMatch ? colors.amber : isDark ? "#A1A1AA" : theme.textMuted,
-                                fontWeight: isMatch ? "800" : "600",
+                                color: isMatch
+                                  ? colors.emerald
+                                  : isDark
+                                  ? "#A1A1AA"
+                                  : theme.textMuted,
+                                fontWeight: isMatch ? "700" : "500",
                               },
                             ]}
                           >
@@ -2845,18 +2373,34 @@ export default function ProfileScreen() {
                     style={[
                       styles.infoBanner,
                       {
-                        backgroundColor: isDark ? "rgba(6, 182, 212, 0.08)" : "rgba(6, 182, 212, 0.08)",
-                        borderColor: isDark ? "rgba(6, 182, 212, 0.25)" : "rgba(6, 182, 212, 0.3)",
+                        backgroundColor: isDark ? "#18181D" : "#f8fafc",
+                        borderColor: isDark ? "#26262D" : "#e2e8f0",
                       },
                     ]}
                   >
-                    <Ionicons name="snow-outline" size={18} color={colors.cyan} style={{ marginTop: 2 }} />
+                    <Ionicons
+                      name="snow-outline"
+                      size={18}
+                      color={isDark ? "#A1A1AA" : theme.textMuted}
+                      style={{ marginTop: 2 }}
+                    />
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[styles.infoBannerTitle, { color: isDark ? "#FAFAFA" : theme.text }]}>
+                      <Text
+                        style={[
+                          styles.infoBannerTitle,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
                         Streak Freeze Protection
                       </Text>
-                      <Text style={[styles.infoBannerText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                        Freezing your streak prevents your study streak from breaking and resetting to 0 during university semester exams, illness, or travel.
+                      <Text
+                        style={[
+                          styles.infoBannerText,
+                          { color: isDark ? "#A1A1AA" : theme.textMuted },
+                        ]}
+                      >
+                        Freezing your streak prevents your study streak from breaking and resetting
+                        to 0 during university semester exams, illness, or travel.
                       </Text>
                     </View>
                   </View>
@@ -2864,7 +2408,12 @@ export default function ProfileScreen() {
                   {/* Active Toggle */}
                   <View style={styles.sectionHeaderBetween}>
                     <View style={styles.titleWithInfoRow}>
-                      <Text style={[styles.formSectionLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+                      <Text
+                        style={[
+                          styles.formSectionLabel,
+                          { color: isDark ? "#71717A" : theme.textFaint },
+                        ]}
+                      >
                         FREEZE STATUS
                       </Text>
                       <InfoButton
@@ -2878,24 +2427,33 @@ export default function ProfileScreen() {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                         setFormStreakActive(!formStreakActive);
                       }}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: formStreakActive }}
                       style={[
                         styles.toggleSwitchBtn,
                         {
                           backgroundColor: formStreakActive
-                            ? colors.cyan
-                            : isDark ? "#26262D" : "#cbd5e1",
+                            ? colors.emerald
+                            : isDark
+                            ? "#26262D"
+                            : "#cbd5e1",
                         },
                       ]}
                     >
                       <Text style={styles.toggleSwitchText}>
-                        {formStreakActive ? "❄️ Active" : "Disabled"}
+                        {formStreakActive ? "Active" : "Disabled"}
                       </Text>
                     </Pressable>
                   </View>
 
                   {formStreakActive && (
                     <>
-                      <Text style={[styles.formSubLabel, { color: isDark ? "#A1A1AA" : theme.textMuted, marginTop: 6 }]}>
+                      <Text
+                        style={[
+                          styles.formSubLabel,
+                          { color: isDark ? "#A1A1AA" : theme.textMuted, marginTop: 6 },
+                        ]}
+                      >
                         Reason for Freeze:
                       </Text>
                       <View style={styles.chipRow}>
@@ -2908,15 +2466,23 @@ export default function ProfileScreen() {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                                 setFormStreakReason(r);
                               }}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: isSelected }}
                               style={[
                                 styles.chipPill,
                                 {
                                   backgroundColor: isSelected
-                                    ? isDark ? "rgba(6, 182, 212, 0.2)" : "rgba(6, 182, 212, 0.12)"
-                                    : isDark ? "#18181D" : "#f1f5f9",
+                                    ? isDark
+                                      ? "rgba(16, 185, 129, 0.2)"
+                                      : "rgba(5, 150, 105, 0.12)"
+                                    : isDark
+                                    ? "#18181D"
+                                    : "#f1f5f9",
                                   borderColor: isSelected
-                                    ? colors.cyan
-                                    : isDark ? "#26262D" : "#e2e8f0",
+                                    ? colors.emerald
+                                    : isDark
+                                    ? "#26262D"
+                                    : "#e2e8f0",
                                 },
                               ]}
                             >
@@ -2924,8 +2490,12 @@ export default function ProfileScreen() {
                                 style={[
                                   styles.chipText,
                                   {
-                                    color: isSelected ? colors.cyan : isDark ? "#A1A1AA" : theme.textMuted,
-                                    fontWeight: isSelected ? "800" : "600",
+                                    color: isSelected
+                                      ? colors.emerald
+                                      : isDark
+                                      ? "#A1A1AA"
+                                      : theme.textMuted,
+                                    fontWeight: isSelected ? "700" : "500",
                                   },
                                 ]}
                               >
@@ -2936,7 +2506,12 @@ export default function ProfileScreen() {
                         })}
                       </View>
 
-                      <Text style={[styles.formSubLabel, { color: isDark ? "#A1A1AA" : theme.textMuted, marginTop: 8 }]}>
+                      <Text
+                        style={[
+                          styles.formSubLabel,
+                          { color: isDark ? "#A1A1AA" : theme.textMuted, marginTop: 8 },
+                        ]}
+                      >
                         Freeze Duration:
                       </Text>
                       <View style={styles.chipRow}>
@@ -2949,15 +2524,23 @@ export default function ProfileScreen() {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                                 setFormStreakDurationDays(d);
                               }}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: isSelected }}
                               style={[
                                 styles.chipPill,
                                 {
                                   backgroundColor: isSelected
-                                    ? isDark ? "rgba(6, 182, 212, 0.2)" : "rgba(6, 182, 212, 0.12)"
-                                    : isDark ? "#18181D" : "#f1f5f9",
+                                    ? isDark
+                                      ? "rgba(16, 185, 129, 0.2)"
+                                      : "rgba(5, 150, 105, 0.12)"
+                                    : isDark
+                                    ? "#18181D"
+                                    : "#f1f5f9",
                                   borderColor: isSelected
-                                    ? colors.cyan
-                                    : isDark ? "#26262D" : "#e2e8f0",
+                                    ? colors.emerald
+                                    : isDark
+                                    ? "#26262D"
+                                    : "#e2e8f0",
                                 },
                               ]}
                             >
@@ -2965,8 +2548,12 @@ export default function ProfileScreen() {
                                 style={[
                                   styles.chipText,
                                   {
-                                    color: isSelected ? colors.cyan : isDark ? "#A1A1AA" : theme.textMuted,
-                                    fontWeight: isSelected ? "800" : "600",
+                                    color: isSelected
+                                      ? colors.emerald
+                                      : isDark
+                                      ? "#A1A1AA"
+                                      : theme.textMuted,
+                                    fontWeight: isSelected ? "700" : "500",
                                   },
                                 ]}
                               >
@@ -2988,24 +2575,46 @@ export default function ProfileScreen() {
                     style={[
                       styles.infoBanner,
                       {
-                        backgroundColor: isDark ? "rgba(139, 92, 246, 0.08)" : "rgba(139, 92, 246, 0.08)",
-                        borderColor: isDark ? "rgba(139, 92, 246, 0.25)" : "rgba(139, 92, 246, 0.3)",
+                        backgroundColor: isDark ? "#18181D" : "#f8fafc",
+                        borderColor: isDark ? "#26262D" : "#e2e8f0",
                       },
                     ]}
                   >
-                    <Ionicons name="sparkles-outline" size={18} color={colors.violet} style={{ marginTop: 2 }} />
+                    <Ionicons
+                      name="refresh-circle-outline"
+                      size={18}
+                      color={isDark ? "#A1A1AA" : theme.textMuted}
+                      style={{ marginTop: 2 }}
+                    />
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[styles.infoBannerTitle, { color: isDark ? "#FAFAFA" : theme.text }]}>
+                      <Text
+                        style={[
+                          styles.infoBannerTitle,
+                          { color: isDark ? "#FAFAFA" : theme.text },
+                        ]}
+                      >
                         Comeback Re-entry Protocol
                       </Text>
-                      <Text style={[styles.infoBannerText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-                        When inactivity is detected, DOOR automatically prepares a gentle 30-minute re-entry routine to eliminate burnout, overcome procrastination, and rebuild your daily study streak.
+                      <Text
+                        style={[
+                          styles.infoBannerText,
+                          { color: isDark ? "#A1A1AA" : theme.textMuted },
+                        ]}
+                      >
+                        When inactivity is detected, DOOR automatically prepares a gentle 30-minute
+                        re-entry routine to eliminate burnout, overcome procrastination, and rebuild
+                        your streak.
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.titleWithInfoRow}>
-                    <Text style={[styles.formSubLabel, { color: isDark ? "#A1A1AA" : theme.textMuted, marginTop: 4 }]}>
+                    <Text
+                      style={[
+                        styles.formSubLabel,
+                        { color: isDark ? "#A1A1AA" : theme.textMuted, marginTop: 4 },
+                      ]}
+                    >
                       Inactivity Trigger Sensitivity:
                     </Text>
                     <InfoButton
@@ -3024,15 +2633,23 @@ export default function ProfileScreen() {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                             setFormComebackThreshold(t);
                           }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isSelected }}
                           style={[
                             styles.chipPill,
                             {
                               backgroundColor: isSelected
-                                ? isDark ? "rgba(139, 92, 246, 0.2)" : "rgba(139, 92, 246, 0.12)"
-                                : isDark ? "#18181D" : "#f1f5f9",
+                                ? isDark
+                                  ? "rgba(16, 185, 129, 0.2)"
+                                  : "rgba(5, 150, 105, 0.12)"
+                                : isDark
+                                ? "#18181D"
+                                : "#f1f5f9",
                               borderColor: isSelected
-                                ? colors.violet
-                                : isDark ? "#26262D" : "#e2e8f0",
+                                ? colors.emerald
+                                : isDark
+                                ? "#26262D"
+                                : "#e2e8f0",
                             },
                           ]}
                         >
@@ -3040,12 +2657,16 @@ export default function ProfileScreen() {
                             style={[
                               styles.chipText,
                               {
-                                color: isSelected ? colors.violet : isDark ? "#A1A1AA" : theme.textMuted,
-                                fontWeight: isSelected ? "800" : "600",
+                                color: isSelected
+                                  ? colors.emerald
+                                  : isDark
+                                  ? "#A1A1AA"
+                                  : theme.textMuted,
+                                fontWeight: isSelected ? "700" : "500",
                               },
                             ]}
                           >
-                            {t} Days Inactive {t === 3 ? "⭐" : ""}
+                            {t} Days Inactive
                           </Text>
                         </Pressable>
                       );
@@ -3055,7 +2676,12 @@ export default function ProfileScreen() {
                   {/* Auto Trigger Toggle */}
                   <View style={[styles.sectionHeaderBetween, { marginTop: 8 }]}>
                     <View style={styles.titleWithInfoRow}>
-                      <Text style={[styles.formSubLabel, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                      <Text
+                        style={[
+                          styles.formSubLabel,
+                          { color: isDark ? "#A1A1AA" : theme.textMuted },
+                        ]}
+                      >
                         Auto-activate Comeback Plan:
                       </Text>
                       <InfoButton
@@ -3069,12 +2695,16 @@ export default function ProfileScreen() {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                         setFormComebackAuto(!formComebackAuto);
                       }}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: formComebackAuto }}
                       style={[
                         styles.toggleSwitchBtn,
                         {
                           backgroundColor: formComebackAuto
-                            ? colors.violet
-                            : isDark ? "#26262D" : "#cbd5e1",
+                            ? colors.emerald
+                            : isDark
+                            ? "#26262D"
+                            : "#cbd5e1",
                         },
                       ]}
                     >
@@ -3087,17 +2717,28 @@ export default function ProfileScreen() {
                   {/* Manual trigger button */}
                   <Pressable
                     onPress={handleTriggerComebackRoutine}
+                    accessibilityRole="button"
+                    accessibilityLabel="Trigger 30-minute momentum session now"
                     style={({ pressed }) => [
                       styles.comebackTriggerBtn,
                       {
-                        backgroundColor: isDark ? "rgba(139, 92, 246, 0.15)" : "rgba(139, 92, 246, 0.10)",
-                        borderColor: isDark ? "rgba(139, 92, 246, 0.35)" : "rgba(139, 92, 246, 0.25)",
+                        backgroundColor: isDark ? "#18181D" : "#f1f5f9",
+                        borderColor: isDark ? "#26262D" : "#e2e8f0",
                       },
                       pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
                     ]}
                   >
-                    <Ionicons name="flash-outline" size={18} color={colors.violet} />
-                    <Text style={[styles.comebackTriggerText, { color: colors.violet }]}>
+                    <Ionicons
+                      name="flash-outline"
+                      size={18}
+                      color={isDark ? "#FAFAFA" : theme.text}
+                    />
+                    <Text
+                      style={[
+                        styles.comebackTriggerText,
+                        { color: isDark ? "#FAFAFA" : theme.text },
+                      ]}
+                    >
                       Trigger 30-Min Re-entry Momentum Task Now
                     </Text>
                   </Pressable>
@@ -3117,6 +2758,8 @@ export default function ProfileScreen() {
             >
               <Pressable
                 onPress={() => setActiveSheet(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Discard changes"
                 style={({ pressed }) => [
                   styles.modalCancelBtn,
                   {
@@ -3126,7 +2769,12 @@ export default function ProfileScreen() {
                   pressed && { opacity: 0.7 },
                 ]}
               >
-                <Text style={[styles.modalCancelText, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
+                <Text
+                  style={[
+                    styles.modalCancelText,
+                    { color: isDark ? "#A1A1AA" : theme.textMuted },
+                  ]}
+                >
                   Discard
                 </Text>
               </Pressable>
@@ -3134,6 +2782,8 @@ export default function ProfileScreen() {
               <Pressable
                 onPress={() => handleSave(activeSheet)}
                 disabled={savingField}
+                accessibilityRole="button"
+                accessibilityLabel="Save settings"
                 style={({ pressed }) => [
                   styles.modalSaveBtn,
                   {
@@ -3162,83 +2812,73 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
-    gap: 16,
+    gap: 12,
   },
 
-  // Hero Card
-  heroCard: {
-    borderRadius: 18,
+  // Compact Profile Card
+  profileCard: {
+    borderRadius: 16,
     borderWidth: 1,
     padding: 16,
     gap: 14,
   },
-  heroTopRow: {
+  profileHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
   },
-  avatarGlowWrapper: {
+  avatarPressable: {
     position: "relative",
   },
   avatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarInitials: {
-    color: colors.emerald,
-    fontSize: 18,
-    fontWeight: "900",
+    fontSize: 16,
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
-  onlineBadge: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    backgroundColor: colors.emerald,
-    borderWidth: 2,
-    borderColor: "#121215",
-  },
-  heroDetails: {
+  profileInfo: {
     flex: 1,
     gap: 3,
   },
-  heroTitleRow: {
+  nameRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  heroNamePressable: {
+  namePressable: {
     flex: 1,
     marginRight: 8,
   },
-  heroName: {
-    fontSize: 16.5,
-    fontWeight: "800",
+  profileName: {
+    fontSize: 17,
+    fontWeight: "700",
     letterSpacing: -0.3,
   },
-  tierPill: {
+  editBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
+    paddingVertical: 2,
   },
-  tierText: {
-    color: colors.emerald,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.2,
+  editText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
-  heroSubtitle: {
-    fontSize: 12,
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  metaText: {
+    fontSize: 12.5,
     fontWeight: "500",
   },
+
+  // 3-Column Metrics Inset Bar
   metricsBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -3248,219 +2888,105 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  metricItem: {
+  metricCol: {
     alignItems: "center",
     gap: 2,
     flex: 1,
+    minHeight: 40,
+    justifyContent: "center",
   },
   metricValue: {
-    color: "#FAFAFA",
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   metricLabel: {
-    fontSize: 10.5,
-    fontWeight: "600",
+    fontSize: 11,
+    fontWeight: "500",
   },
   metricDivider: {
     width: 1,
-    height: 22,
+    height: 20,
   },
 
-  // Quick Stepper on Main Row
+  // Quick Stepper on Row
   quickStepperWrapper: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
   stepperBtn: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   stepperValueText: {
-    fontSize: 13,
-    fontWeight: "800",
+    fontSize: 13.5,
+    fontWeight: "700",
     paddingHorizontal: 2,
   },
 
-  // Inset Groups (Apple Settings style)
-  groupHeader: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    paddingHorizontal: 6,
-    marginTop: 4,
-  },
-  insetGroup: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  groupRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 12,
-  },
-  groupRowPressable: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 12,
-  },
-  iconTile: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  // Test Action button
+  testActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  rowContent: {
-    flex: 1,
-    gap: 2,
+  testActionText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
-  titleWithInfoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
+
+  // Info Button
   infoCircleBtn: {
     padding: 2,
     alignItems: "center",
     justifyContent: "center",
   },
-  rowTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: -0.2,
-  },
-  rowSubtitle: {
-    fontSize: 11.5,
-    fontWeight: "500",
-  },
-  rowValueText: {
-    fontSize: 12.5,
-    fontWeight: "600",
-  },
-  rowSeparator: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 60,
-  },
-  statusPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusPillText: {
-    fontSize: 11.5,
-    fontWeight: "700",
-  },
 
-  // Info Banner
-  infoBanner: {
-    flexDirection: "row",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 10,
-    alignItems: "flex-start",
+  // Diagnostics
+  diagnosticsWrapper: {
+    marginTop: 12,
+    gap: 8,
   },
-  infoBannerTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: -0.2,
-  },
-  infoBannerText: {
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "500",
-  },
-
-  // Weight Tuner
-  totalWeightBadge: {
+  diagnosticsToggle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignSelf: "flex-start",
+    paddingVertical: 8,
   },
-  totalWeightText: {
+  diagnosticsToggleText: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
   },
-  weightTunerRow: {
+  diagnosticsCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+  },
+  diagRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
   },
-  weightTunerTitle: {
-    fontSize: 13.5,
-    fontWeight: "700",
-  },
-  weightTunerSubtitle: {
-    fontSize: 11,
+  diagLabel: {
+    fontSize: 12,
     fontWeight: "500",
   },
-  weightStepperGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  smallStepBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  weightValueText: {
-    fontSize: 14,
-    fontWeight: "900",
-    minWidth: 38,
-    textAlign: "center",
-  },
-
-  // Toggle switch button
-  toggleSwitchBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  toggleSwitchText: {
-    color: "#ffffff",
+  diagValue: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "600",
+    maxWidth: "60%",
   },
-
-  // Comeback trigger button
-  comebackTriggerBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 6,
-  },
-  comebackTriggerText: {
-    fontSize: 12.5,
-    fontWeight: "800",
+  diagDivider: {
+    height: StyleSheet.hairlineWidth,
   },
 
   // Footer
@@ -3471,7 +2997,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   footerText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "600",
   },
   footerSubtext: {
@@ -3516,12 +3042,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "700",
     letterSpacing: -0.3,
   },
   modalSubtitle: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "400",
   },
   modalCloseBtn: {
     width: 32,
@@ -3544,9 +3070,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  titleWithInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   formSectionLabel: {
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "700",
     letterSpacing: 0.8,
   },
   formSubLabel: {
@@ -3567,7 +3098,7 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   chipRow: {
     flexDirection: "row",
@@ -3606,12 +3137,12 @@ const styles = StyleSheet.create({
   },
   modalStepperVal: {
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: "800",
     letterSpacing: -0.3,
   },
   modalStepperSub: {
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: "500",
   },
 
   // Sleep Badge
@@ -3623,7 +3154,107 @@ const styles = StyleSheet.create({
   },
   sleepBadgeText: {
     fontSize: 11,
+    fontWeight: "600",
+  },
+
+  // Info Banner
+  infoBanner: {
+    flexDirection: "row",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  infoBannerTitle: {
+    fontSize: 13,
     fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  infoBannerText: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+
+  // Weight Tuner
+  totalWeightBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignSelf: "flex-start",
+  },
+  totalWeightText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  weightTunerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  weightTunerTitle: {
+    fontSize: 13.5,
+    fontWeight: "600",
+  },
+  weightTunerSubtitle: {
+    fontSize: 11,
+    fontWeight: "400",
+  },
+  weightStepperGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  smallStepBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  weightValueText: {
+    fontSize: 14,
+    fontWeight: "700",
+    minWidth: 38,
+    textAlign: "center",
+  },
+
+  // Toggle switch button
+  toggleSwitchBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  toggleSwitchText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  // Comeback trigger button
+  comebackTriggerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  comebackTriggerText: {
+    fontSize: 12.5,
+    fontWeight: "600",
   },
 
   // Modal Action Bar
@@ -3645,7 +3276,7 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   modalSaveBtn: {
     flex: 2,
@@ -3659,7 +3290,6 @@ const styles = StyleSheet.create({
   modalSaveText: {
     color: "#ffffff",
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "700",
   },
 });
-

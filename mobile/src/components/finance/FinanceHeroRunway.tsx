@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ProgressBar } from "@/src/components/ui";
 import { useTheme } from "@/src/providers/theme-provider";
@@ -236,19 +236,11 @@ export function FinanceHeroRunway({
 
       {/* 5. Footer Coaching / Context Row */}
       <View style={styles.footerRow}>
-        <Ionicons
-          name={
-            isOverBudget
-              ? "alert-circle"
-              : isNearLimit
-              ? "warning-outline"
-              : isHealthy
-              ? "sparkles"
-              : "information-circle-outline"
-          }
-          size={13}
-          color={statusTone}
-        />
+        {isOverBudget ? (
+          <Ionicons name="alert-circle" size={13} color={SEMANTIC.crimson} />
+        ) : isNearLimit ? (
+          <Ionicons name="warning-outline" size={13} color={SEMANTIC.amber} />
+        ) : null}
         <Text
           style={[
             styles.footerContextText,
@@ -257,8 +249,6 @@ export function FinanceHeroRunway({
                 ? SEMANTIC.crimson
                 : isNearLimit
                 ? SEMANTIC.amber
-                : isHealthy
-                ? theme.textMuted
                 : theme.textMuted,
             },
           ]}

@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import { Card, ProgressBar } from "@/src/components/ui";
 import { useTheme } from "@/src/providers/theme-provider";
 import { radii, spacing, typography } from "@/src/theme/tokens";

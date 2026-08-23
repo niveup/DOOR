@@ -183,15 +183,11 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
               <div className="flex items-center justify-between gap-1">
                 <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="brand-mark brand-fixed focus-ring flex items-center gap-2.5 rounded-lg p-2 flex-1 min-w-0 group hover:bg-[var(--bg-card)] transition-colors">
                   <div className="h-8 w-8 flex items-center justify-center shrink-0">
-                    <svg className="h-[28px] w-[28px] text-stone-800 dark:text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M5 21V9a7 7 0 0114 0v12Z" fill="#FAF8F4" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V9a7 7 0 0114 0v12M3 21h18" stroke="#292524" />
-                      <g className="transition-transform duration-500 ease-out origin-[6.5px_12px] group-hover:[transform:rotateY(-45deg)]">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 21V9.5a5.5 5.5 0 0111 0V21Z" fill="#EFECE6" stroke="#44403C" />
-                        <path d="M8.5 10a3.5 3.5 0 017 0v3h-7v-3zM8.5 14.5h7V19.5h-7v-5z" fill="#E7E4DC" stroke="#A8A29E" strokeWidth="0.8" />
-                        <circle cx="15.8" cy="14" r="0.75" fill="#78716C" stroke="none" />
-                      </g>
-                    </svg>
+                    <img
+                      src="/adaptive-icon.png"
+                      alt="DOOR"
+                      className="h-[28px] w-[28px] object-contain transition-transform duration-300 group-hover:scale-105"
+                    />
                   </div>
                   <span className="text-[16px] font-black tracking-[0.22em] text-[#000000] dark:text-[#ffffff] uppercase font-sans">DOOR</span>
                 </Link>
@@ -323,15 +319,11 @@ export function AppShellLayout({ children }: { children: ReactNode }) {
                 <div className="flex items-center gap-2.5">
                   <Link href="/dashboard" onClick={() => setOptimisticPathname("/dashboard")} className="brand-mark brand-fixed focus-ring flex items-center gap-2.5 rounded-lg group">
                     <div className="h-8 w-8 flex items-center justify-center shrink-0">
-                      <svg className="h-[28px] w-[28px] text-stone-800 dark:text-stone-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                        <path d="M5 21V9a7 7 0 0114 0v12Z" fill="#FAF8F4" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V9a7 7 0 0114 0v12M3 21h18" stroke="#292524" />
-                        <g className="transition-transform duration-500 ease-out origin-[6.5px_12px] group-hover:[transform:rotateY(-45deg)]">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 21V9.5a5.5 5.5 0 0111 0V21Z" fill="#EFECE6" stroke="#44403C" />
-                          <path d="M8.5 10a3.5 3.5 0 017 0v3h-7v-3zM8.5 14.5h7V19.5h-7v-5z" fill="#E7E4DC" stroke="#A8A29E" strokeWidth="0.8" />
-                          <circle cx="15.8" cy="14" r="0.75" fill="#78716C" stroke="none" />
-                        </g>
-                      </svg>
+                      <img
+                        src="/adaptive-icon.png"
+                        alt="DOOR"
+                        className="h-[28px] w-[28px] object-contain transition-transform duration-300 group-hover:scale-105"
+                      />
                     </div>
                     <span>
                       <span className="block text-sm font-black tracking-[0.22em] text-[#000000] dark:text-[#ffffff] uppercase font-sans leading-none">DOOR</span>

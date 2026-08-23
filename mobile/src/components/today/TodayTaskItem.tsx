@@ -5,7 +5,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import { useTheme } from "@/src/providers/theme-provider";
 import { fontWeights, radii, spacing, typography } from "@/src/theme/tokens";
 import { TagConfigItem, TodoTag } from "./TodayAddTaskForm";

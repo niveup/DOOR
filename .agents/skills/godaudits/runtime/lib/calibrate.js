@@ -1,0 +1,149 @@
+'use strict';
+
+// Internal detector regression. evaluateAudit already measures one recorded
+// audit against one expectation; nothing rolled those up, so the suite asserted
+// calibrated confidence with no standing measurement of its own detectors.
+//
+// Scope, deliberately narrow. This aggregates audits over a seeded-defect
+// corpus to answer one question: do the seeded defects still get detected after
+// a catalog change? It is NOT a reliability estimate for unseen repositories,
+// no number it produces feeds a per-repo score (that would break per-audit
+// reproducibility and assume a transfer the method does not have), and it is
+// not published as a stakeholder-facing reliability claim.
+//
+// Provenance is load-bearing. An `authored` case is a fixture a maintainer
+// hand-built; it detects its own seeded defect by construction, so counting it
+// toward a detection rate would manufacture a reliability-shaped number out of
+// data written to pass. Authored cases gate regressions and nothing else. Only
+// a `recorded` case (a real audit run captured verbatim) can support a rate,
+// and even then only above a floor of independent audits.
+
+const { evaluateAudit } = require('./evaluate');
+
+const PROVENANCE = new Set(['authored', 'recorded']);
+
+// Independent audits, not seeded instances. Five defects seeded inside one
+// audit are one observation of that detector, not five: they share a repository,
+// a model run, and every correlated mistake in it. Below this many independent
+// recorded audits a rate is a rumour, so the corpus reports nothing rather than
+// printing a decimal that invites over-reading. Convention, not a tuned
+// coefficient: it decides what gets reported, never what anything scores.
+const MIN_SAMPLE = 5;
+
+// Wilson score interval, lower bound at 95%. Three-for-three is not a 100%
+// detector. Reporting the lower bound keeps a small sample from reading as a
+// precise rate.
+function wilsonLower(successes, trials, z = 1.96) {
+  if (!trials) return 0;
+  const p = successes / trials;
+  const denominator = 1 + (z * z) / trials;
+  const centre = p + (z * z) / (2 * trials);
+  const margin = z * Math.sqrt((p * (1 - p)) / trials + (z * z) / (4 * trials * trials));
+  return Number(Math.max(0, (centre - margin) / denominator).toFixed(4));
+}
+
+function rateFor(stats) {
+  // A rate may only come from real audit runs, and only once enough
+  // independent ones exist to carry it.
+  if (!stats.recorded_cases.size) return { detection_rate: null, detection_rate_lower_bound: null, sample: 'authored-only' };
+  if (stats.recorded_cases.size < MIN_SAMPLE) return { detection_rate: null, detection_rate_lower_bound: null, sample: 'insufficient' };
+  return {
+    detection_rate: Number((stats.recorded_detected / stats.recorded_seeded).toFixed(4)),
+    detection_rate_lower_bound: wilsonLower(stats.recorded_detected, stats.recorded_seeded),
+    sample: 'reported'
+  };
+}
+
+// cases: [{ name, provenance, audit, expected }] where audit is an AUDIT.json
+// object and expected is a benchmark expectation ({ required_findings,
+// clean_checks }).
+function aggregateCorpus(cases) {
+  const perCheck = new Map();
+  const results = [];
+  const missed = [];
+  const false_alarms = [];
+
+  for (const item of cases) {
+    if (!PROVENANCE.has(item.provenance)) {
+      throw new Error(`corpus case ${item.name} needs provenance authored or recorded, got ${item.provenance}`);
+    }
+    const recorded = item.provenance === 'recorded';
+    const metrics = evaluateAudit(item.audit, item.expected);
+    results.push({
+      name: item.name,
+      provenance: item.provenance,
+      recall: metrics.recall,
+      precision: metrics.precision,
+      clean_control_rate: metrics.clean_control_rate,
+      false_positives: metrics.false_positives,
+      passed: metrics.passed
+    });
+
+    // Over-detection is a regression too. A gate that only measures recall
+    // rewards flagging everything: fire every check, score perfect recall, stay
+    // green forever. Surface false alarms the way misses are surfaced.
+    if (metrics.clean_control_rate < 1 || metrics.false_positives > 0) {
+      false_alarms.push({
+        case: item.name,
+        clean_control_rate: metrics.clean_control_rate,
+        false_positives: metrics.false_positives
+      });
+    }
+
+    const missedKeys = new Set((metrics.missed || []).map((entry) => `${entry.check} ${entry.path || ''}`));
+    for (const required of item.expected.required_findings) {
+      const stats = perCheck.get(required.check) || {
+        check: required.check,
+        seeded: 0,
+        detected: 0,
+        cases: new Set(),
+        recorded_cases: new Set(),
+        recorded_seeded: 0,
+        recorded_detected: 0
+      };
+      stats.seeded += 1;
+      stats.cases.add(item.name);
+      if (recorded) {
+        stats.recorded_seeded += 1;
+        stats.recorded_cases.add(item.name);
+      }
+      const wasMissed = missedKeys.has(`${required.check} ${required.path || ''}`);
+      if (wasMissed) missed.push({ case: item.name, check: required.check, path: required.path });
+      else {
+        stats.detected += 1;
+        if (recorded) stats.recorded_detected += 1;
+      }
+      perCheck.set(required.check, stats);
+    }
+  }
+
+  const checks = [...perCheck.values()]
+    .sort((left, right) => left.check.localeCompare(right.check))
+    .map((stats) => ({
+      check: stats.check,
+      seeded: stats.seeded,
+      detected: stats.detected,
+      cases: stats.cases.size,
+      recorded_cases: stats.recorded_cases.size,
+      ...rateFor(stats)
+    }));
+
+  return {
+    schema_version: '1.0',
+    scope: 'Internal detector regression over a seeded-defect corpus. It measures whether seeded defects are still detected. It is not a reliability estimate for unseen repositories and never feeds a per-repo score. A detection rate is reported only from recorded real audit runs, never from authored fixtures, which detect their own seeds by construction.',
+    cases: results.length,
+    recorded_cases: results.filter((result) => result.provenance === 'recorded').length,
+    authored_cases: results.filter((result) => result.provenance === 'authored').length,
+    checks,
+    results,
+    missed,
+    false_alarms,
+    // evaluateAudit already judges each case on recall, precision, severity
+    // accuracy, citation validity, remediation closure, and the declared clean
+    // checks. Honour that verdict instead of recomputing a weaker one: gating
+    // on recall alone would let a detector that flags everything pass forever.
+    passed: missed.length === 0 && false_alarms.length === 0 && results.every((result) => result.passed)
+  };
+}
+
+module.exports = { MIN_SAMPLE, PROVENANCE, aggregateCorpus, wilsonLower };

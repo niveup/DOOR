@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/providers/theme-provider";
 import { shortDate, todayInKolkata } from "@/src/lib/format";

@@ -1,0 +1,189 @@
+{
+  "domain": "llm",
+  "dom": "LLM",
+  "checks": [
+    {"id":"A-LLM-1","outcome":"fail","confidence":"Certain","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":1876,"quote":"mergedTopic = `[User uploaded an image. Gemma Vision OCR extracted the following content from the image:\\n${ocrText}\\n\\nUser's prompt/question: \"${topic || \"Explain this concept\"}\" ]`;","symbol":"untrusted OCR/topic content merged into the privileged instruction channel"},
+      {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":613,"quote":"const fn = new Function(\"x\", `return ${expr}`);","symbol":"privileged sink executes model output; cross-filed as F-SEC-1"}
+    ],"finding_titles":["AI-generated output is executed with new Function and injected as raw SVG in the renderer","User content is interpolated into the system-role prompt without delimiters or isolation"]},
+    {"id":"A-LLM-2","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":332,"quote":"const prompt = loadPrompt(\"journal.md\", {\n      user_name: settings?.name || \"Aspirant\",\n      date,\n      entry_text: content,","symbol":"private journal text interpolated into the template that is passed as systemPrompt at server.ts:341"},
+      {"type":"source","path":"backend/src/server.ts","line":114,"quote":"function loadPrompt(filename: string, variables: Record<string, any> = {}): string {\n  const promptsDir = path.join(process.cwd(), \"prompts\");\n  const preamble = fs.readFileSync(...);\n  ... fullPrompt = fullPrompt.replace(new RegExp(`\\\\{\\\\{${key}\\\\}`, \"g\"), String(value));","symbol":"naive whole-string interpolation, no role separation or data delimiters"}
+    ],"finding_titles":["User content is interpolated into the system-role prompt without delimiters or isolation"]},
+    {"id":"A-LLM-3","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":907,"quote":"const [settings, progressRatings, subjects, existingPlan, recentJournals, recentPlans] = await Promise.all([...]) ","symbol":"plan-chat assembles up to 7 journals (500 chars each), 7 plans, subject table and conversation with no token budget"},
+      {"type":"source","path":"backend/src/server.ts","line":1912,"quote":"finalSystemPrompt += \"\\n\\n## Conversation History:\\n\" + historyText +","symbol":"history appended after instructions, no budgeting or summarization"}
+    ],"finding_titles":["Context assembly has no token budget across chat surfaces"]},
+    {"id":"A-LLM-4","outcome":"fail","confidence":"Certain","evidence":[
+      {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":613,"quote":"const fn = new Function(\"x\", `return ${expr}`);"},
+      {"type":"source","path":"backend/src/server.ts","line":2014,"quote":"explanationText: JSON.stringify(data)"}
+    ],"finding_titles":["AI-generated output is executed with new Function and injected as raw SVG in the renderer"]},
+    {"id":"A-LLM-5","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"sk-or|api_key|apiKey|password|secret\" backend/prompts/","scope":"all seven prompt templates","quote":"0 hits: no credential material in prompts; authorization lives in passcodeAuth middleware, never in prompt wording."}
+    ]},
+    {"id":"A-LLM-6","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/private-journal-store.ts","line":84,"quote":"const signature = crypto.createHmac(\"sha256\", secret).update(`${timestamp}.${bodyText}`).digest(\"base64url\");","symbol":"contrast: journal payload itself is encrypted before storage, but the AI feedback path sends entry text to providers in clear"},
+      {"type":"absence","command":"rg -n \"store:false|zero.data.retention|ZDR|dataPolicy|redact\" backend/src/lib/ai/provider.ts backend/src/server.ts","scope":"provider client construction and call sites","quote":"0 hits: no provider data-control flags, no minimization or redaction before sending journal text, names, and study notes to third-party providers."}
+    ],"finding_titles":["Personal journal and study content is sent to LLM providers unminimized with no data-control configuration"]},
+    {"id":"A-LLM-7","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":129,"quote":"const aiProviderDefaults: Record<AiProviderName, string> = {\n  openrouter: \"openrouter/free\",\n  nvidia: \"meta/llama-3.1-8b-instruct\",\n  cerebras: \"gemma-4-31b\",\n};","symbol":"floating aliases as production defaults; requested aiModel body param accepted unvalidated up to 160 chars (multiple call sites)"}
+    ],"finding_titles":["Model selection accepts arbitrary caller strings and floats on unpinned aliases"]},
+    {"id":"A-LLM-8","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/ai/provider.ts","line":52,"quote":"temperature: 0.35,\n      max_tokens: 4096,"}
+    ]},
+    {"id":"A-LLM-9","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"fallback.*model|escalat|retry.*model\" backend/src -i","scope":"backend AI paths","quote":"0 hits: single active credential, no fallback chain exists to evaluate."}
+    ]},
+    {"id":"A-LLM-10","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/ai/provider.ts","line":63,"quote":"return response.choices[0]?.message?.content || \"\";","symbol":"finish_reason never inspected; a length-truncated completion flows into JSON parsers as if complete"}
+    ],"finding_titles":["Model responses are consumed without checking finish_reason or truncation"]},
+    {"id":"A-LLM-11","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":220,"quote":"const aiProvider = createAiProvider(configuration);\n  return aiProvider.chat(systemPrompt, userPrompt, options.model, options.imageUrl);","symbol":"new OpenAI client constructed per request inside resolveAiConfiguration->aiChat"}
+    ],"finding_titles":["The OpenAI client is rebuilt on every call instead of module-scope reuse"]},
+    {"id":"A-LLM-12","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/ai/provider.ts","line":30,"quote":"timeout: 90_000,\n      maxRetries: 1,","symbol":"SDK-level timeout and retry with exponential backoff; chat calls are side-effect-free so retry idempotency holds"}
+    ]},
+    {"id":"A-LLM-13","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":714,"quote":"error: \"AI mentor was temporarily unavailable, but your entry was saved safely. Retrying shortly.\",\n        friendlyMessage: \"Aapka entry save ho gaya hai, par mentor abhi offline hai.\"","symbol":"explicit degradation branch; journal durability does not depend on the model call succeeding"}
+    ]},
+    {"id":"A-LLM-14","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":2014,"quote":"explanationText: JSON.stringify(data)","symbol":"explainer output persisted with only subject_id checked against subjects; session/topics/quiz structure unvalidated"},
+      {"type":"source","path":"backend/src/server.ts","line":1218,"quote":"const action = parsed.action && typeof parsed.action === \"object\" ? parsed.action : null;","symbol":"general-chat action object forwarded to client unchecked"},
+      {"type":"source","path":"backend/src/gateway.ts","line":28,"quote":"function validateFeedback(value: unknown, labels: string[]): InterviewFeedback { if (!value || typeof value !== \"object\") throw new Error(\"AI response is not an object.\"); ... }","symbol":"positive contrast: interview path validates strictly"}
+    ],"finding_titles":["Parsed AI responses enter app state without schema validation outside the interview surface"]},
+    {"id":"A-LLM-15","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"quota|rateLimit|spend|usage.total_tokens\" backend/src","scope":"AI call sites","quote":"0 hits: no pre-call quota of any kind; every holder of the shared passcode can invoke unlimited paid completions across explainer/journal/planner/coach surfaces."},
+      {"type":"absence","command":"rg -n \"usage\" backend/src/lib/ai/provider.ts","scope":"provider module","quote":"0 hits: the SDK usage block is discarded; no token attribution anywhere."}
+    ],"finding_titles":["AI spend is unbounded: no quota layer and no usage accounting"]},
+    {"id":"A-LLM-16","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"stream\" backend/src/lib/ai/provider.ts backend/src/server.ts","scope":"AI surfaces","quote":"0 hits: all chat paths buffer the full completion; users wait up to the 90s timeout for long generations."}
+    ],"finding_titles":["No streaming on user-facing chat and explainer paths"]},
+    {"id":"A-LLM-17","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"git ls-files | rg -i 'eval|golden|__tests__|\\.test\\.'","scope":"repository","quote":"0 test files of any kind exist; the quality-critical mentor features (journal coaching, planning, scoring) have no eval harness or CI gate."}
+    ],"finding_titles":["Zero tests exist for critical paths including AI feature quality"]},
+    {"id":"A-LLM-18","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -ln \"retrieval|RAG|vector|embedding\" backend/src","scope":"backend","quote":"0 hits: no retrieval, embeddings, or judge models are used."}
+    ]},
+    {"id":"A-LLM-19","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"prisma/schema.prisma","line":135,"quote":"model AiCallLog {\n  logId String @id @default(uuid())\n  surface String\n  latencyMs Int\n  success Boolean\n  errorMessage String?","symbol":"a real tracing table exists for legacy-journal/routine_plan/explainer surfaces"},
+      {"type":"source","path":"backend/src/server.ts","line":766,"quote":"const aiResponse = await aiChat(\n      \"You are Jujum AI, a strict, honest Hinglish mentor. Do not retain or repeat private journal text beyond your response.\",","symbol":"active journal feedback path bypasses AiCallLog entirely (deliberate privacy choice, undocumented tradeoff) and no surface captures token usage"}
+    ],"finding_titles":["AI spend is unbounded: no quota layer and no usage accounting"]},
+    {"id":"A-LLM-20","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"embedding|vector|pgvector\" backend/src prisma/schema.prisma -i","scope":"backend and schema","quote":"0 hits."}
+    ]},
+    {"id":"A-LLM-21","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"similarity|topK|rerank|hybrid\" backend/src -i","scope":"backend","quote":"0 hits: no retrieval pipeline exists."}
+    ]},
+    {"id":"A-LLM-22","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"tools\\s*:|tool_calls|function calling|max_iterations\" backend/src/lib/ai/provider.ts backend/src/server.ts -i","scope":"provider and call sites","quote":"0 hits: all calls are single-shot chat completions; no agentic loop exists to bound."}
+    ]},
+    {"id":"A-LLM-23","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":449,"quote":"if (typeof model !== \"string\" || model.trim().length < 3 || model.trim().length > 160) {","symbol":"the only validation on model ids is length; no allowlist check against /api/ai/models on any consumption path"},
+      {"type":"source","path":"backend/src/server.ts","line":592,"quote":"fs.writeFileSync(preamblePath, prompt, \"utf8\");","symbol":"runtime-writable system prompt bypasses the versioned registry in git"}
+    ],"finding_titles":["System prompt is writable at runtime through the API and lost on redeploy","Model selection accepts arbitrary caller strings and floats on unpinned aliases"]},
+    {"id":"A-LLM-24","outcome":"pass","confidence":"Tentative","evidence":[
+      {"type":"absence","command":"rg -n \"text-davinci|davinci|gpt-3.5-turbo-instruct|deprecated\" backend/src backend/prompts -i","scope":"callers and fixtures","quote":"0 retired ids found; defaults reference current provider catalogs. Static capability cannot verify catalog liveness online."}
+    ]},
+    {"id":"A-LLM-25","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":1001,"quote":"You are a collaborative study planner. The student has final control. Return valid JSON only.","symbol":"'Return valid JSON only' has a mechanical counterpart (jsonrepair + parse), but 'student has final control' is enforced only by prompt wording"},
+      {"type":"source","path":"backend/src/server.ts","line":1195,"quote":"Do NOT force background subjects (like Thermodynamics), exam tags, or study stats into greetings or unrelated prompts.","symbol":"behavioral claim with no mechanical gate; off_syllabus flag persisted without server-side enforcement (server.ts:2011 area)"}
+    ],"finding_titles":["Prompt-wording claims lack mechanical enforcement for scope control and syllabus gating"]}
+  ],
+  "findings": [
+    {
+      "title": "User content is interpolated into the system-role prompt without delimiters or isolation",
+      "severity": "High",
+      "confidence": "Firm",
+      "effort": "M",
+      "evidence": [
+        {"type":"source","path":"backend/src/server.ts","line":122,"quote":"fullPrompt = fullPrompt.replace(new RegExp(`\\\\{\\\\{${key}\\\\}`, \"g\"), String(value));"},
+        {"type":"source","path":"backend/src/server.ts","line":332,"quote":"const prompt = loadPrompt(\"journal.md\", {\n      user_name: settings?.name || \"Aspirant\",\n      date,\n      entry_text: content,"}
+      ],
+      "impact": "Journal entries, OCR text from uploaded images, topics, tags, and conversation history are concatenated into the same channel the model treats as trusted instructions; crafted content can override the mentor's constraints and steer output toward downstream consumers, including the renderer sinks already filed as F-SEC-1.",
+      "fix": "Pass durable instructions in the system role and move ALL user/retrieved content into user-role messages wrapped in explicit delimiters (<user_entry>...</user_entry>); add an instruction-resistance line and validate that template variables never contain the delimiters.",
+      "verify": "node -e \"const s=require('fs').readFileSync('D:/DOOR/backend/src/server.ts','utf8');console.log(/entry_text[^]*systemPrompt/.test(s))\" plus manual review that loadPrompt variables land in the user message",
+      "checks": ["A-LLM-2", "A-LLM-1"]
+    },
+    {
+      "title": "Parsed AI responses enter app state without schema validation outside the interview surface",
+      "severity": "High",
+      "confidence": "Firm",
+      "effort": "M",
+      "evidence": [
+        {"type":"source","path":"backend/src/server.ts","line":2011,"quote":"normalizedTopic: data.session?.topic || data.concept || topic || \"Uploaded Image Analysis\",","symbol":"deep property walks on unvalidated structures"},
+        {"type":"source","path":"backend/src/server.ts","line":2014,"quote":"explanationText: JSON.stringify(data)"},
+        {"type":"source","path":"backend/src/gateway.ts","line":28,"quote":"if (!Array.isArray(candidate.dimensions) || candidate.dimensions.length !== 5) throw new Error(\"AI must return five dimensions.\");","symbol":"strict validator exists only on the interview path"}
+      ],
+      "impact": "Malformed or hostile model output shapes propagate into Postgres and back to the browser renderer (the F-SEC-1 execution sink), producing runtime TypeErrors on odd shapes today and a persistent injection channel tomorrow; zod is already a backend dependency but is unused on these paths.",
+      "fix": "Define one zod schema per AI surface (explainer session/sections/quiz, plan-chat draftTasks/suggestions, general-chat action/layout) with additionalProperties restrictions; validate before persistence and return the structured parse error to the retry loop.",
+      "verify": "rg -c \"zod\" backend/src/server.ts (expect >=3 schema definitions)",
+      "checks": ["A-LLM-14", "A-LLM-23"]
+    },
+    {
+      "title": "AI spend is unbounded: no quota layer and no usage accounting",
+      "severity": "High",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"absence","command":"rg -n \"quota|rateLimit|total_tokens|usage\" backend/src","scope":"all AI call sites and provider module","quote":"0 hits: unlimited invocations per passcode holder across seven AI surfaces; usage block discarded at provider.ts:63."},
+        {"type":"source","path":"prisma/schema.prisma","line":135,"quote":"model AiCallLog {\n  logId String @id @default(uuid())\n  surface String\n  latencyMs Int\n  success Boolean"}
+      ],
+      "impact": "One leaked passcode converts directly into an open wallet: explainer vision calls and long generations can be invoked at unlimited rate with zero token attribution, and cost anomalies are invisible because usage is never recorded.",
+      "fix": "Capture response.usage into AiCallLog (promptTokens/completionTokens columns), add a per-day call/token ceiling checked in resolveAiConfiguration before dispatch, and mount the rate limiter from F-SEC-2 in front of AI routes.",
+      "verify": "rg -n \"total_tokens|dailyBudget\" backend/src (expect >=2 sites)",
+      "checks": ["A-LLM-15", "A-LLM-19"]
+    },
+    {
+      "title": "System prompt is writable at runtime through the API and lost on redeploy",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"source","path":"backend/src/server.ts","line":592,"quote":"fs.writeFileSync(preamblePath, prompt, \"utf8\");"},
+        {"type":"source","path":"render.yaml","line":7,"quote":"buildCommand: npm install --include=dev && npm run prisma:generate && npm run build","symbol":"redeploy restores the repo copy, silently discarding runtime edits"}
+      ],
+      "impact": "The mentor personality edited through settings silently reverts on every Render deploy, and the write path lets any passcode holder mutate the instruction file that every AI surface loads, with no version history.",
+      "fix": "Store the preamble override in the Settings table (Json column) instead of the filesystem, keep the repo file as fallback, and version changes through AiCallLog-like audit rows.",
+      "verify": "rg -n \"writeFileSync\" backend/src/server.ts (expect 0)",
+      "checks": ["A-LLM-23", "A-LLM-7"]
+    },
+    {
+      "title": "Model responses are consumed without checking finish_reason or truncation",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"source","path":"backend/src/lib/ai/provider.ts","line":63,"quote":"return response.choices[0]?.message?.content || \"\";"},
+        {"type":"source","path":"backend/src/lib/ai/provider.ts","line":23,"quote":"this.client = new OpenAI({","symbol":"client also rebuilt per call at server.ts:220 via createAiProvider"}
+      ],
+      "impact": "Length-truncated completions enter the JSON repair pipeline as if complete, burning the fallback retry and degrading answer quality; a fresh OpenAI client per request adds connection churn on every mentor interaction.",
+      "fix": "Branch on choices[0].finish_reason ('length' triggers a continuation or explicit degradation), hoist one OpenAI instance per provider into module scope keyed by credential, and treat refusals explicitly.",
+      "verify": "rg -n \"finish_reason\" backend/src/lib/ai/provider.ts (expect >=1)",
+      "checks": ["A-LLM-10", "A-LLM-11"]
+    },
+    {
+      "title": "Personal journal and study content is sent to LLM providers unminimized with no data-control configuration",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"source","path":"backend/src/server.ts","line":338,"quote":"history_context: historyContext,","symbol":"prior week's private entries included in provider payloads"},
+        {"type":"absence","command":"rg -n \"store:false|logprobs|data.*retention|ZDR\" backend/src/lib/ai/provider.ts","scope":"provider construction","quote":"0 hits: no provider data controls set; free-tier OpenRouter routing means payload destinations are not contractually bound."}
+      ],
+      "impact": "The product documents journals as private enough to encrypt at rest and isolate in D1, then transmits their plaintext (plus name, mood, study notes) to third-party model providers over ordinary API terms; the privacy posture is inconsistent between storage and inference.",
+      "fix": "Document the inference-privacy boundary in PRD, prefer providers with no-training/no-retention terms (OpenRouter provider routing flags where supported), strip or pseudimize name/history context where the feature tolerates it, and record the tradeoff next to the D1 encryption rationale.",
+      "verify": "rg -n \"no-train|retention|privacy\" backend/src/lib/ai/provider.ts PRD.md (expect >=1 documented stance)",
+      "checks": ["A-LLM-6"]
+    }
+  ],
+  "strengths": [
+    {"title":"Interview evaluation is the model-output validation exemplar","evidence":[
+      {"type":"source","path":"backend/src/gateway.ts","line":29,"quote":"function interviewIdentity(body: Record<string, unknown>) { const sessionId=typeof body.sessionId === \"string\"?body.sessionId.trim():\"\"; ... if(!/^[a-zA-Z0-9_-]{8,100}$/.test(sessionId)) throw new Error(\"Invalid interview session.\");"},
+      {"type":"source","path":"backend/src/gateway.ts","line":28,"quote":"const dimensions = candidate.dimensions.map((item,index) => { const numeric=Number(item?.value); if (!Number.isFinite(numeric)||numeric<0||numeric>2) throw new Error(\"Invalid score.\"); ..."}
+    ],"preserve":"Keep strict identity regexes, dimension-count checks, score clamping and rounding on every new AI-consuming endpoint; generalize this validator rather than diluting it."},
+    {"title":"Degrade-don't-fail AI integration keeps user data durable ahead of model output","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":224,"quote":"// A temporary D1 outage should reduce journal context, not take the planner or\n// coach offline."},
+      {"type":"source","path":"backend/src/server.ts","line":1517,"quote":"const fallbackPlan = await prisma.routinePlan.create({\n    data: {\n      date: today,\n      greeting: \"AI is offline, so a simple starter plan is ready.\","}
+    ],"preserve":"Preserve the pattern: persist user input first, treat model failure as a degraded-but-successful request, and never let an AI outage block writes."}
+  ]
+}

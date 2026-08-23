@@ -1,0 +1,31 @@
+{
+  "domain": "launch",
+  "dom": "LCH",
+  "checks": [
+    {"id":"A-LAUNCH-1","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application ... used daily for exam preparation","symbol":"no public launch event, landing page, or channel exists or is planned; deployment docs cover infrastructure only"}]},
+    {"id":"A-LAUNCH-2","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":31,"quote":"has no monetization"}]},
+    {"id":"A-LAUNCH-3","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":31,"quote":"no monetization","symbol":"no pricing page or checkout surface exists"}]},
+    {"id":"A-LAUNCH-4","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":31,"quote":"has no monetization"}]},
+    {"id":"A-LAUNCH-5","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"absence","command":"rg -ln waitlist|signup|newsletter frontend/app","scope":"web routes","quote":"0 hits: no pre-launch capture surface."}]},
+    {"id":"A-LAUNCH-6","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1","symbol":"audience is the owner; no launch communications exist"}]},
+    {"id":"A-LAUNCH-7","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-8","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-9","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-10","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-11","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-12","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-13","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-14","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-15","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-16","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-17","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-18","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-19","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-20","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-21","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-22","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]},
+    {"id":"A-LAUNCH-23","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":1,"quote":"Personal PRD v3.1"}]}
+  ],
+  "findings": [],
+  "strengths": []
+}

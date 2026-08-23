@@ -9,15 +9,16 @@ import {
 } from "react-native";
 import Animated, {
   FadeIn,
+  FadeInUp,
   FadeOut,
-  SlideInUp,
-  SlideOutUp,
+  FadeOutUp,
+  LinearTransition,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/providers/theme-provider";
-import { colors, radii } from "@/src/theme/tokens";
+import { colors } from "@/src/theme/tokens";
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -74,11 +75,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const showToast = useCallback(
-    ({ type, title, message, duration = 4500 }: Omit<ToastItem, "id">) => {
+    ({ type, title, message, duration = 4000 }: Omit<ToastItem, "id">) => {
+      // Clear existing active timers to avoid overlap pile-ups
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current.clear();
+
       const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const newToast: ToastItem = { id, type, title, message, duration };
 
-      // Haptic feedback
+      // Subtle haptic feedback
       try {
         if (type === "success") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -91,7 +96,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
       } catch {}
 
-      setToasts((prev) => [newToast, ...prev.slice(0, 1)]); // Keep at most 2 to avoid clutter
+      // Keep only the most recent toast for a clean, non-cluttered display
+      setToasts([newToast]);
 
       const timer = setTimeout(() => {
         dismissToast(id);
@@ -163,12 +169,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     >
       {children}
 
-      {/* Floating Toast Notification Stack */}
+      {/* Floating Notification Pill */}
       <View
         pointerEvents="box-none"
         style={[
           styles.toastContainer,
-          { top: Math.max(insets.top + 8, 16) },
+          { top: Math.max(insets.top + 8, Platform.OS === "android" ? 24 : 16) },
         ]}
       >
         {toasts.map((item) => {
@@ -179,7 +185,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               ? colors.rose
               : item.type === "warning"
               ? colors.amber
-              : colors.cyan;
+              : colors.blue;
 
           const typeIcon: keyof typeof Ionicons.glyphMap =
             item.type === "success"
@@ -190,37 +196,56 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               ? "warning"
               : "information-circle";
 
+          const iconBg =
+            item.type === "success"
+              ? isDark
+                ? "rgba(16, 185, 129, 0.14)"
+                : "rgba(5, 150, 105, 0.10)"
+              : item.type === "error"
+              ? isDark
+                ? "rgba(244, 63, 94, 0.14)"
+                : "rgba(225, 29, 72, 0.10)"
+              : item.type === "warning"
+              ? isDark
+                ? "rgba(245, 158, 11, 0.14)"
+                : "rgba(217, 119, 6, 0.10)"
+              : isDark
+              ? "rgba(59, 130, 246, 0.14)"
+              : "rgba(37, 99, 235, 0.10)";
+
           return (
             <Animated.View
               key={item.id}
-              entering={SlideInUp.duration(320)}
-              exiting={SlideOutUp.duration(280)}
+              entering={FadeInUp.springify().damping(22).stiffness(180).mass(0.6)}
+              exiting={FadeOutUp.duration(200)}
+              layout={LinearTransition.springify().damping(20).stiffness(160)}
               style={[
                 styles.toastPill,
                 {
-                  backgroundColor: isDark ? "#121215" : "#ffffff",
-                  borderColor: isDark ? "#27272A" : "#e2e8f0",
-                  shadowColor: isDark ? "#000000" : "#64748b",
+                  backgroundColor: isDark ? "#141418" : "#ffffff",
+                  borderColor: isDark ? "#24242A" : "#e2e8f0",
+                  shadowColor: isDark ? "#000000" : "#0f172a",
                 },
               ]}
             >
               <Pressable
-                onPress={() => dismissToast(item.id)}
-                style={styles.toastPressable}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  dismissToast(item.id);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.title}. Tap to dismiss notification`}
+                style={({ pressed }) => [
+                  styles.toastPressable,
+                  pressed && { opacity: 0.85 },
+                ]}
               >
-                <View
-                  style={[
-                    styles.toastIconWrapper,
-                    {
-                      backgroundColor: isDark
-                        ? "rgba(255, 255, 255, 0.04)"
-                        : "rgba(0, 0, 0, 0.03)",
-                    },
-                  ]}
-                >
-                  <Ionicons name={typeIcon} size={20} color={typeColor} />
+                {/* Status Indicator Icon Tile */}
+                <View style={[styles.toastIconWrapper, { backgroundColor: iconBg }]}>
+                  <Ionicons name={typeIcon} size={18} color={typeColor} />
                 </View>
 
+                {/* Text Content */}
                 <View style={styles.toastTextWrapper}>
                   <Text
                     style={[
@@ -231,7 +256,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                   >
                     {item.title}
                   </Text>
-                  {item.message ? (
+                  {Boolean(item.message) && (
                     <Text
                       style={[
                         styles.toastMessage,
@@ -241,40 +266,58 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     >
                       {item.message}
                     </Text>
-                  ) : null}
+                  )}
                 </View>
 
-                <Ionicons
-                  name="close"
-                  size={16}
-                  color={isDark ? "#71717A" : theme.textFaint}
-                  style={styles.toastCloseIcon}
-                />
+                {/* Close Button */}
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    dismissToast(item.id);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss notification"
+                  hitSlop={10}
+                  style={styles.toastCloseBtn}
+                >
+                  <Ionicons
+                    name="close"
+                    size={15}
+                    color={isDark ? "#71717A" : theme.textFaint}
+                  />
+                </Pressable>
               </Pressable>
             </Animated.View>
           );
         })}
       </View>
 
-      {/* Custom Confirmation Modal Dialog */}
+      {/* Confirmation Modal Dialog */}
       {confirmDialog ? (
         <Modal
           visible={true}
           transparent={true}
           animationType="fade"
+          statusBarTranslucent={true}
           onRequestClose={handleCancelAction}
         >
           <View style={styles.modalOverlay}>
-            <Pressable style={styles.modalBackdrop} onPress={handleCancelAction} />
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={handleCancelAction}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss dialog"
+            />
 
             <Animated.View
-              entering={FadeIn.duration(200)}
-              exiting={FadeOut.duration(150)}
+              entering={FadeIn.duration(180)}
+              exiting={FadeOut.duration(140)}
               style={[
                 styles.dialogCard,
                 {
                   backgroundColor: isDark ? "#121215" : "#ffffff",
-                  borderColor: isDark ? "#27272A" : "#e2e8f0",
+                  borderColor: isDark ? "#24242A" : "#e2e8f0",
                 },
               ]}
             >
@@ -305,10 +348,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                   name={
                     confirmDialog.icon ||
                     (confirmDialog.tone === "destructive"
-                      ? "trash-outline"
+                      ? "lock-closed-outline"
                       : "help-circle-outline")
                   }
-                  size={24}
+                  size={22}
                   color={
                     confirmDialog.tone === "destructive"
                       ? colors.rose
@@ -342,11 +385,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 <Pressable
                   onPress={handleCancelAction}
                   disabled={confirmBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel={confirmDialog.cancelLabel || "Cancel"}
                   style={({ pressed }) => [
                     styles.dialogCancelButton,
                     {
-                      backgroundColor: isDark ? "#18181D" : "#f4f4f5",
-                      borderColor: isDark ? "#27272A" : "#e4e4e7",
+                      backgroundColor: isDark ? "#18181D" : "#f1f5f9",
+                      borderColor: isDark ? "#26262D" : "#e2e8f0",
                     },
                     pressed && { opacity: 0.75 },
                   ]}
@@ -364,6 +409,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 <Pressable
                   onPress={handleConfirmAction}
                   disabled={confirmBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel={confirmDialog.confirmLabel || "Confirm"}
                   style={({ pressed }) => [
                     styles.dialogConfirmButton,
                     {
@@ -380,10 +427,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     style={[
                       styles.dialogConfirmText,
                       {
-                        color:
-                          confirmDialog.tone === "destructive"
-                            ? "#ffffff"
-                            : "#09090B",
+                        color: "#ffffff",
                       },
                     ]}
                   >
@@ -410,31 +454,31 @@ export function useNotify() {
 }
 
 const styles = StyleSheet.create({
-  // Toast styles
+  // Floating Toast Stack
   toastContainer: {
     position: "absolute",
     left: 16,
     right: 16,
     zIndex: 99999,
-    gap: 8,
     alignItems: "center",
   },
   toastPill: {
     width: "100%",
-    borderRadius: 14,
+    maxWidth: 420,
+    borderRadius: 16,
     borderWidth: 1,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 8,
     overflow: "hidden",
   },
   toastPressable: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 10,
   },
   toastIconWrapper: {
     width: 32,
@@ -446,20 +490,22 @@ const styles = StyleSheet.create({
   toastTextWrapper: {
     flex: 1,
     gap: 2,
+    justifyContent: "center",
   },
   toastTitle: {
     fontSize: 13.5,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: -0.2,
   },
   toastMessage: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "400",
     lineHeight: 16,
   },
-  toastCloseIcon: {
+  toastCloseBtn: {
     padding: 4,
-    opacity: 0.6,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Modal dialog styles
@@ -467,15 +513,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.72)",
-    padding: 24,
+    backgroundColor: "rgba(0, 0, 0, 0.68)",
+    padding: 20,
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
   },
   dialogCard: {
     width: "100%",
-    maxWidth: 360,
+    maxWidth: 340,
     borderRadius: 20,
     borderWidth: 1,
     padding: 20,
@@ -488,9 +534,9 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   dialogIconBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -501,14 +547,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dialogTitle: {
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: 16.5,
+    fontWeight: "700",
     letterSpacing: -0.3,
     textAlign: "center",
   },
   dialogMessage: {
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "400",
     lineHeight: 18,
     textAlign: "center",
   },
@@ -528,7 +574,7 @@ const styles = StyleSheet.create({
   },
   dialogCancelText: {
     fontSize: 13.5,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   dialogConfirmButton: {
     flex: 1,
@@ -539,6 +585,6 @@ const styles = StyleSheet.create({
   },
   dialogConfirmText: {
     fontSize: 13.5,
-    fontWeight: "800",
+    fontWeight: "700",
   },
 });

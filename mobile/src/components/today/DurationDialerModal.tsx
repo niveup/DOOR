@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import { useTheme } from "@/src/providers/theme-provider";
 import { layout, radii, shadows, spacing, typography } from "@/src/theme/tokens";
 

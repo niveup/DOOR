@@ -52,7 +52,7 @@ export function StudyLogForm({ subjects, busy, onSave }: StudyLogFormProps) {
 
   return (
     <View style={styles.formContainer}>
-      {/* 1. Header Area */}
+      {/* 1. Header Block */}
       <View style={styles.headerBlock}>
         <Text
           style={[
@@ -68,7 +68,7 @@ export function StudyLogForm({ subjects, busy, onSave }: StudyLogFormProps) {
             { color: theme.textMuted },
           ]}
         >
-          Record your focused block to update readiness and track goal progress.
+          Record your focused work to update readiness and track daily goals.
         </Text>
       </View>
 
@@ -107,9 +107,10 @@ export function StudyLogForm({ subjects, busy, onSave }: StudyLogFormProps) {
             ]}
             value={customSubject}
             onChangeText={setCustomSubject}
-            placeholder="e.g. Operating Systems"
+            placeholder="e.g. Thermodynamics"
             placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
             autoCapitalize="sentences"
+            accessibilityLabel="Subject name"
           />
         )}
       </View>
@@ -172,6 +173,7 @@ export function StudyLogForm({ subjects, busy, onSave }: StudyLogFormProps) {
             keyboardType="decimal-pad"
             placeholder="1"
             placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
+            accessibilityLabel="Exact study hours"
           />
         </View>
 
@@ -195,6 +197,7 @@ export function StudyLogForm({ subjects, busy, onSave }: StudyLogFormProps) {
             keyboardType="number-pad"
             placeholder="0"
             placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
+            accessibilityLabel="Questions solved"
           />
         </View>
       </View>
@@ -221,6 +224,7 @@ export function StudyLogForm({ subjects, busy, onSave }: StudyLogFormProps) {
           multiline
           placeholder="Topics covered, problem areas, or formulas revised"
           placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
+          accessibilityLabel="Session notes"
         />
       </View>
 
@@ -248,22 +252,23 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     ...typography.largeHeading,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     letterSpacing: -0.3,
   },
   sheetSubtitle: {
     ...typography.caption,
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   fieldGroup: {
     gap: spacing.xs,
   },
   fieldLabel: {
     ...typography.label,
-    fontSize: 10,
+    fontSize: 9.5,
     letterSpacing: 0.8,
+    fontWeight: "700",
   },
   horizontalChipRow: {
     gap: spacing.xs,
@@ -288,13 +293,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: spacing.sm,
     fontSize: 13.5,
+    fontVariant: ["tabular-nums"],
   },
   multilineInput: {
-    height: 76,
+    height: 72,
     textAlignVertical: "top",
     paddingTop: spacing.xs,
+    fontVariant: undefined,
   },
   actionBlock: {
     paddingTop: spacing.xxs,
   },
 });
+

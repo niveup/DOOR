@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@/src/components/app-icon";
 import { FinanceCategory } from "@/src/types/domain";
 import { CATEGORY_TOKENS } from "@/src/components/finance/FinanceConstants";
 

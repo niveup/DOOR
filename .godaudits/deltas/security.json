@@ -1,0 +1,296 @@
+{
+  "domain": "security",
+  "dom": "SEC",
+  "checks": [
+    {"id":"A-SEC-1","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":279,"quote":"app.use(passcodeAuth);"},
+      {"type":"source","path":"backend/src/gateway.ts","line":24,"quote":"function requirePasscode(req: Request, res: Response) { const expected = process.env.APP_PASSCODE; if (!expected || expected.length < 8) { res.status(503).json({ error: \"Backend authentication is not configured.\" }); return false; }"},
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":713,"quote":"const session = await getSession();\n  if (!session.isLoggedIn) return NextResponse.json({ error: \"Unauthorized\" }, { status: 401 });"}
+    ]},
+    {"id":"A-SEC-2","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":613,"quote":"const fn = new Function(\"x\", `return ${expr}`);"},
+      {"type":"absence","command":"rg -n \"DOMPurify|sanitize-html|dompurify\" frontend/components frontend/app frontend/package.json --glob '!node_modules' -i","scope":"frontend product code and manifest","quote":"0 hits for a sanitizer library in code or dependencies; AI markdown, SVG blocks, and journal HTML are rendered with hand-rolled escaping only."}
+    ],"finding_titles":["AI-generated output is executed with new Function and injected as raw SVG in the renderer"]},
+    {"id":"A-SEC-3","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"model User\" prisma/schema.prisma backend/prisma/schema.prisma","scope":"both Prisma schemas","quote":"0 hits: no user/owner/tenant model exists; every table is single-principal (Settings id=default, FinanceBudget id=default). Object-level ownership predicates have no surface to bind."},
+      {"type":"source","path":"PRD.md","line":14,"quote":"No complex auth system (no users table, no password recovery, no OAuth).\n* No row-level security (RLS) or multi-tenant isolation."}
+    ]},
+    {"id":"A-SEC-4","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":398,"quote":"const dataToUpdate: Record<string, any> = {};\n    if (name !== undefined) dataToUpdate.name = String(name);\n    if (dailyAvailableHours !== undefined) dataToUpdate.dailyAvailableHours = Number(dailyAvailableHours);"},
+      {"type":"source","path":"backend/src/server.ts","line":248,"quote":"activeProvider: credentials.find((credential) => credential.isActive)?.provider || null,\n    activeModel: credentials.find((credential) => credential.isActive)?.model || null,\n    providers: ... keyHint: credential?.keyHint || null"}
+    ]},
+    {"id":"A-SEC-5","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"jwt.decode|jsonwebtoken|X-User-Id|x-user-id\" backend/src frontend/lib mobile/src","scope":"all first-party auth surfaces","quote":"0 hits: no JWT handling and no client-supplied identity headers exist; the Vercel relay injects the passcode server-side."},
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":767,"quote":"const headers = new Headers({ accept: \"application/json\", \"x-passcode\": passcode });"}
+    ]},
+    {"id":"A-SEC-6","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":273,"quote":"if (!expected || expected.length < 8) return res.status(503).json({ error: \"Backend authentication is not configured.\" });\n  const received = typeof req.headers[\"x-passcode\"] === \"string\" ? req.headers[\"x-passcode\"] : \"\";"},
+      {"type":"source","path":"frontend/app/api/auth/route.ts","line":17,"quote":"export async function POST(request: NextRequest) {\n  try {\n    const contentLength = Number(request.headers.get(\"content-length\") || 0);\n    if (contentLength > 1024) {"},
+      {"type":"absence","command":"rg -n \"express-rate-limit|rateLimit|throttle|blockedUntil.*attempt|loginAttempts\" backend/src frontend/app frontend/lib","scope":"backend and frontend server code","quote":"0 hits: no rate limiting or attempt-throttling exists on /api/auth, /api/auth/verify, or any other endpoint."}
+    ],"finding_titles":["No rate limiting or brute-force throttling exists on any endpoint including passcode verification"]},
+    {"id":"A-SEC-7","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"frontend/lib/session.ts","line":11,"quote":"cookieOptions: { secure: process.env.NODE_ENV === \"production\", httpOnly: true, sameSite: \"lax\", maxAge: 604800, path: \"/\"","symbol":"sessionOptions"},
+      {"type":"source","path":"frontend/lib/session.ts","line":8,"quote":"journalUnlockedUntil?: number;\n  journalUnlockFailures?: number;\n  journalUnlockBlockedUntil?: number;"}
+    ]},
+    {"id":"A-SEC-8","outcome":"pass","confidence":"Certain","evidence":[
+      {"type":"absence","command":"rg -n \"\\$queryRaw|\\$executeRaw|child_process|shell:|\\.exec\\(\" backend/src cloudflare/journal-store/src","scope":"all first-party data-access and worker code","quote":"0 hits: all persistence goes through Prisma's parameterized client API; no raw SQL construction and no shell invocation exists."},
+      {"type":"source","path":"cloudflare/journal-store/src/index.ts","line":80,"quote":"INSERT INTO journal_entries (id, entry_date, ciphertext, created_at, edited_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(entry_date) DO UPDATE SET ciphertext = excluded.ciphertext\n  ).bind(input.id, input.date, input.ciphertext, input.createdAt, input.editedAt).run();"}
+    ]},
+    {"id":"A-SEC-9","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":499,"quote":"dangerouslySetInnerHTML={{ __html: cleanCode }}","symbol":"SvgViewer"},
+      {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":492,"quote":"const cleanCode = code.trim();\n  if (!cleanCode.startsWith(\"<svg\")) {\n    return <pre className=...>Invalid SVG markup.</pre>;\n  }","symbol":"SvgViewer guard"},
+      {"type":"source","path":"frontend/app/journal/page.tsx","line":214,"quote":"return `<div><span class=\"journal-prompt-question\">${escapeHtml(promptLabel)}</span><span class=\"journal-user-ink\">${escapeHtml(userContent)}</span></div>`;"}
+    ],"finding_titles":["AI-generated output is executed with new Function and injected as raw SVG in the renderer"]},
+    {"id":"A-SEC-10","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/ai/provider.ts","line":25,"quote":"baseURL: options.provider === \"nvidia\"\n        ? \"https://integrate.api.nvidia.com/v1\"\n        : options.provider === \"cerebras\"\n          ? \"https://api.cerebras.ai/v1\"\n          : \"https://openrouter.ai/api/v1\""},
+      {"type":"source","path":"backend/src/lib/private-journal-store.ts","line":44,"quote":"if (url.protocol !== \"https:\") throw new Error(\"CF_JOURNAL_STORE_URL must use HTTPS.\");"}
+    ]},
+    {"id":"A-SEC-11","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/ai/credentials.ts","line":10,"quote":"function encryptionKey(): Buffer {\n  const secret = process.env.AI_CREDENTIAL_ENCRYPTION_KEY || process.env.SESSION_SECRET;\n  if (!secret || secret.length < 16) {\n    throw new Error(...);\n  }\n  return crypto.createHash(\"sha256\").update(secret).digest();"},
+      {"type":"absence","command":"rg -n \"keyId|key_id|version|rotation\" backend/src/lib/ai/credentials.ts","scope":"credentials module","quote":"0 hits: no key versioning or rotation mechanism; rotating SESSION_SECRET or AI_CREDENTIAL_ENCRYPTION_KEY silently breaks decryption of every stored provider credential."},
+      {"type":"source","path":"render.yaml","line":26,"quote":"- key: AI_CREDENTIAL_ENCRYPTION_KEY\n        sync: false # Optional key for AI credentials (defaults to SESSION_SECRET if not set)"}
+    ],"finding_titles":["AI credential encryption has no rotation path and falls back to SESSION_SECRET"]},
+    {"id":"A-SEC-12","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/private-tracker-store.ts","line":63,"quote":"const result = await signedFetch(\"/v1/tracker/logs\", {\n      method: \"POST\",\n      headers: { \"Content-Type\": \"application/json\" },\n      body: JSON.stringify(log),\n    });","symbol":"plaintext tracker log to D1"},
+      {"type":"source","path":"backend/src/lib/private-journal-store.ts","line":74,"quote":"const cipher = crypto.createCipheriv(\"aes-256-gcm\", journalEncryptionKey(), iv);","symbol":"journal encrypted before D1"},
+      {"type":"source","path":"backend/src/server.ts","line":1440,"quote":"await prisma.aiCallLog.create({\n    data: {\n      surface: \"routine_plan\",\n      latencyMs: Date.now() - startedAt,\n      success: Boolean(aiResponse),\n      errorMessage: aiError,\n      promptPreview: systemPrompt,\n      responsePreview: aiResponse,"}
+    ],"finding_titles":["Sensitive-data protection is inconsistent across stores and AI logs retain full prompt text"]},
+    {"id":"A-SEC-13","outcome":"pass","confidence":"Certain","evidence":[
+      {"type":"absence","command":"git ls-files | rg '\\.env$|\\.pem$|\\.key$|secret|credential'","scope":"entire tracked tree at commit d826add","quote":"Only .env.example templates match. backend/.env exists locally but is untracked and gitignored (git check-ignore passes). No key material tracked."},
+      {"type":"tool","tool":"git-history-regex-sweep","tool_version":"git 2.x + PowerShell 5.1","command":"git log --all -p | regex 'sk-or-v1-[A-Za-z0-9]{20}|sk-proj-[A-Za-z0-9]{20}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30}|nvapi-[A-Za-z0-9]{20}|csk-[A-Za-z0-9]{20}'","quote":"All six provider-shaped patterns: 0 matches across full history of all branches."}
+    ]},
+    {"id":"A-SEC-14","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"Test-Path .pre-commit-config.yaml; rg -ln \"gitleaks|detect-secrets|trufflehog\" .github .","scope":"repository root and CI workflows","quote":"false / 0 hits: no secret scanner is configured in pre-commit or CI at any scope."}
+    ],"finding_titles":["No secret scanning is wired into pre-commit or CI"]},
+    {"id":"A-SEC-15","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"helmet|Strict-Transport-Security|Content-Security-Policy|X-Content-Type-Options|nosniff\" backend/src","scope":"Express gateway and API source","quote":"0 hits: the Express API mounts no security-header middleware; only the Vercel relay adds x-content-type-options to proxied responses."},
+      {"type":"source","path":"backend/src/server.ts","line":377,"quote":"} catch (error: any) {\n      res.status(500).json({ error: error.message });\n    }","symbol":"settings getter error path (pattern repeats ~30 times)"},
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":782,"quote":"const responseHeaders = new Headers({ \"x-content-type-options\": \"nosniff\" });"}
+    ],"finding_titles":["API responses ship without security headers and internal error messages reach clients"]},
+    {"id":"A-SEC-16","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"express-rate-limit|rateLimit\" backend/src frontend/app","scope":"all server entry points","quote":"0 hits: no limiter exists on authentication, AI-spend, reset, or export endpoints on any of the three surfaces."},
+      {"type":"source","path":"backend/src/gateway.ts","line":20,"quote":"app.use(express.raw({ type: () => true, limit: \"8mb\" }));"},
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":13,"quote":"const MAX_BODY_BYTES = 6 * 1024 * 1024;"}
+    ],"finding_titles":["No rate limiting or brute-force throttling exists on any endpoint including passcode verification"]},
+    {"id":"A-SEC-17","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":".github/workflows/vercel-production-check.yml","line":27,"quote":"- working-directory: frontend\n        run: npm install --legacy-peer-deps --include=dev --no-audit --no-fund"},
+      {"type":"source","path":".github/workflows/vercel-production-check.yml","line":22,"quote":"- uses: actions/checkout@v4\n      - uses: actions/setup-node@v4"},
+      {"type":"absence","command":"rg -n \"npm ci|--immutable|audit --audit-level|osv-scanner|sbom\" .github/workflows","scope":"all workflows","quote":"0 hits: lockfiles exist but CI installs with npm install and runs no SCA/audit gate."}
+    ],"finding_titles":["CI installs with npm install despite lockfiles, uses floating action tags, and has no SCA gate"]},
+    {"id":"A-SEC-18","outcome":"unknown","confidence":"Tentative","evidence":[
+      {"type":"source","path":".github/workflows/verify-audit-fixes.yml","line":7,"quote":"permissions:\n  contents: read"}
+    ],"question":"Are production branches (main/deploy/*) protected with required checks and no force-push on GitHub? Branch settings are not visible statically."},
+    {"id":"A-SEC-19","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"graphql|webhook|Apollo|EventSource|WebSocket\" backend/src cloudflare/journal-store/src -i","scope":"first-party API surfaces","quote":"0 hits: no GraphQL, webhook receivers, or realtime endpoints exist; conditional sub-parts are absent."},
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":771,"quote":"const controller = new AbortController();\n  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);","symbol":"bounded outbound client"}
+    ]},
+    {"id":"A-SEC-20","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/lib/logger.ts","line":4,"quote":"function sanitize(value: unknown): unknown {\n ... value.replace(/(api[_-]?key|passcode|secret|token)\\s*[:=]\\s*\\S+/gi, \"$1=[redacted]\");","symbol":"redacting formatter"},
+      {"type":"absence","command":"rg -n \"lib/logger|logger\\.(info|warn|error)\" backend/src","scope":"entire backend source","quote":"0 imports: the redacting logger is never used; backend/src makes 41 raw console.log/error/warn calls including [CORS] Checking Origin logging at server.ts:33."},
+      {"type":"source","path":"backend/src/server.ts","line":276,"quote":"if (crypto.timingSafeEqual(...)) return next();\n  return res.status(401).json({ error: \"Unauthorized\" });","symbol":"silent auth-failure branch without actor/IP log"}
+    ],"finding_titles":["Redacting logger exists but is never wired; security events go through raw console calls"]},
+    {"id":"A-SEC-21","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"PHI|HIPAA|GDPR|DPDP\" backend/src prisma/schema.prisma","scope":"first-party runtime and schema","quote":"0 hits: the HIPAA evidence signal does not reproduce in current source; PRD v3.1 Section 1.2 explicitly scopes the product out of compliance regimes and no regulated-data fields exist in the schema."}
+    ]},
+    {"id":"A-SEC-22","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"git ls-files | rg 'Dockerfile|\\.tf$|k8s/|helm|securityContext'","scope":"tracked tree","quote":"0 hits: no containers or IaC files exist; deployment is PaaS-native via render.yaml, vercel, and wrangler.toml."}
+    ]},
+    {"id":"A-SEC-23","outcome":"fail","confidence":"Certain","evidence":[
+      {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":613,"quote":"const fn = new Function(\"x\", `return ${expr}`);\n      const val = fn(x);","symbol":"FunctionGraphBlock.evaluate"},
+      {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":976,"quote":"if (data.type === \"function\") { ... return <FunctionGraphBlock equation={data.equation || \"x\"} range={data.range} />; }","symbol":"AI JSON dispatch into exec sink"},
+      {"type":"source","path":"backend/src/server.ts","line":2014,"quote":"explanationText: JSON.stringify(data)","symbol":"unvalidated AI JSON persisted and served back to renderer"}
+    ],"finding_titles":["AI-generated output is executed with new Function and injected as raw SVG in the renderer"]},
+    {"id":"A-SEC-24","outcome":"fail","confidence":"Certain","evidence":[
+      {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":613,"quote":"const fn = new Function(\"x\", `return ${expr}`);"},
+      {"type":"absence","command":"rg -n \"lib/logger|logger\\.(info|warn|error)\" backend/src","scope":"entire backend source","quote":"0 imports: redaction control defined at backend/src/lib/logger.ts:4-11 is unwired while 41 raw console calls ship."},
+      {"type":"source","path":".github/workflows/verify-audit-fixes.yml","line":25,"quote":"branches: [fix/audit-report-2026-07-11]","symbol":"security assertions workflow scoped to one stale branch, not main"}
+    ],"finding_titles":["AI-generated output is executed with new Function and injected as raw SVG in the renderer","Redacting logger exists but is never wired; security events go through raw console calls"]},
+    {"id":"A-SEC-25","outcome":"fail","confidence":"Firm","evidence":[
+      {"type":"absence","command":"git ls-files | rg -i 'SECURITY\\.md|security\\.txt'","scope":"tracked tree","quote":"0 hits: an internet-deployed app ships no disclosure baseline (no SECURITY.md, no /.well-known/security.txt route or file)."}
+    ],"finding_titles":["Deployed app ships no security disclosure baseline (SECURITY.md / security.txt)"]},
+    {"id":"A-SEC-26","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"tool","tool":"node-lockfile-version-read","tool_version":"v24.12.0","command":"node -e \"require('D:/DOOR/backend/package-lock.json').packages['node_modules/express'].version; ...same for next/react/@prisma/client/openai\"","quote":"express 4.22.2; @prisma/client 5.22.0; openai 4.104.0; next 16.2.9; react 19.2.4 — all current-line majors with known historical CVEs patched in these versions. Static capability: no live advisory feed consulted."}
+    ]},
+    {"id":"A-SEC-27","outcome":"pass","confidence":"Certain","evidence":[
+      {"type":"tool","tool":"git-history-regex-sweep","tool_version":"git 2.x + PowerShell 5.1","command":"git log --all -p -- . | measure provider-shaped patterns (openrouter sk-or-v1, openai sk-proj, AWS AKIA, GitHub ghp_, NVIDIA nvapi-, Cerebras csk-)","quote":"0 matches across all six patterns over full multi-branch history; no deleted .env ever committed (only .env.example templates appear)."}
+    ]},
+    {"id":"A-SEC-28","outcome":"unknown","confidence":"Tentative","evidence":[],"question":"Final OWASP A01-A10 disposition pass runs after the full check ledger is merged; dispositions will be recorded in audit.standards."},
+    {"id":"A-SEC-29","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":712,"quote":"async function relay(request: NextRequest, context: RouteContext) {\n  const session = await getSession();\n  if (!session.isLoggedIn) return NextResponse.json({ error: \"Unauthorized\" }, { status: 401 });"},
+      {"type":"source","path":"backend/src/gateway.ts","line":32,"quote":"app.post(\"/api/interview/evaluate\", async (req,res)=>{ if(!requirePasscode(req,res))return;"},
+      {"type":"source","path":"cloudflare/journal-store/src/index.ts","line":42,"quote":"if (!Number.isInteger(seconds) || Math.abs(Date.now() - seconds * 1000) > 5 * 60 * 1000 || !supplied) return false;","symbol":"worker HMAC replay window applies to every handler path"}
+    ]},
+    {"id":"A-SEC-30","outcome":"fail","confidence":"Certain","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":2748,"quote":"targetBill = await bill.findFirst({\n          where: { OR: [{ id }, { paid: false }] },\n          orderBy: { createdAt: \"desc\" },\n        });","symbol":"unknown id falls back to arbitrary unpaid bill"},
+      {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":653,"quote":"if (!targetBill) return NextResponse.json({ error: \"Bill not found.\" }, { status: 404 });","symbol":"relay twin returns 404 instead — implementations diverge"}
+    ],"finding_titles":["Bill-pay endpoint pays an arbitrary unpaid bill when the requested bill id does not exist"]},
+    {"id":"A-SEC-31","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -ln \"gtag\\(|fbq\\(|googletagmanager|hotjar|posthog|plausible|umami\" frontend/app frontend/components mobile/src","scope":"web and mobile product surfaces","quote":"0 hits: no third-party trackers or analytics fire anywhere; no non-essential cookies beyond the iron-session cookie."}
+    ]},
+    {"id":"A-SEC-32","outcome":"not-applicable","confidence":"Firm","evidence":[
+      {"type":"absence","command":"rg -n \"PHI|HIPAA|card|PAN\" prisma/schema.prisma backend/src -i","scope":"schema and runtime","quote":"0 regulated-data fields: schema stores study/finance/journal records only; PRD v3.1 Section 1.2 documents compliance out of scope. Regulatory overlay refuted."}
+    ]},
+    {"id":"A-SEC-33","outcome":"pass","confidence":"Firm","evidence":[
+      {"type":"source","path":"backend/src/gateway.ts","line":33,"quote":"await prisma.interviewAttempt.upsert({where:{sessionId_questionIndex:{sessionId:id.sessionId,questionIndex:id.questionIndex}},update:{skipped:true,...}","symbol":"retry-safe natural-key upsert"},
+      {"type":"source","path":"backend/src/server.ts","line":2761,"quote":"const expenseId = `bill-${targetBill.id}`;\n     ... await expense.upsert({ where: { id: expenseId }, ...","symbol":"bill-pay creates deterministic-id expense, retry-safe"},
+      {"type":"absence","command":"rg -n \"WebSocket|EventSource|text/event-stream|socket.io\" backend/src frontend/app frontend/components mobile/src","scope":"all first-party client/server code","quote":"0 hits: no realtime surfaces exist; all flows are request/response with natural-key idempotent writes."}
+    ]}
+  ],
+  "findings": [
+    {
+      "title": "AI-generated output is executed with new Function and injected as raw SVG in the renderer",
+      "severity": "Critical",
+      "confidence": "Certain",
+      "effort": "M",
+      "evidence": [
+        {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":613,"quote":"const fn = new Function(\"x\", `return ${expr}`);\n      const val = fn(x);"},
+        {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":976,"quote":"if (data.type === \"function\") {\n      ...\n      return <FunctionGraphBlock equation={data.equation || \"x\"} range={data.range} />;"},
+        {"type":"source","path":"frontend/components/AiMarkdown.tsx","line":499,"quote":"dangerouslySetInnerHTML={{ __html: cleanCode }}"},
+        {"type":"source","path":"backend/src/server.ts","line":2014,"quote":"explanationText: JSON.stringify(data)"}
+      ],
+      "impact": "Any content that steers the explainer model (a crafted topic, OCR text from an uploaded image, or a compromised/malicious free-tier model) can make the browser execute arbitrary JavaScript in the logged-in session via the function-graph block, or inject script-bearing SVG. The payload persists in ConceptExplanation.explanationText and re-executes on every future render of that explanation.",
+      "fix": "Remove the new Function sink: parse equations with a restricted math parser (mathjs evaluate with a narrow node allowlist, or a small shunting-yard evaluator) and render plots from its output. Sanitize every AI-derived HTML/SVG sink with DOMPurify (allowing only svg/path/circle/etc.) before dangerouslySetInnerHTML, and strip event handlers and foreignObject.",
+      "verify": "rg -n \"new Function\" frontend/components && rg -c \"DOMPurify.sanitize\" frontend/components (expect 0 and >=2)",
+      "checks": ["A-SEC-23", "A-SEC-9", "A-SEC-2", "A-SEC-24"]
+    },
+    {
+      "title": "No rate limiting or brute-force throttling exists on any endpoint including passcode verification",
+      "severity": "High",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"absence","command":"rg -n \"express-rate-limit|rateLimit|throttle\" backend/src frontend/app frontend/lib","scope":"all three server surfaces","quote":"0 hits across gateway.ts, server.ts, Next.js api routes."},
+        {"type":"source","path":"backend/src/server.ts","line":273,"quote":"if (!expected || expected.length < 8) return res.status(503).json({ error: \"Backend authentication is not configured.\" });","symbol":"single shared static passcode is the only factor"}
+      ],
+      "impact": "The internet-facing Render URL accepts unlimited guesses against the single shared APP_PASSCODE that guards every endpoint, and unlimited invocations of paid AI endpoints once any caller holds the passcode. A leaked passcode cannot be contained by lockout because no counter exists.",
+      "fix": "Add express-rate-limit (and a Vercel edge rate limit on the relay): strict window on /api/auth*, per-key windows on AI and export endpoints, and a failure counter with temporary lockout mirroring the journal-unlock brake already present in frontend/lib/session.ts.",
+      "verify": "rg -n \"rateLimit\" backend/src/server.ts frontend/app/api/auth/route.ts (expect >=2 sites)",
+      "checks": ["A-SEC-16", "A-SEC-6"]
+    },
+    {
+      "title": "AI credential encryption has no rotation path and falls back to SESSION_SECRET",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "M",
+      "evidence": [
+        {"type":"source","path":"backend/src/lib/ai/credentials.ts","line":10,"quote":"const secret = process.env.AI_CREDENTIAL_ENCRYPTION_KEY || process.env.SESSION_SECRET;\n  ... return crypto.createHash(\"sha256\").update(secret).digest();"},
+        {"type":"source","path":"render.yaml","line":26,"quote":"sync: false # Optional key for AI credentials (defaults to SESSION_SECRET if not set)"}
+      ],
+      "impact": "Rotating SESSION_SECRET (the documented session-signing secret) silently breaks decryption of every stored provider API key, taking AI features down until keys are re-entered; there is no versioned key id to perform a controlled re-encryption rotation after suspected compromise.",
+      "fix": "Add keyVersion column to AiProviderCredential, derive keys via HKDF with a recorded key id, require AI_CREDENTIAL_ENCRYPTION_KEY explicitly (drop the SESSION_SECRET fallback), and add a re-encrypt-on-boot routine that migrates rows from old key versions.",
+      "verify": "rg -n \"SESSION_SECRET\" backend/src/lib/ai/credentials.ts (expect 0) && rg -n \"keyVersion\" backend/prisma/schema.prisma",
+      "checks": ["A-SEC-11"]
+    },
+    {
+      "title": "Sensitive-data protection is inconsistent across stores and AI logs retain full prompt text",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "M",
+      "evidence": [
+        {"type":"source","path":"backend/src/lib/private-tracker-store.ts","line":63,"quote":"body: JSON.stringify(log),","symbol":"tracker study logs sent plaintext to D1 while journals are AES-GCM encrypted"},
+        {"type":"source","path":"backend/src/server.ts","line":1446,"quote":"promptPreview: systemPrompt,\n      responsePreview: aiResponse,","symbol":"full prompt/response persisted per AI call"},
+        {"type":"source","path":"prisma/schema.prisma","line":141,"quote":"promptPreview String?\n  responsePreview String?"}
+      ],
+      "impact": "Personal study notes and topics sit plaintext in Cloudflare D1 while journals get encryption, so the privacy guarantee documented for the journal does not extend to sibling personal data; unbounded prompt/response previews grow AiCallLog rows forever and embed user content (topics, notes, names) in Postgres with no retention or truncation policy.",
+      "fix": "Encrypt tracker payloads with the same door-journal AES-GCM envelope (or document why tracker data is lower-class), truncate promptPreview/responsePreview to ~500 chars at write time, and add a retention prune (e.g. delete AiCallLog rows older than 30 days) to the cron tick.",
+      "verify": "rg -n \"door-journal:v1:\" backend/src/lib/private-tracker-store.ts (expect >=1) && rg -n \"slice\\(0, 500\\)\" backend/src/server.ts near aiCallLog writes",
+      "checks": ["A-SEC-12"]
+    },
+    {
+      "title": "No secret scanning is wired into pre-commit or CI",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"absence","command":"Test-Path .pre-commit-config.yaml; rg -ln \"gitleaks|detect-secrets|trufflehog\" .github .","scope":"repository root and CI workflows","quote":"false / 0 hits."}
+      ],
+      "impact": "A future commit carrying a provider key (the repo keeps live .env files locally beside the working tree) would reach GitHub unnoticed; nothing fails the build on credential shapes.",
+      "fix": "Add gitleaks to a pre-commit hook and as a hard-gating CI step over full history (--no-banner, no continue-on-error).",
+      "verify": "grep -c gitleaks .github/workflows/*.yml .pre-commit-config.yaml",
+      "checks": ["A-SEC-14"]
+    },
+    {
+      "title": "API responses ship without security headers and internal error messages reach clients",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"absence","command":"rg -n \"helmet|Strict-Transport|Content-Security-Policy|nosniff\" backend/src","scope":"Express source","quote":"0 hits: no header middleware mounted on gateway or internal API."},
+        {"type":"source","path":"backend/src/server.ts","line":720,"quote":"res.status(500).json({ error: error.message });","symbol":"error.message pattern repeated across ~30 handlers"}
+      ],
+      "impact": "Prisma/driver error strings returned to clients disclose internals (table and query details) useful for probing, and missing nosniff/HSTS on direct API responses weaken the browser posture for anyone hitting the Render origin directly instead of through the relay.",
+      "fix": "Mount helmet (CSP relaxed only where needed, HSTS, nosniff, frame-ancestors none) in gateway.ts before routes, and replace res.status(500).json({ error: error.message }) with a generic message plus console-level detail via the structured logger.",
+      "verify": "rg -c \"helmet\" backend/src/gateway.ts && rg -n \"error: error.message\" backend/src/server.ts (expect header mount >=1 and message leak count reduced)",
+      "checks": ["A-SEC-15"]
+    },
+    {
+      "title": "CI installs with npm install despite lockfiles, uses floating action tags, and has no SCA gate",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"source","path":".github/workflows/vercel-production-check.yml","line":27,"quote":"run: npm install --legacy-peer-deps --include=dev --no-audit --no-fund"},
+        {"type":"source","path":".github/workflows/vercel-production-check.yml","line":22,"quote":"uses: actions/checkout@v4"}
+      ],
+      "impact": "Builds do not verify the committed dependency graph (install can drift from package-lock.json), third-party actions float on mutable major tags, and no automated vulnerability gate exists, so a compromised or vulnerable release can ship silently.",
+      "fix": "Switch both workflows to npm ci, pin checkout/setup-node to 40-char commit SHAs, and add an osv-scanner or npm-audit step gated on high with no soft-fail.",
+      "verify": "grep -c \"npm ci\" .github/workflows/*.yml && grep -Ec \"uses: .*@[0-9a-f]{40}\" .github/workflows/vercel-production-check.yml",
+      "checks": ["A-SEC-17"]
+    },
+    {
+      "title": "Redacting logger exists but is never wired; security events go through raw console calls",
+      "severity": "Medium",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"source","path":"backend/src/lib/logger.ts","line":4,"quote":"value.replace(/(api[_-]?key|passcode|secret|token)\\s*[:=]\\s*\\S+/gi, \"$1=[redacted]\")","symbol":"redaction formatter"},
+        {"type":"absence","command":"rg -n \"lib/logger|logger\\.(info|warn|error)\" backend/src","scope":"backend source","quote":"0 imports; 41 raw console.* call sites remain, including origin logging and silent 401 branches with no actor/IP record."}
+      ],
+      "impact": "Passcode-shaped values or origins reaching logs are never redacted (paper control), and failed-auth events leave no trace, making brute-force attempts invisible until cost anomalies appear.",
+      "fix": "Import the structured logger everywhere, replace the 41 console call sites, and add warn-level events with IP+outcome to passcodeAuth denial and cron-secret failures.",
+      "verify": "rg -n \"console\\.(log|error|warn)\" backend/src | wc -l (expect ~0) && rg -n \"logger.warn\" backend/src/server.ts (expect >=1 in passcodeAuth)",
+      "checks": ["A-SEC-20", "A-SEC-24"]
+    },
+    {
+      "title": "Deployed app ships no security disclosure baseline (SECURITY.md / security.txt)",
+      "severity": "Low",
+      "confidence": "Firm",
+      "effort": "S",
+      "evidence": [
+        {"type":"absence","command":"git ls-files | rg -i 'SECURITY\\.md|security\\.txt'","scope":"tracked tree","quote":"0 hits."}
+      ],
+      "impact": "A researcher who finds the brute-forceable shared-passcode design has no contact channel, increasing the chance of public disclosure rather than a report.",
+      "fix": "Add SECURITY.md with a contact address and, ideally, serve /.well-known/security.txt from the frontend.",
+      "verify": "test -f SECURITY.md",
+      "checks": ["A-SEC-25"]
+    },
+    {
+      "title": "Bill-pay endpoint pays an arbitrary unpaid bill when the requested bill id does not exist",
+      "severity": "High",
+      "confidence": "Certain",
+      "effort": "S",
+      "evidence": [
+        {"type":"source","path":"backend/src/server.ts","line":2748,"quote":"targetBill = await bill.findFirst({\n          where: { OR: [{ id }, { paid: false }] },\n          orderBy: { createdAt: \"desc\" },\n        });"},
+        {"type":"source","path":"frontend/app/api/backend/[...path]/route.ts","line":653,"quote":"if (!targetBill) return NextResponse.json({ error: \"Bill not found.\" }, { status: 404 });","symbol":"relay twin already fixed; Express copy retains the fallback"}
+      ],
+      "impact": "POST /api/finance/bill/pay with a stale or wrong id marks the newest unpaid bill paid and books an expense for it, silently corrupting finance records instead of returning 404; the same operation behaves differently depending on which of the two backends handles it.",
+      "fix": "Delete the findFirst fallback in backend/src/server.ts and return 404 like the relay implementation; add a regression test asserting unknown ids return 404 and mutate nothing.",
+      "verify": "rg -n \"paid: false\" backend/src/server.ts (expect 0 within /api/finance/bill/pay)",
+      "checks": ["A-SEC-30", "A-SEC-4"]
+    }
+  ],
+  "strengths": [
+    {"title":"Timing-safe comparison on every credential check across all three surfaces","evidence":[
+      {"type":"source","path":"backend/src/server.ts","line":275,"quote":"if (crypto.timingSafeEqual(crypto.createHash(\"sha256\").update(received).digest(), crypto.createHash(\"sha256\").update(expected).digest())) return next();"},
+      {"type":"source","path":"frontend/app/api/auth/route.ts","line":14,"quote":"function safeEqual(left: string, right: string) {\n  const a = crypto.createHash(\"sha256\").update(left).digest();\n  const b = crypto.createHash(\"sha256\").update(right).digest();\n  return crypto.timingSafeEqual(a, b);}"}
+    ],"preserve":"Keep hashing-then-timingSafeEqual for every new token or passcode comparison; never introduce plain string equality on secrets."},
+    {"title":"Private journal uses layered defense: AES-256-GCM envelope plus HMAC-signed replay-windowed worker auth plus bound D1 queries","evidence":[
+      {"type":"source","path":"backend/src/lib/private-journal-store.ts","line":84,"quote":"const signature = crypto.createHmac(\"sha256\", secret).update(`${timestamp}.${bodyText}`).digest(\"base64url\");"},
+      {"type":"source","path":"cloudflare/journal-store/src/index.ts","line":42,"quote":"Math.abs(Date.now() - seconds * 1000) > 5 * 60 * 1000 || !supplied) return false;"}
+    ],"preserve":"Never move the journal encryption key or D1 service secret to the client; keep ciphertext-only storage in D1 and the timestamp replay window on every new worker route."},
+    {"title":"Natural-key upserts make retryable writes idempotent end to end","evidence":[
+      {"type":"source","path":"backend/src/gateway.ts","line":33,"quote":"upsert({where:{sessionId_questionIndex:{sessionId:id.sessionId,questionIndex:id.questionIndex}},update:{skipped:true,...}"},
+      {"type":"source","path":"backend/src/server.ts","line":2761,"quote":"const expenseId = `bill-${targetBill.id}`;","symbol":"deterministic derived id for bill expenses"}
+    ],"preserve":"Keep client-stable ids (sessionId+questionIndex, date-keyed journals, bill-{id} expenses) so retries converge; apply the same pattern to any new create-or-update flow."}
+  ]
+}

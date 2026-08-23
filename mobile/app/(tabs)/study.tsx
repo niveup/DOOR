@@ -1,7 +1,8 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { Ionicons } from "@expo/vector-icons";
+import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@/src/components/app-icon";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/src/providers/theme-provider";
 import { useNotify } from "@/src/providers/notification-provider";
@@ -29,9 +30,24 @@ export default function StudyScreen() {
   const { unlocked } = useAuth();
   const notify = useNotify();
   const client = useQueryClient();
+  const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheetModal>(null);
   const [sheetMode, setSheetMode] = useState<SheetMode>("log");
   const [viewAllVisible, setViewAllVisible] = useState(false);
+  const [formSessionKey, setFormSessionKey] = useState(1);
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        pressBehavior="close"
+        opacity={isDark ? 0.65 : 0.4}
+      />
+    ),
+    [isDark]
+  );
 
   const tracker = useQuery({
     queryKey: ["tracker"],
@@ -42,6 +58,7 @@ export default function StudyScreen() {
 
   const open = (mode: SheetMode) => {
     setSheetMode(mode);
+    setFormSessionKey((prev) => prev + 1);
     sheetRef.current?.present();
   };
 
@@ -228,30 +245,43 @@ export default function StudyScreen() {
       {/* BOTTOM SHEET FOR LOGGING & GOAL SETTING */}
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={sheetMode === "log" ? ["75%"] : ["48%"]}
-        backgroundStyle={[
-          styles.sheetBackground,
-          { backgroundColor: isDark ? "#121216" : theme.surface },
-        ]}
-        handleIndicatorStyle={[
-          styles.sheetHandle,
-          { backgroundColor: isDark ? theme.borderHover : theme.borderMuted },
-        ]}
+        snapPoints={sheetMode === "log" ? ["75%", "92%"] : ["48%", "65%"]}
+        topInset={insets.top + 16}
+        enablePanDownToClose={true}
+        backdropComponent={renderBackdrop}
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="none"
+        android_keyboardInputMode="adjustResize"
+        backgroundStyle={{
+          backgroundColor: isDark ? "#121216" : theme.surface,
+          borderTopLeftRadius: radii.xl,
+          borderTopRightRadius: radii.xl,
+        }}
+        handleIndicatorStyle={{
+          backgroundColor: isDark ? theme.borderHover : theme.borderMuted,
+          width: 40,
+          height: 4.5,
+          borderRadius: 3,
+        }}
       >
         <BottomSheetScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.sheetContent}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.sheetContent,
+            { paddingBottom: insets.bottom + 60 },
+          ]}
         >
           {sheetMode === "log" ? (
             <StudyLogForm
-              key={`log-${Date.now()}`}
+              key={`log-${formSessionKey}`}
               subjects={tracker.data?.subjects || []}
               busy={logMutation.isPending}
               onSave={(logData) => logMutation.mutate(logData)}
             />
           ) : (
             <StudyGoalForm
-              key={`goal-${tracker.data?.dailyAvailableHours || 4}`}
+              key={`goal-${formSessionKey}`}
               initialGoal={String(tracker.data?.dailyAvailableHours || 4)}
               busy={goalMutation.isPending}
               onSave={(goalVal) => goalMutation.mutate(Number(goalVal))}
@@ -266,7 +296,6 @@ export default function StudyScreen() {
 const styles = StyleSheet.create({
   contentContainer: {
     gap: spacing.md,
-    paddingBottom: layout.bottomScrollPadding,
   },
   primaryStudyButton: {
     width: "100%",
@@ -285,8 +314,8 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   textActionPill: {
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xxs,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: radii.sm,
   },
   textActionLabel: {
@@ -294,17 +323,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  sheetBackground: {
-    borderTopLeftRadius: radii.sheet,
-    borderTopRightRadius: radii.sheet,
-  },
-  sheetHandle: {
-    width: 38,
-    height: 4,
-    borderRadius: radii.full,
-  },
   sheetContent: {
     padding: spacing.md,
-    paddingBottom: spacing.xxxl,
   },
 });

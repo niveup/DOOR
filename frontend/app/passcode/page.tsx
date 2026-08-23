@@ -98,58 +98,15 @@ export default function PasscodePage() {
         <section className="md:col-span-5 p-8 md:p-12 flex flex-col justify-center bg-white">
           <div className="w-full">
             <div className="text-center mb-8">
-              {/* Symmetric Architectural Door SVG */}
-              <div className="mx-auto w-20 h-20 flex items-center justify-center text-stone-800 mb-3">
-                <svg
-                  className="h-16 w-16"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  {/* Revealed Doorway Background */}
-                  <path
-                    d="M5 21V9a7 7 0 0114 0v12Z"
-                    fill="#FAF8F4"
-                  />
-
-                  {/* Outer Symmetric Arch Frame */}
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 21V9a7 7 0 0114 0v12M3 21h18"
-                    stroke="#292524"
-                  />
-
-                  {/* Separated Symmetric Door Leaf (Rotates on left hinge only) */}
-                  <g
-                    className="transition-transform duration-500 ease-out"
-                    style={{
-                      transformOrigin: "6.5px 12px",
-                      transform: isHovered || loading ? "rotateY(-45deg)" : "rotateY(0deg)",
-                    }}
-                  >
-                    {/* Door Leaf Body */}
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6.5 21V9.5a5.5 5.5 0 0111 0V21Z"
-                      fill="#EFECE6"
-                      stroke="#44403C"
-                    />
-
-                    {/* Symmetric Inner Panel Relief */}
-                    <path
-                      d="M8.5 10a3.5 3.5 0 017 0v3h-7v-3zM8.5 14.5h7V19.5h-7v-5z"
-                      fill="#E7E4DC"
-                      stroke="#A8A29E"
-                      strokeWidth="0.8"
-                    />
-
-                    {/* Door Knob */}
-                    <circle cx="15.8" cy="14" r="0.75" fill="#78716C" stroke="none" />
-                  </g>
-                </svg>
+              <div className="mx-auto w-20 h-20 flex items-center justify-center mb-3">
+                <img
+                  src="/icon.png"
+                  alt="DOOR"
+                  className="w-16 h-16 rounded-2xl shadow-md object-contain transition-transform duration-300 ease-out"
+                  style={{
+                    transform: isHovered || loading ? "scale(1.08)" : "scale(1.0)",
+                  }}
+                />
               </div>
               <h2 className="text-2xl font-sans font-extrabold text-stone-900 tracking-[0.15em] uppercase">DOOR</h2>
             </div>

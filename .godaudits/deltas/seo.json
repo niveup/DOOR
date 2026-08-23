@@ -1,0 +1,33 @@
+{
+  "domain": "seo",
+  "dom": "SEO",
+  "checks": [
+    {"id":"A-SEO-1","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"frontend/app/page.tsx","line":4,"quote":"redirect(\"/dashboard\");"},{"type":"source","path":"frontend/lib/session.ts","line":713,"quote":"if (!session.isLoggedIn) return NextResponse.json({ error: \"Unauthorized\" }, { status: 401 });","symbol":"root routes into a session-gated app; no crawlable public surface exists"}]},
+    {"id":"A-SEO-2","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"absence","command":"rg -ln robots.txt|sitemap frontend/public frontend/app","scope":"web assets","quote":"0 hits and nothing public to index; PRD Section 1.1 documents a personal single-user tool with no discovery intent."}]},
+    {"id":"A-SEO-3","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":31,"quote":"no monetization, cohort analytics","symbol":"private tool: keyword/content strategy has no audience"}]},
+    {"id":"A-SEO-4","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":30,"quote":"Out of Scope: ... leaderboards, and community features","symbol":"no public content pages exist"}]},
+    {"id":"A-SEO-5","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":30,"quote":"Out of Scope: Multi-user accounts... community features","symbol":"no listing or directory surfaces exist"}]},
+    {"id":"A-SEO-6","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"absence","command":"rg -ln next-sitemap|generateMetadata frontend/next.config.mjs frontend/app/layout.tsx","scope":"web config","quote":"No public pages whose metadata could be optimized."}]},
+    {"id":"A-SEO-7","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-8","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-9","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-10","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-11","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-12","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-13","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-14","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-15","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-16","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-17","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-18","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-19","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-20","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-21","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-22","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-23","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-24","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]},
+    {"id":"A-SEO-25","outcome":"not-applicable","confidence":"Firm","evidence":[{"type":"source","path":"PRD.md","line":11,"quote":"personal, free, single-user web application"}]}
+  ],
+  "findings": [],
+  "strengths": []
+}
