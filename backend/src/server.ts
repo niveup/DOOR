@@ -10,6 +10,8 @@ import { decryptApiKey, encryptApiKey } from "./lib/ai/credentials";
 import { jsonrepair } from "jsonrepair";
 import { listPrivateJournalEntries, privateJournalByDate, savePrivateJournalEntry } from "./lib/private-journal-store";
 import { saveStudyLogToD1, fetchStudyLogsFromD1, clearTrackerLogsInD1 } from "./lib/private-tracker-store";
+import { isPasscodeConfigured, verifySharedSecret } from "./lib/auth";
+import { payBillById } from "./lib/billing";
 
 // Stub types for initial compilation prior to running 'prisma generate'
 type Journal = any;
@@ -269,11 +271,11 @@ function passcodeAuth(req: Request, res: Response, next: NextFunction) {
  const expectedCron = process.env.CRON_SHARED_SECRET;
  const cronHeader = typeof req.headers["x-cron-secret"] === "string" ? req.headers["x-cron-secret"] : "";
  if (req.path.startsWith("/cron") && expectedCron && cronHeader && crypto.timingSafeEqual(crypto.createHash("sha256").update(cronHeader).digest(), crypto.createHash("sha256").update(expectedCron).digest())) return next();
- const expected = process.env.APP_PASSCODE;
- if (!expected || expected.length < 8) return res.status(503).json({ error: "Backend authentication is not configured." });
+ if (!isPasscodeConfigured(process.env.APP_PASSCODE)) return res.status(503).json({ error: "Backend authentication is not configured." });
+ const expected = process.env.APP_PASSCODE as string;
  const received = typeof req.headers["x-passcode"] === "string" ? req.headers["x-passcode"] : "";
- if (crypto.timingSafeEqual(crypto.createHash("sha256").update(received).digest(), crypto.createHash("sha256").update(expected).digest())) return next();
- return res.status(401).json({ error: "Unauthorized" });
+ if (!verifySharedSecret(received, expected)) return res.status(401).json({ error: "Unauthorized" });
+ return next();
 }
 
 app.use(passcodeAuth);
@@ -321,22 +323,12 @@ app.post("/api/journal/entry", async (req: Request, res: Response) => {
   }
 
   try {
-    const [settings, history] = await Promise.all([
-      prisma.settings.findUnique({ where: { id: "default" } }),
-      listPrivateJournalEntries(7),
-    ]);
-    const historyContext = history
-      .filter((item) => item.date.toISOString().slice(0, 10) !== date)
-      .map((item) => `- ${item.date.toISOString().slice(0, 10)}: ${item.entryText} (Mood: ${item.mood || "N/A"})`)
-      .join("\n") || "No previous journal entries found.";
     const prompt = loadPrompt("journal.md", {
-      user_name: settings?.name || "Aspirant",
+      user_name: "Aspirant",
       date,
       entry_text: content,
       mood: mood || "N/A",
       tags: JSON.stringify(tags),
-      history_context: historyContext,
-      weak_subjects: "Not requested for this private response",
     });
     const feedback = await aiChat(
       "You are Jujum AI, a strict, honest Hinglish mentor. Return five clear sections separated by ---.",
@@ -613,43 +605,13 @@ app.post("/api/journal", async (req: Request, res: Response) => {
       create: { date: today, entryText, mood, tags, studyDone, exerciseDone, readingDone }
     });
 
-    // 2. Fetch context for AI: settings, prior 7 journals, and weak subjects
-    const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-    const user_name = settings?.name || "Aspirant";
-
-    const lastJournals = await prisma.journal.findMany({
-      where: { date: { lt: today } },
-      orderBy: { date: "desc" },
-      take: 7
-    });
-
-    const historyContext = lastJournals.map((j: Journal) => 
-      `- ${j.date.toISOString().split("T")[0]}: ${j.entryText} (Mood: ${j.mood || "N/A"})`
-    ).join("\n");
-
-    // Fetch weak subjects (ratings <= 2)
-    const progressRatings = await prisma.progressRating.findMany({
-      orderBy: [{ weekStartDate: "desc" }],
-      distinct: ["subjectId"]
-    });
-    
-    // Join with subject table to get names
-    const subjects = await prisma.subject.findMany();
-    const weakSubjects = progressRatings
-      .filter((r: ProgressRating) => r.selfRating <= 2)
-      .map((r: ProgressRating) => subjects.find((s: Subject) => s.subjectId === r.subjectId)?.subjectName || "")
-      .filter(Boolean)
-      .join(", ") || "None";
-
-    // 3. Assemble prompt and call AI
+    // 2. Assemble prompt and call AI directly without passing DB history
     const systemPrompt = loadPrompt("journal.md", {
-      user_name,
+      user_name: "Aspirant",
       date: today.toISOString().split("T")[0],
       entry_text: entryText,
       mood: mood || "N/A",
       tags: JSON.stringify(tags || []),
-      history_context: historyContext || "No previous journal entries found.",
-      weak_subjects: weakSubjects
     });
 
     const startTime = Date.now();
@@ -746,18 +708,12 @@ app.post("/api/journal/feedback", async (req: Request, res: Response) => {
   }
 
   try {
-    const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-    const historyContext = history.length
-      ? history.map((entry: { date: string; entryText: string; mood: string }) => `- ${entry.date}: ${entry.entryText} (Mood: ${entry.mood})`).join("\n")
-      : "No previous journal entries found.";
     const systemPrompt = loadPrompt("journal.md", {
-      user_name: settings?.name || "Aspirant",
+      user_name: "Aspirant",
       date: getKolkataDate().toISOString().split("T")[0],
       entry_text: entryText,
       mood,
       tags: JSON.stringify(tags),
-      history_context: historyContext,
-      weak_subjects: "Not requested for this private response",
     });
     const requestedProvider = isAiProviderName(req.body?.aiProvider) ? req.body.aiProvider : undefined;
     const requestedModel = typeof req.body?.aiModel === "string" && req.body.aiModel.trim().length <= 160
@@ -904,29 +860,6 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
   }
 
   try {
-    const [settings, progressRatings, subjects, existingPlan, recentJournals, recentPlans] = await Promise.all([
-      prisma.settings.findUnique({ where: { id: "default" } }),
-      prisma.progressRating.findMany({
-        orderBy: [{ weekStartDate: "desc" }],
-        distinct: ["subjectId"],
-      }),
-      prisma.subject.findMany(),
-      prisma.routinePlan.findUnique({
-        where: { date: getKolkataDate() },
-        include: { tasks: true },
-      }),
-      privateJournalEntriesOrEmpty(7),
-      prisma.routinePlan.findMany({
-        orderBy: { date: "desc" },
-        take: 7,
-        include: { tasks: true },
-      }),
-    ]);
-    const weakSubjects = progressRatings
-      .filter((rating: ProgressRating) => rating.selfRating <= 2)
-      .map((rating: ProgressRating) => subjects.find((subject: Subject) => subject.subjectId === rating.subjectId)?.subjectName || "")
-      .filter(Boolean)
-      .join(", ") || "None logged";
     const conversation = messages
       .map((message: { role: "user" | "assistant"; content: string }) => `${message.role === "user" ? "Student" : "Planner"}: ${message.content}`)
       .join("\n");
@@ -938,22 +871,7 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
       .map((match) => `${match[1]} ${match[2]}`);
     const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")?.content || "";
     const confirmationDetected = /\b(yes|confirm|confirmed|looks good|create it|finalize|finalise|done|okay|ok|haan|theek)\b/i.test(latestUserMessage);
-    const existingPlanText = existingPlan?.tasks.length
-      ? existingPlan.tasks.map((task: Task) => `${task.title} (${task.durationMin} mins, ${task.status})`).join(", ")
-      : "No plan yet";
-    const recentJournalContext = recentJournals.length
-      ? recentJournals.map((journal: any) =>
-          `${journal.date.toISOString().split("T")[0]} | mood ${journal.mood || "not set"} | `
-          + `done: study ${journal.studyDone}, exercise ${journal.exerciseDone}, reading ${journal.readingDone} | `
-          + `next: ${journal.tomorrowTask || "none"} | entry: ${journal.entryText.slice(0, 500)}`
-        ).join("\n")
-      : "No journal history";
-    const recentPlanContext = recentPlans.length
-      ? recentPlans.map((plan: any) =>
-          `${plan.date.toISOString().split("T")[0]} | `
-          + plan.tasks.map((task: Task) => `${task.title} ${task.durationMin}m ${task.status}`).join("; ")
-        ).join("\n")
-      : "No previous plans";
+
     const rawDraftTasks = Array.isArray(req.body?.draftTasks)
       ? req.body.draftTasks
       : Array.isArray(req.body?.currentDraft)
@@ -968,27 +886,12 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
       durationMentions: [...new Set(durationMentions)],
       latestUserMessage,
       confirmationDetected,
-      currentPlanTaskCount: existingPlan?.tasks.length || 0,
       userDraftTaskCount: rawDraftTasks.length,
     });
 
     const prompt = loadPrompt("plan_chat.md", {
-      user_name: settings?.name || "Aspirant",
-      available_hours: 24,
-      weak_subjects: weakSubjects,
-      existing_plan: existingPlanText,
+      user_name: "Aspirant",
       current_draft_tasks: currentDraftText,
-      student_profile: JSON.stringify({
-        targetExam: settings?.targetExam || "GATE",
-        targetYear: settings?.targetYear || 2027,
-        prepLevel: settings?.prepLevel || "Beginner",
-        preferredLanguage: settings?.preferredLanguage || "hinglish",
-        wakeTime: settings?.wakeTime || "06:00",
-        sleepTime: settings?.sleepTime || "22:00",
-        otherGoals: settings?.otherGoals || [],
-      }),
-      recent_journals: recentJournalContext,
-      recent_plans: recentPlanContext,
       explicit_facts: explicitFacts,
       conversation,
     });
@@ -1082,107 +985,12 @@ app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
   }
 
   try {
-    const [settings, progressRatings, subjects, existingPlan, recentJournals] = await Promise.all([
-      prisma.settings.findUnique({ where: { id: "default" } }),
-      prisma.progressRating.findMany({
-        orderBy: [{ weekStartDate: "desc" }],
-      }),
-      prisma.subject.findMany({ orderBy: { subjectId: "asc" } }),
-      prisma.routinePlan.findUnique({
-        where: { date: getKolkataDate() },
-        include: { tasks: true },
-      }),
-      privateJournalEntriesOrEmpty(5),
-    ]);
-
-    const ratingsBySubject = new Map<number, any[]>();
-    for (const r of progressRatings) {
-      const list = ratingsBySubject.get(r.subjectId) || [];
-      if (list.length < 2) {
-        list.push(r);
-        ratingsBySubject.set(r.subjectId, list);
-      }
-    }
-
-    const now = getKolkataDate();
-    const threeWeeksAgo = new Date(now);
-    threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
-
-    const ratingsList = subjects.map((subject) => {
-      const recentRatings = ratingsBySubject.get(subject.subjectId) || [];
-      const latestRating = recentRatings[0] || null;
-      const isNeglected = latestRating
-        ? latestRating.weekStartDate < threeWeeksAgo
-        : true;
-      const hasAvoidanceWarning = recentRatings.length >= 2
-        && recentRatings.every((r) => r.selfRating <= 2);
-
-      return {
-        subjectName: subject.subjectName,
-        importanceLevel: subject.importanceLevel,
-        latestRating: latestRating ? latestRating.selfRating : null,
-        hoursStudied: latestRating ? latestRating.hoursStudied : 0,
-        questionsSolved: latestRating ? latestRating.questionsSolved : 0,
-        isNeglected,
-        hasAvoidanceWarning
-      };
-    });
-
-    const sumRatings = ratingsList.reduce((acc, r) => acc + (r.latestRating || 0), 0);
-    const overallReadiness = Math.round((sumRatings / 70) * 100);
-
-    const weakSubject =
-      subjects.find((subject) => ratingsBySubject.get(subject.subjectId)?.some((r) => r.hasAvoidanceWarning)) ||
-      subjects.find((subject) => ratingsBySubject.get(subject.subjectId)?.some((r) => r.isNeglected)) ||
-      [...subjects].sort((a, b) => {
-        const aRating = ratingsBySubject.get(a.subjectId)?.[0]?.selfRating || 5;
-        const bRating = ratingsBySubject.get(b.subjectId)?.[0]?.selfRating || 5;
-        return aRating - bRating;
-      })[0];
-    const weakSubjectName = weakSubject ? weakSubject.subjectName : "None";
-
-    const subjectsStatus = ratingsList
-      .map((item) => 
-        `- ${item.subjectName} (Weight: ${Math.round(item.importanceLevel * 100)}%): ` +
-        `Rating: ${item.latestRating ? `${item.latestRating}/5` : "Not rated"}, ` +
-        `Hours studied: ${item.hoursStudied}h, ` +
-        `Questions solved: ${item.questionsSolved}, ` +
-        `${item.isNeglected ? "[Neglected] " : ""}${item.hasAvoidanceWarning ? "[Avoidance Warning]" : ""}`
-      )
-      .join("\n");
-
-    const todayTasks = existingPlan?.tasks.length
-      ? existingPlan.tasks.map((task: Task) => `- ${task.title} (${task.durationMin} mins, status: ${task.status})`).join("\n")
-      : "No plan generated for today yet.";
-
-    const recentJournalContext = recentJournals.length
-      ? recentJournals.map((journal: any) =>
-          `* ${journal.date.toISOString().split("T")[0]}: ` +
-          `Study: ${journal.studyDone ? "Done" : "Missed"}, Exercise: ${journal.exerciseDone ? "Done" : "Missed"} | ` +
-          `Entry: ${journal.entryText.slice(0, 300)}`
-        ).join("\n")
-      : "No journal history logged.";
-
     const conversation = messages
       .map((message: { role: "user" | "assistant"; content: string }) => `${message.role === "user" ? "Student" : "Coach"}: ${message.content}`)
       .join("\n");
 
     const prompt = loadPrompt("general_chat.md", {
       TUTOR_NAME: "Jujum AI",
-      STUDENT_LEVEL: settings?.prepLevel || "Beginner",
-      user_name: settings?.name || "Aspirant",
-      target_exam: settings?.targetExam || "GATE",
-      target_year: settings?.targetYear || 2027,
-      prep_level: settings?.prepLevel || "Beginner",
-      preferred_language: settings?.preferredLanguage || "hinglish",
-      wake_time: settings?.wakeTime || "06:00",
-      sleep_time: settings?.sleepTime || "22:00",
-      overall_readiness: String(overallReadiness),
-      weak_subject: weakSubjectName,
-      subjects_status: subjectsStatus,
-      main_priority: existingPlan?.mainPriority || "None",
-      today_tasks: todayTasks,
-      recent_journals: recentJournalContext,
       conversation,
     });
 
@@ -1395,36 +1203,18 @@ async function generateTodayRoutinePlan(replaceExisting: boolean) {
     return { job: "generate_plan", status: "skipped_already_exists", planId: existingPlan.planId };
   }
 
-  const [settings, yesterdayJournal, progressRatings, subjects] = await Promise.all([
-    prisma.settings.findUnique({ where: { id: "default" } }),
-    privateJournalByDateOrNull(yesterday),
-    prisma.progressRating.findMany({
-      orderBy: [{ weekStartDate: "desc" }],
-      distinct: ["subjectId"],
-    }),
-    prisma.subject.findMany(),
-  ]);
-
-  const userName = settings?.name || "Aspirant";
+  const userName = "Aspirant";
   const availableHours = 24;
-  const tomorrowTask = yesterdayJournal?.tomorrowTask || "Study GATE Syllabus Core Topics";
-  const weakSubjects = progressRatings
-    .filter((rating: ProgressRating) => rating.selfRating <= 2)
-    .map((rating: ProgressRating) => subjects.find((subject: Subject) => subject.subjectId === rating.subjectId)?.subjectName || "")
-    .filter(Boolean)
-    .join(", ") || "None";
+  const tomorrowTask = "Study GATE Syllabus Core Topics";
   const isWeekend = today.getDay() === 0 || today.getDay() === 6;
   const systemPrompt = loadPrompt("routine_plan.md", {
     user_name: userName,
     date: today.toISOString().split("T")[0],
     streak_count: 5,
     tomorrow_task: tomorrowTask,
-    weak_subjects: weakSubjects,
     available_hours: availableHours,
     available_minutes: availableHours * 60,
     max_minutes: Math.round(availableHours * 60 * 1.1),
-    missed_tasks: "None",
-    personal_habits: "Study in the morning, exercise in the evening.",
     is_weekend: isWeekend ? "Yes" : "No",
   });
 
@@ -1844,12 +1634,25 @@ async function explainConcept(req: Request, res: Response) {
   }
   
   try {
-    const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-    const user_name = settings?.name || "Aspirant";
-    const prep_level = settings?.prepLevel || "Beginner";
+    const user_name = "Aspirant";
+    const prep_level = "Beginner";
     
-    const subjects = await prisma.subject.findMany();
-    const subjectsList = subjects.map(s => `${s.subjectId}: ${s.subjectName}`).join("\n");
+    const subjectsList = [
+      "1: Engineering Mathematics",
+      "2: Engineering Mechanics",
+      "3: Strength of Materials",
+      "4: Theory of Machines",
+      "5: Machine Design",
+      "6: Fluid Mechanics",
+      "7: Heat Transfer",
+      "8: Thermodynamics",
+      "9: Power Plant Engineering",
+      "10: Refrigeration & Air Conditioning",
+      "11: Internal Combustion Engines",
+      "12: Manufacturing Engineering",
+      "13: Industrial Engineering",
+      "14: General Aptitude"
+    ].join("\n");
 
     // OCR: use provided ocrText if available, otherwise run Gemma Vision OCR on image
     let ocrText = providedOcrText || "";
@@ -2009,7 +1812,7 @@ async function explainConcept(req: Request, res: Response) {
         data: {
           topicInput: topic || "Uploaded Image",
           normalizedTopic: data.session?.topic || data.concept || topic || "Uploaded Image Analysis",
-          subjectId: subjects.some(s => s.subjectId === subjectId) ? subjectId : null,
+          subjectId: subjectId && subjectId >= 1 && subjectId <= 14 ? subjectId : null,
           mode: mode || "detailed",
           explanationText: JSON.stringify(data)
         }
@@ -2426,64 +2229,18 @@ app.get("/api/tracker/status", async (req: Request, res: Response) => {
       });
     }
 
-    // Check if daily analysis is stale (Daily refresh: regenerate each day, or when new logs/ratings arrive)
-    const lastAnalysisDate = settings?.analysisWeekOf
-      ? new Date(settings.analysisWeekOf).toISOString().slice(0, 10)
-      : null;
-
-    const isStale =
-      settings?.analysisStale ||
-      !settings?.weeklyAnalysis ||
-      settings.weeklyAnalysis === "Unable to generate AI analysis at this time." ||
-      lastAnalysisDate !== todayKolkataDateStr;
-
-    let weeklyAnalysis = settings?.weeklyAnalysis || "";
-
-    if (isStale) {
-      try {
-        let subjectsTable = "| Subject | Weight | 7-Day Hours | 7-Day Questions | Sessions (7d) | All-Time Hours | Status |\n";
-        subjectsTable += "|---|---|---|---|---|---|---|\n";
-        for (const r of ratingsList) {
-          const s7 = subject7DayMap.get(r.subjectId) || { hours: 0, questions: 0, sessionCount: 0 };
-          const status = s7.hours > 0 ? "Active this week" : r.isNeglected ? "Neglected (>21d)" : "No study this week";
-          subjectsTable += `| ${r.subjectName} | ${Math.round(r.importanceLevel * 100)}% | ${s7.hours.toFixed(1)}h | ${s7.questions} | ${s7.sessionCount} | ${r.cumulativeHours.toFixed(1)}h | ${status} |\n`;
-        }
-
-        const logHistorySummary = last7DayLogs.slice(0, 10).map((l) =>
-          `- ${l.logDate} (${l.timeBlock}): ${l.subjectName} — ${l.hoursStudied}h, ${l.questionsSolved} questions${l.notes ? ` ("${l.notes}")` : ""}`
-        ).join("\n") || "No study sessions logged in the last 7 days.";
-
-        const sysPrompt = loadPrompt("tracker_analysis.md", {
-          user_name: settings?.name || "Aspirant",
-          readiness: overallReadiness,
-          subjects_table: subjectsTable,
-          recent_logs: logHistorySummary,
-          total_7d_hours: total7DayHours.toFixed(1),
-          total_7d_questions: String(total7DayQuestions),
-          daily_goal: String(settings.dailyAvailableHours || 4.0),
-        });
-
-        const aiResponse = await aiChat(
-          sysPrompt,
-          `Review my last 7-day study logs (${total7DayHours.toFixed(1)}h total studied across ${last7DayLogs.length} sessions, ${total7DayQuestions} questions solved) and give me daily actionable feedback for GATE CSE.`
-        );
-
-        weeklyAnalysis = aiResponse.replace(/```(?:markdown)?/gi, "").replace(/```/g, "").trim();
-
-        // Update cached values in settings with today's date
-        settings = await (prisma.settings as any).update({
-          where: { id: "default" },
-          data: {
-            weeklyAnalysis,
-            analysisWeekOf: new Date(`${todayKolkataDateStr}T00:00:00.000Z`),
-            analysisStale: false,
-          },
-        });
-      } catch (aiError) {
-        console.error("Failed to generate tracker AI analysis:", aiError);
-        weeklyAnalysis = settings?.weeklyAnalysis || "";
-      }
-    }
+    // Generate deterministic analysis without passing database study logs to external AI
+    const weakList = ratingsList.filter(r => (r.latestRating !== null && r.latestRating <= 2) || r.hasAvoidanceWarning).map(r => r.subjectName);
+    const strongList = ratingsList.filter(r => (r.latestRating !== null && r.latestRating >= 4)).map(r => r.subjectName);
+    const neglectedList = ratingsList.filter(r => r.isNeglected).map(r => r.subjectName);
+    
+    let weeklyAnalysis = `### 1. Weak Subjects\n${weakList.length ? weakList.join(", ") + " need focused practice." : "No critical weak subjects flagged."}\n\n`;
+    weeklyAnalysis += `### 2. Strong Subjects\n${strongList.length ? strongList.join(", ") + " are currently your highest rated areas." : "Keep building consistency across subjects."}\n\n`;
+    weeklyAnalysis += `### 3. Neglected Subjects\n${neglectedList.length ? neglectedList.join(", ") + " have not been logged in over 3 weeks." : "All subjects are being actively revised."}\n\n`;
+    weeklyAnalysis += `### 4. Recommended Next Topics\nFocus next study blocks on ${weakList[0] || neglectedList[0] || "core formula derivations and numerical problem sets"}.\n\n`;
+    weeklyAnalysis += `### 5. Daily Study Plan\nTarget ${settings?.dailyAvailableHours || 4.0} hours daily divided into 45-minute focus intervals.\n\n`;
+    weeklyAnalysis += `### 6. Readiness & Velocity Reflection\nOverall syllabus readiness is ${overallReadiness}% with ${total7DayHours.toFixed(1)}h logged in the last 7 days.\n\n`;
+    weeklyAnalysis += `### 7. Avoidance Warnings\n${weakList.length > 2 ? "High concentration of low ratings detected. Prioritize one weak area today." : "No avoidance warnings active. Consistency maintains momentum."}`;
 
     const value = {
       overallReadiness,
@@ -2740,60 +2497,11 @@ app.post("/api/finance/bill/pay", async (req: Request, res: Response) => {
       return res.json({ success: true });
     }
 
-    let targetBill = await bill.findUnique({
-      where: { id },
-    });
-
-    if (!targetBill) {
-      targetBill = await bill.findFirst({
-        where: { OR: [{ id }, { paid: false }] },
-        orderBy: { createdAt: "desc" },
-      });
+    const result = await payBillById(bill, expense, id, getKolkataDateString());
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error });
     }
-
-    if (!targetBill) return res.status(404).json({ error: "Bill not found." });
-
-    const updatedBill = await bill.update({
-      where: { id: targetBill.id },
-      data: { paid: true },
-    });
-
-    const expenseId = `bill-${targetBill.id}`;
-    const todayDate = getKolkataDateString();
-
-    let createdExpense = null;
-    try {
-      createdExpense = await expense.upsert({
-        where: { id: expenseId },
-        update: {
-          title: targetBill.title,
-          category: targetBill.category,
-          amount: targetBill.amount,
-          date: todayDate,
-          payment: "UPI",
-        },
-        create: {
-          id: expenseId,
-          title: targetBill.title,
-          category: targetBill.category,
-          amount: targetBill.amount,
-          date: todayDate,
-          payment: "UPI",
-        },
-      });
-    } catch {
-      createdExpense = await expense.create({
-        data: {
-          title: targetBill.title,
-          category: targetBill.category,
-          amount: targetBill.amount,
-          date: todayDate,
-          payment: "UPI",
-        },
-      });
-    }
-
-    res.json({ success: true, bill: updatedBill, expense: createdExpense });
+    res.json({ success: true, bill: result.bill, expense: result.expense });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
