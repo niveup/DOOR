@@ -8,6 +8,7 @@
     "start": "node dist/gateway.js",
     "dev": "nodemon --watch src/**/*.ts --exec ts-node src/gateway.ts",
     "test": "node --test",
+    "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=./prisma/schema.prisma"
   },
