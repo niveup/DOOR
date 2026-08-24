@@ -36,5 +36,8 @@
   },
   "prisma": {
     "seed": "ts-node src/seed.ts"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
