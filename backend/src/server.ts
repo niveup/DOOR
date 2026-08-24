@@ -13,6 +13,22 @@ import { saveStudyLogToD1, clearTrackerLogsInD1 } from "./lib/private-tracker-st
 import { isPasscodeConfigured, verifySharedSecret } from "./lib/auth";
 import { payBillById } from "./lib/billing";
 import { getKolkataDate, getKolkataHour, getKolkataMonday, getKolkataDateString } from "./lib/time";
+import { createRateLimiter, clientKey } from "./lib/rate-limit";
+
+// GA-102: brute-force brake on credential failures + a generous global cap.
+const authFailureLimiter = createRateLimiter({ windowMs: 5 * 60_000, max: 10 });
+const apiCapLimiter = createRateLimiter({ windowMs: 60_000, max: 300 });
+// AI surfaces are the paid endpoints; 30/min per client is far above human use
+// but stops scripted wallet-drain instantly.
+const aiSpendLimiter = createRateLimiter({ windowMs: 60_000, max: 30 });
+
+function allowAiSpend(req: Request, res: Response): boolean {
+  const result = aiSpendLimiter.hit(clientKey(req));
+  if (result.allowed) return true;
+  res.status(429).set("Retry-After", String(result.retryAfterSeconds))
+    .json({ error: "Too many AI requests. Please wait a moment and try again." });
+  return false;
+}
 
 // Stub types for initial compilation prior to running 'prisma generate'
 type Journal = any;
@@ -231,13 +247,28 @@ async function publicAiConfiguration() {
 
 function passcodeAuth(req: Request, res: Response, next: NextFunction) {
  if (req.path === "/health") return next();
+ const key = clientKey(req);
+ const cap = apiCapLimiter.hit(key);
+ if (!cap.allowed) {
+   res.set("Retry-After", String(cap.retryAfterSeconds));
+   return res.status(429).json({ error: "Too many requests. Slow down." });
+ }
  const expectedCron = process.env.CRON_SHARED_SECRET;
  const cronHeader = typeof req.headers["x-cron-secret"] === "string" ? req.headers["x-cron-secret"] : "";
  if (req.path.startsWith("/cron") && expectedCron && cronHeader && crypto.timingSafeEqual(crypto.createHash("sha256").update(cronHeader).digest(), crypto.createHash("sha256").update(expectedCron).digest())) return next();
  if (!isPasscodeConfigured(process.env.APP_PASSCODE)) return res.status(503).json({ error: "Backend authentication is not configured." });
+ const brake = authFailureLimiter.peek(key);
+ if (!brake.allowed) {
+   res.set("Retry-After", String(brake.retryAfterSeconds));
+   return res.status(429).json({ error: "Too many failed attempts. Try again later." });
+ }
  const expected = process.env.APP_PASSCODE as string;
  const received = typeof req.headers["x-passcode"] === "string" ? req.headers["x-passcode"] : "";
- if (!verifySharedSecret(received, expected)) return res.status(401).json({ error: "Unauthorized" });
+ if (!verifySharedSecret(received, expected)) {
+   authFailureLimiter.hit(key);
+   return res.status(401).json({ error: "Unauthorized" });
+ }
+ authFailureLimiter.reset(key);
  return next();
 }
 
@@ -275,6 +306,7 @@ app.get("/api/journal/entry", async (req: Request, res: Response) => {
 });
 
 app.post("/api/journal/entry", async (req: Request, res: Response) => {
+  if (!allowAiSpend(req, res)) return;
   const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
   const mood = typeof req.body?.mood === "string" ? req.body.mood.slice(0, 20) : null;
   const tags = Array.isArray(req.body?.tags)
@@ -494,6 +526,7 @@ app.get("/api/ai/models", async (req: Request, res: Response) => {
 });
 
 app.post("/api/ai/test", async (req: Request, res: Response) => {
+  if (!allowAiSpend(req, res)) return;
   const provider = req.body?.provider;
   if (!isAiProviderName(provider)) {
     return res.status(400).json({ error: "Choose OpenRouter, NVIDIA, or Cerebras." });
@@ -600,18 +633,6 @@ app.post("/api/journal", async (req: Request, res: Response) => {
 
     const latencyMs = Date.now() - startTime;
 
-    // Log AI call
-    await prisma.aiCallLog.create({
-      data: {
-        surface: "journal",
-        latencyMs,
-        success,
-        errorMessage,
-        promptPreview: systemPrompt,
-        responsePreview: aiResponse
-      }
-    });
-
     if (success && aiResponse) {
       // 4. Parse 5 parts from response
       const parts = aiResponse.split("---").map(p => p.trim());
@@ -649,6 +670,7 @@ app.post("/api/journal", async (req: Request, res: Response) => {
 // Private-journal feedback only. Persistence is intentionally handled by the
 // encrypted Cloudflare D1 journal store, not by this service or its AI logs.
 app.post("/api/journal/feedback", async (req: Request, res: Response) => {
+  if (!allowAiSpend(req, res)) return;
   const entryText = typeof req.body?.entryText === "string" ? req.body.entryText.trim() : "";
   const mood = typeof req.body?.mood === "string" ? req.body.mood : null;
   const tags = Array.isArray(req.body?.tags) ? req.body.tags.filter((tag: unknown): tag is string => typeof tag === "string").slice(0, 6) : [];
@@ -808,6 +830,7 @@ app.post("/api/routine/manual", async (req: Request, res: Response) => {
 });
 
 app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
+  if (!allowAiSpend(req, res)) return;
   const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
   const messages = rawMessages
     .filter((message: any) => message && (message.role === "user" || message.role === "assistant"))
@@ -933,6 +956,7 @@ app.post("/api/routine/plan-chat", async (req: Request, res: Response) => {
 });
 
 app.post("/api/routine/general-chat", async (req: Request, res: Response) => {
+  if (!allowAiSpend(req, res)) return;
   const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
   const messages = rawMessages
     .filter((message: any) => message && (message.role === "user" || message.role === "assistant"))
@@ -1189,17 +1213,6 @@ async function generateTodayRoutinePlan(replaceExisting: boolean) {
   } catch (error: any) {
     aiError = error.message;
   }
-
-  await prisma.aiCallLog.create({
-    data: {
-      surface: "routine_plan",
-      latencyMs: Date.now() - startedAt,
-      success: Boolean(aiResponse),
-      errorMessage: aiError,
-      promptPreview: systemPrompt,
-      responsePreview: aiResponse,
-    },
-  });
 
   if (aiResponse) {
     const parsedTasks = aiResponse
@@ -1586,6 +1599,7 @@ function robustJsonExtract(rawAiOutput: string): { data: any; error: string | nu
 }
 
 async function explainConcept(req: Request, res: Response) {
+  if (!allowAiSpend(req, res)) return;
   const { topic, mode, deep, image, ocrText: providedOcrText, history } = req.body;
   const requestedProvider = isAiProviderName(req.body?.aiProvider) ? req.body.aiProvider : undefined;
   const requestedModel = typeof req.body?.aiModel === "string" && req.body.aiModel.trim().length <= 160
@@ -1735,17 +1749,6 @@ async function explainConcept(req: Request, res: Response) {
 
     const latencyMs = Date.now() - startTime;
 
-    await prisma.aiCallLog.create({
-      data: {
-        surface: "explainer",
-        latencyMs,
-        success: parseSuccessful && success,
-        errorMessage: errorMessage || (parseSuccessful ? null : "JSON formatting check failed."),
-        promptPreview: systemPrompt,
-        responsePreview: aiResponse
-      }
-    });
-
     if (parseSuccessful && data) {
       // Normalize array data if jsonrepair wrapped multiple elements
       if (Array.isArray(data)) {
@@ -1770,19 +1773,10 @@ async function explainConcept(req: Request, res: Response) {
         }
       }
 
-      const subjectId = Number(data.subject_id) || null;
-      const explanation = await prisma.conceptExplanation.create({
-        data: {
-          topicInput: topic || "Uploaded Image",
-          normalizedTopic: data.session?.topic || data.concept || topic || "Uploaded Image Analysis",
-          subjectId: subjectId && subjectId >= 1 && subjectId <= 14 ? subjectId : null,
-          mode: mode || "detailed",
-          explanationText: JSON.stringify(data)
-        }
-      });
+      const explanationId = `exp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
       return res.json({
-        explanationId: explanation.explanationId,
+        explanationId,
         data,
         ocrExtracted: ocrText || null
       });
@@ -1933,7 +1927,6 @@ app.delete("/api/subjects/:subjectId", async (req: Request, res: Response) => {
       prisma.progressRating.deleteMany({ where: { subjectId } }),
       prisma.topicStatus.deleteMany({ where: { subjectId } }),
       prisma.task.updateMany({ where: { subjectId }, data: { subjectId: null } }),
-      prisma.conceptExplanation.updateMany({ where: { subjectId }, data: { subjectId: null } }),
       prisma.subject.delete({ where: { subjectId } }),
     ]);
 
@@ -2246,12 +2239,30 @@ function getFinanceModels() {
   return { expense, budget, bill };
 }
 
+function toNumericAmount(val: unknown): number {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === "number") return val;
+  if (typeof val === "object" && val !== null && "toNumber" in val && typeof (val as any).toNumber === "function") {
+    return (val as any).toNumber();
+  }
+  const parsed = Number(val);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatExpense(e: any) {
+  return e ? { ...e, amount: toNumericAmount(e.amount) } : null;
+}
+
+function formatBill(b: any) {
+  return b ? { ...b, amount: toNumericAmount(b.amount) } : null;
+}
+
 app.get("/api/finance/data", async (_req: Request, res: Response) => {
   try {
     const { expense, budget, bill } = getFinanceModels();
     // Rolling 180-day window with a hard cap: the finance screen must not
     // grow unbounded (audit A-CODE-15). Older expenses remain in Postgres.
-    const cutoff = getKolkataDateString(new Date(Date.now() - 180 * 24 * 60 * 60 * 1000));
+    const cutoff = getKolkataDateString(new Date(Date.now() - 180 * 24 * 60 * 1000));
     const [expenses, budgetRecord, bills] = await Promise.all([
       expense?.findMany
         ? expense.findMany({ where: { date: { gte: cutoff } }, orderBy: [{ date: "desc" }, { createdAt: "desc" }], take: 2000 })
@@ -2276,17 +2287,17 @@ app.get("/api/finance/data", async (_req: Request, res: Response) => {
     };
 
     res.json({
-      expenses: expenses || [],
+      expenses: (expenses || []).map(formatExpense),
       budget: budgetRecord
         ? {
-            allowance: budgetRecord.allowance,
+            allowance: toNumericAmount(budgetRecord.allowance),
             caps: budgetRecord.caps || defaultCaps,
           }
         : {
             allowance: 0,
             caps: defaultCaps,
           },
-      bills: bills || [],
+      bills: (bills || []).map(formatBill),
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2296,13 +2307,14 @@ app.get("/api/finance/data", async (_req: Request, res: Response) => {
 app.post("/api/finance/expense", async (req: Request, res: Response) => {
   try {
     const { id, title, category, amount, date, payment } = req.body;
-    if (!title || typeof amount !== "number") {
+    const amountNum = Number(amount);
+    if (!title || !Number.isFinite(amountNum)) {
       return res.status(400).json({ error: "title and numeric amount are required." });
     }
 
     const { expense } = getFinanceModels();
     if (!expense) {
-      return res.json({ success: true, expense: { id: id || `exp-${Date.now()}`, title, category, amount, date, payment } });
+      return res.json({ success: true, expense: { id: id || `exp-${Date.now()}`, title, category, amount: amountNum, date, payment } });
     }
 
     if (id) {
@@ -2311,7 +2323,7 @@ app.post("/api/finance/expense", async (req: Request, res: Response) => {
         update: {
           title: String(title).trim(),
           category: String(category || "Others"),
-          amount: Number(amount),
+          amount: amountNum,
           date: String(date || getKolkataDateString()),
           payment: String(payment || "UPI"),
         },
@@ -2319,23 +2331,23 @@ app.post("/api/finance/expense", async (req: Request, res: Response) => {
           id,
           title: String(title).trim(),
           category: String(category || "Others"),
-          amount: Number(amount),
+          amount: amountNum,
           date: String(date || getKolkataDateString()),
           payment: String(payment || "UPI"),
         },
       });
-      return res.json({ success: true, expense: updated });
+      return res.json({ success: true, expense: formatExpense(updated) });
     } else {
       const created = await expense.create({
         data: {
           title: String(title).trim(),
           category: String(category || "Others"),
-          amount: Number(amount),
+          amount: amountNum,
           date: String(date || getKolkataDateString()),
           payment: String(payment || "UPI"),
         },
       });
-      return res.json({ success: true, expense: created });
+      return res.json({ success: true, expense: formatExpense(created) });
     }
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2393,7 +2405,13 @@ app.post("/api/finance/budget", async (req: Request, res: Response) => {
       },
     });
 
-    res.json({ success: true, budget: updated });
+    res.json({
+      success: true,
+      budget: {
+        ...updated,
+        allowance: toNumericAmount(updated.allowance),
+      },
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -2402,13 +2420,14 @@ app.post("/api/finance/budget", async (req: Request, res: Response) => {
 app.post("/api/finance/bill", async (req: Request, res: Response) => {
   try {
     const { id, title, date, amount, category, paid } = req.body;
-    if (!title || typeof amount !== "number") {
+    const amountNum = Number(amount);
+    if (!title || !Number.isFinite(amountNum)) {
       return res.status(400).json({ error: "title and numeric amount are required." });
     }
 
     const { bill } = getFinanceModels();
     if (!bill) {
-      return res.json({ success: true, bill: { id: id || `bill-${Date.now()}`, title, date, amount, category, paid: Boolean(paid) } });
+      return res.json({ success: true, bill: { id: id || `bill-${Date.now()}`, title, date, amount: amountNum, category, paid: Boolean(paid) } });
     }
 
     if (id) {
@@ -2417,7 +2436,7 @@ app.post("/api/finance/bill", async (req: Request, res: Response) => {
         update: {
           title: String(title).trim(),
           date: String(date || getKolkataDateString()),
-          amount: Number(amount),
+          amount: amountNum,
           category: String(category || "Subscriptions"),
           paid: Boolean(paid),
         },
@@ -2425,23 +2444,23 @@ app.post("/api/finance/bill", async (req: Request, res: Response) => {
           id,
           title: String(title).trim(),
           date: String(date || getKolkataDateString()),
-          amount: Number(amount),
+          amount: amountNum,
           category: String(category || "Subscriptions"),
           paid: Boolean(paid),
         },
       });
-      return res.json({ success: true, bill: updated });
+      return res.json({ success: true, bill: formatBill(updated) });
     } else {
       const created = await bill.create({
         data: {
           title: String(title).trim(),
           date: String(date || getKolkataDateString()),
-          amount: Number(amount),
+          amount: amountNum,
           category: String(category || "Subscriptions"),
           paid: Boolean(paid),
         },
       });
-      return res.json({ success: true, bill: created });
+      return res.json({ success: true, bill: formatBill(created) });
     }
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -2462,7 +2481,7 @@ app.post("/api/finance/bill/pay", async (req: Request, res: Response) => {
     if (!result.ok) {
       return res.status(result.status).json({ error: result.error });
     }
-    res.json({ success: true, bill: result.bill, expense: result.expense });
+    res.json({ success: true, bill: formatBill(result.bill), expense: formatExpense(result.expense) });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

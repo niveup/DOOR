@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { appPasscode } from "@/lib/env";
 import { getSession } from "@/lib/session";
+import { loginAttemptLimiter, loginFailureLimiter, clientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,21 @@ function safeEqual(left: string, right: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = clientIp(request);
+    const cap = loginAttemptLimiter.hit(ip);
+    if (!cap.allowed) {
+      return NextResponse.json(
+        { success: false, error: "Too many attempts. Please wait a moment." },
+        { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(cap.retryAfterSeconds) } }
+      );
+    }
+    const brake = loginFailureLimiter.peek(ip);
+    if (!brake.allowed) {
+      return NextResponse.json(
+        { success: false, error: "Too many failed attempts. Try again later." },
+        { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(brake.retryAfterSeconds) } }
+      );
+    }
     const contentLength = Number(request.headers.get("content-length") || 0);
     if (contentLength > 1024) {
       return NextResponse.json({ success: false, error: "Invalid request." }, { status: 413, headers: { "Cache-Control": "no-store" } });
@@ -21,8 +37,10 @@ export async function POST(request: NextRequest) {
     const payload = (await request.json()) as { passcode?: unknown };
     const passcode = typeof payload.passcode === "string" ? payload.passcode : "";
     if (!passcode || passcode.length > 256 || !safeEqual(passcode, appPasscode())) {
+      loginFailureLimiter.hit(ip);
       return NextResponse.json({ success: false, error: "Incorrect passcode.", demo: true }, { status: 401, headers: { "Cache-Control": "no-store" } });
     }
+    loginFailureLimiter.reset(ip);
     const session = await getSession();
     session.isLoggedIn = true;
     await session.save();
