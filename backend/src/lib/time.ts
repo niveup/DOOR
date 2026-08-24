@@ -49,3 +49,7 @@ export function getKolkataDateString(date: Date = new Date()): string {
   });
   return formatter.format(date);
 }
+
+export function backupWeekOf(now: Date = new Date()): string {
+  return getKolkataDateString(now);
+}

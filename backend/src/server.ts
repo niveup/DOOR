@@ -14,6 +14,7 @@ import { isPasscodeConfigured, verifySharedSecret } from "./lib/auth";
 import { payBillById } from "./lib/billing";
 import { getKolkataDate, getKolkataHour, getKolkataMonday, getKolkataDateString } from "./lib/time";
 import { createRateLimiter, clientKey } from "./lib/rate-limit";
+import { pushBackup } from "./lib/backup-store";
 
 // GA-102: brute-force brake on credential failures + a generous global cap.
 const authFailureLimiter = createRateLimiter({ windowMs: 5 * 60_000, max: 10 });
@@ -1378,6 +1379,16 @@ app.get("/cron/tick", async (req: Request, res: Response) => {
         console.log(`[Cron 04:00] Calculated score for yesterday: ${dailyScore}/100`);
       }
 
+      // Weekly backup (GA-112): Mondays 04:00 IST, after finalization.
+      if (getKolkataDate(now).getDay() === 1) {
+        try {
+          const backup = await pushBackup(prisma);
+          console.log("[Cron Backup]", JSON.stringify(backup));
+        } catch (backupError) {
+          console.error("[Cron Backup] failed:", backupError instanceof Error ? backupError.message : backupError);
+        }
+      }
+
       return res.json({ job: "finalize_yesterday", status: "completed" });
     }
 
@@ -1967,9 +1978,6 @@ app.post("/api/tracker/log", async (req: Request, res: Response) => {
       },
     });
 
-    const currentHours = existing?.hoursStudied || 0;
-    const currentQuestions = existing?.questionsSolved || 0;
-
     await prisma.progressRating.upsert({
       where: {
         subjectId_weekStartDate: {
@@ -1978,8 +1986,8 @@ app.post("/api/tracker/log", async (req: Request, res: Response) => {
         },
       },
       update: {
-        hoursStudied: currentHours + hours,
-        questionsSolved: currentQuestions + questions,
+        hoursStudied: { increment: hours },
+        questionsSolved: { increment: questions },
         notes: notes ? `${existing?.notes ? existing.notes + " | " : ""}${notes}` : existing?.notes,
       },
       create: {
@@ -2232,10 +2240,10 @@ app.post("/api/tracker/goal", async (req: Request, res: Response) => {
 
 // --- Finance API Routes ---
 
-function getFinanceModels() {
-  const expense = (prisma as any).financeExpense || (prisma as any).FinanceExpense;
-  const budget = (prisma as any).financeBudget || (prisma as any).FinanceBudget;
-  const bill = (prisma as any).financeBill || (prisma as any).FinanceBill;
+function getFinanceModels(db: any = prisma) {
+  const expense = db?.financeExpense || db?.FinanceExpense;
+  const budget = db?.financeBudget || db?.FinanceBudget;
+  const bill = db?.financeBill || db?.FinanceBill;
   return { expense, budget, bill };
 }
 
@@ -2469,15 +2477,19 @@ app.post("/api/finance/bill", async (req: Request, res: Response) => {
 
 app.post("/api/finance/bill/pay", async (req: Request, res: Response) => {
   try {
-    const { id } = req.body;
+    const { id, paymentDate } = req.body;
     if (!id) return res.status(400).json({ error: "Bill ID is required." });
 
-    const { bill, expense } = getFinanceModels();
+    const { bill, expense } = getFinanceModels(prisma);
     if (!bill || !expense) {
       return res.json({ success: true });
     }
 
-    const result = await payBillById(bill, expense, id, getKolkataDateString());
+    const effectiveDate = typeof paymentDate === "string" && paymentDate.trim()
+      ? paymentDate.trim()
+      : getKolkataDateString();
+
+    const result = await payBillById(prisma, id, effectiveDate);
     if (!result.ok) {
       return res.status(result.status).json({ error: result.error });
     }
@@ -2564,6 +2576,17 @@ app.post("/api/finance/reset", async (_req: Request, res: Response) => {
 });
 
 // --- Server Listen ---
+
+// Manual backup run (GA-112): passcode-gated like every other route.
+app.post("/api/backup/run", async (_req: Request, res: Response) => {
+  try {
+    const backup = await pushBackup(prisma);
+    if (!backup.pushed) return res.status(502).json({ success: false, ...backup });
+    res.json({ success: true, ...backup });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Backend server successfully running on port ${PORT}`);

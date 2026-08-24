@@ -153,6 +153,40 @@ async function clearTrackerLogs(request: Request, env: Env) {
   return json({ success: true, message: "Tracker study logs cleared." });
 }
 
+async function saveBackup(request: Request, env: Env) {
+  const body = await request.text();
+  if (body.length > 4 * 1024 * 1024) return json({ error: "Request too large" }, 413);
+  if (!await authenticate(request, env, body)) return json({ error: "Unauthorized" }, 401);
+  let input: { id?: unknown; kind?: unknown; weekOf?: unknown; createdAt?: unknown; payload?: unknown };
+  try {
+    input = JSON.parse(body);
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  if (
+    !/^[a-zA-Z0-9_.-]{4,64}$/.test(String(input.id || "")) ||
+    !/^[a-zA-Z0-9_-]{2,32}$/.test(String(input.kind || "")) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(String(input.weekOf || "")) ||
+    !Number.isFinite(Number(input.createdAt)) ||
+    typeof input.payload !== "string" ||
+    input.payload.length === 0
+  ) {
+    return json({ error: "Invalid backup record" }, 400);
+  }
+  await env.JOURNAL_DB.prepare(
+    "INSERT INTO backups (id, kind, week_of, created_at, payload) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, created_at = excluded.created_at"
+  ).bind(input.id, input.kind, input.weekOf, Number(input.createdAt), input.payload).run();
+  return json({ success: true, id: input.id });
+}
+
+async function getLatestBackup(request: Request, env: Env) {
+  if (!await authenticate(request, env, "")) return json({ error: "Unauthorized" }, 401);
+  const result = await env.JOURNAL_DB.prepare(
+    "SELECT id, kind, week_of, created_at, payload FROM backups ORDER BY created_at DESC LIMIT 1"
+  ).first<Record<string, unknown>>();
+  return json(result ? { backup: result } : { backup: null });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -161,6 +195,8 @@ export default {
     if (request.method === "GET" && url.pathname === "/v1/tracker/logs") return listTrackerLogs(request, env);
     if (request.method === "POST" && url.pathname === "/v1/tracker/logs") return saveTrackerLog(request, env);
     if (request.method === "DELETE" && url.pathname === "/v1/tracker/logs") return clearTrackerLogs(request, env);
+    if (request.method === "POST" && url.pathname === "/v1/backups") return saveBackup(request, env);
+    if (request.method === "GET" && url.pathname === "/v1/backups/latest") return getLatestBackup(request, env);
     return json({ error: "Not found" }, 404);
   },
 };

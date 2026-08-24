@@ -34,7 +34,7 @@ function storeConfig() {
   }
 }
 
-async function signedFetch(path: string, options: RequestInit = {}): Promise<Response | null> {
+export async function signedFetch(path: string, options: RequestInit = {}): Promise<Response | null> {
   const config = storeConfig();
   if (!config) return null;
 
