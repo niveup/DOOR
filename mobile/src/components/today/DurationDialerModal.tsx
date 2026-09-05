@@ -1,31 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Extrapolation,
+  FadeIn,
   interpolate,
   runOnJS,
   SharedValue,
+  SlideInDown,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Ionicons } from "@/src/components/app-icon";
 import { useTheme } from "@/src/providers/theme-provider";
-import { fontWeights, radii, shadows, spacing, typography } from "@/src/theme/tokens";
+import { typography } from "@/src/theme/tokens";
 
 export const HOURS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 export const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+const PRESETS = [15, 30, 60, 120];
 
-const ROW_HEIGHT = 50;
-const VISIBLE_ROWS = 5;
-const WHEEL_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS; // 250px
+const ROW_HEIGHT = 48;
+const WHEEL_HEIGHT = ROW_HEIGHT * 5;
 
 export interface DurationDialerModalProps {
   visible: boolean;
@@ -35,611 +30,353 @@ export interface DurationDialerModalProps {
   onSave: (mins: number) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Single 3D Wheel Item: Interpolates Scale, Opacity & 3D Tilt in Native Worklet
-// ---------------------------------------------------------------------------
 interface WheelItemProps {
   item: number;
   index: number;
   scrollY: SharedValue<number>;
-  rowHeight: number;
-  isMinutes?: boolean;
-  textColor: string;
-  onPress: (index: number) => void;
+  color: string;
 }
 
-const WheelItem = React.memo(function WheelItem({
-  item,
-  index,
-  scrollY,
-  rowHeight,
-  isMinutes,
-  textColor,
-  onPress,
-}: WheelItemProps) {
+const WheelItem = React.memo(function WheelItem({ item, index, scrollY, color }: WheelItemProps) {
   const animatedStyle = useAnimatedStyle(() => {
-    const inputRange = [
-      (index - 2) * rowHeight,
-      (index - 1) * rowHeight,
-      index * rowHeight,
-      (index + 1) * rowHeight,
-      (index + 2) * rowHeight,
-    ];
-
-    // Smooth continuous scale: center is large (1.18x), edges shrink to 0.72x
-    const scale = interpolate(
-      scrollY.value,
-      inputRange,
-      [0.72, 0.88, 1.18, 0.88, 0.72],
-      Extrapolation.CLAMP
-    );
-
-    // Continuous brightness: center is pure 1.0, adjacent rows are 0.50, outer rows are 0.22
-    const opacity = interpolate(
-      scrollY.value,
-      inputRange,
-      [0.22, 0.50, 1.0, 0.50, 0.22],
-      Extrapolation.CLAMP
-    );
-
-    // 3D cylindrical drum tilt: +36deg (below) -> 0deg (center) -> -36deg (above)
-    const rotateX = interpolate(
-      scrollY.value,
-      inputRange,
-      [36, 20, 0, -20, -36],
-      Extrapolation.CLAMP
-    );
-
-    // Subtle foreshortening along the curved barrel
-    const translateY = interpolate(
-      scrollY.value,
-      inputRange,
-      [-4, -1, 0, 1, 4],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      opacity,
-      transform: [
-        { perspective: 500 },
-        { translateY },
-        { rotateX: `${rotateX}deg` },
-        { scale },
-      ],
-    };
+    const offset = scrollY.value / ROW_HEIGHT - index;
+    const abs = Math.abs(offset);
+    const scale = interpolate(abs, [0, 1, 2], [1.12, 0.9, 0.8], Extrapolation.CLAMP);
+    const opacity = interpolate(abs, [0, 1, 2.2], [1, 0.45, 0.18], Extrapolation.CLAMP);
+    const translateY = interpolate(offset, [-2, 0, 2], [-6, 0, 6], Extrapolation.CLAMP);
+    return { opacity, transform: [{ translateY }, { scale }] };
   });
-
-  const formatted = isMinutes ? String(item).padStart(2, "0") : String(item);
-
   return (
-    <Pressable
-      onPress={() => onPress(index)}
-      style={[styles.itemTouchArea, { height: rowHeight }]}
-      hitSlop={{ top: 2, bottom: 2, left: 16, right: 16 }}
-    >
-      <Animated.View style={[styles.itemContent, animatedStyle]}>
-        <Text style={[styles.numberText, { color: textColor }]}>
-          {formatted}
-        </Text>
+    <View style={[styles.item, { height: ROW_HEIGHT }]}>
+      <Animated.View style={animatedStyle}>
+        <Text style={[styles.number, { color }]}>{String(item).padStart(2, "0")}</Text>
       </Animated.View>
-    </Pressable>
+    </View>
   );
 });
 
-// ---------------------------------------------------------------------------
-// Wheel Column Component: Smooth 60/120fps UI Thread Scroll & Micro Haptics
-// ---------------------------------------------------------------------------
 interface WheelColumnProps {
   items: number[];
-  initialIndex: number;
-  rowHeight: number;
-  isMinutes?: boolean;
-  textColor: string;
-  onSelect: (value: number) => void;
+  value: number;
+  color: string;
+  onSettle: (value: number) => void;
 }
 
-const WheelColumn = React.memo(function WheelColumn({
-  items,
-  initialIndex,
-  rowHeight,
-  isMinutes,
-  textColor,
-  onSelect,
-}: WheelColumnProps) {
-  const scrollY = useSharedValue(initialIndex * rowHeight);
-  const lastHapticIdx = useSharedValue(initialIndex);
-  const scrollRef = useRef<Animated.ScrollView>(null);
-  const lastSettledIdx = useRef(initialIndex);
-  const lastTickTime = useRef(0);
+const WheelColumn = React.memo(function WheelColumn({ items, value, color, onSettle }: WheelColumnProps) {
+  const targetIdx = Math.max(0, items.indexOf(value));
+  const scrollY = useSharedValue(targetIdx * ROW_HEIGHT);
+  const lastTick = useSharedValue(targetIdx);
+  const ref = useRef<Animated.ScrollView>(null);
+  const lastTickAt = useRef(0);
+  const mounted = useRef(false);
+  const onSettleRef = useRef(onSettle);
+  onSettleRef.current = onSettle;
 
-  const snapOffsets = useMemo(
-    () => items.map((_, i) => i * rowHeight),
-    [items, rowHeight]
-  );
-
-  // Sync scroll position when initialIndex changes or modal opens
   useEffect(() => {
-    scrollY.value = initialIndex * rowHeight;
-    lastHapticIdx.value = initialIndex;
-    lastSettledIdx.current = initialIndex;
-    scrollRef.current?.scrollTo({
-      y: initialIndex * rowHeight,
-      animated: false,
-    });
-  }, [initialIndex, rowHeight, scrollY, lastHapticIdx]);
+    const idx = Math.max(0, items.indexOf(value));
+    scrollY.value = idx * ROW_HEIGHT;
+    lastTick.value = idx;
+    ref.current?.scrollTo({ y: idx * ROW_HEIGHT, animated: mounted.current });
+    mounted.current = true;
+  }, [value]);
 
-  // Micro-haptic tick locked to wheel detents
-  const triggerTick = useCallback(() => {
+  const tick = useCallback(() => {
     const now = Date.now();
-    if (now - lastTickTime.current > 35) {
-      lastTickTime.current = now;
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {}
-    }
+    if (now - lastTickAt.current < 70) return;
+    lastTickAt.current = now;
+    try {
+      Haptics.selectionAsync();
+    } catch {}
   }, []);
 
-  // Real-time index change notification to parent for duration pill
-  const handleIndexChange = useCallback(
+  const settle = useCallback(
     (idx: number) => {
       const clamped = Math.max(0, Math.min(items.length - 1, idx));
-      if (clamped !== lastSettledIdx.current) {
-        lastSettledIdx.current = clamped;
-        onSelect(items[clamped]);
-      }
-    },
-    [items, onSelect]
-  );
-
-  // Settled notification
-  const handleSettled = useCallback(
-    (idx: number) => {
-      const clamped = Math.max(0, Math.min(items.length - 1, idx));
-      lastSettledIdx.current = clamped;
-      onSelect(items[clamped]);
+      onSettleRef.current(items[clamped]);
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch {}
     },
-    [items, onSelect]
+    [items]
   );
 
-  // Programmatic smooth snap to target row
-  const snapTo = useCallback(
-    (idx: number) => {
-      const clamped = Math.max(0, Math.min(items.length - 1, idx));
-      scrollRef.current?.scrollTo({
-        y: clamped * rowHeight,
-        animated: true,
-      });
-      handleSettled(clamped);
-    },
-    [items, rowHeight, handleSettled]
-  );
-
-  // UI-thread animated scroll handler
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-      const currentIdx = Math.round(event.contentOffset.y / rowHeight);
-      if (currentIdx !== lastHapticIdx.value) {
-        lastHapticIdx.value = currentIdx;
-        runOnJS(triggerTick)();
-        runOnJS(handleIndexChange)(currentIdx);
+  const handler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollY.value = e.contentOffset.y;
+      const idx = Math.round(e.contentOffset.y / ROW_HEIGHT);
+      if (idx !== lastTick.value) {
+        lastTick.value = idx;
+        runOnJS(tick)();
       }
     },
-    onMomentumEnd: (event) => {
-      scrollY.value = event.contentOffset.y;
-      const finalIdx = Math.round(event.contentOffset.y / rowHeight);
-      runOnJS(handleSettled)(finalIdx);
-    },
-    onEndDrag: (event) => {
-      scrollY.value = event.contentOffset.y;
-      const velocityY = event.velocity?.y || 0;
-      // If drag ends with low velocity, snap explicitly to avoid sticking midway
-      if (Math.abs(velocityY) < 0.15) {
-        const finalIdx = Math.round(event.contentOffset.y / rowHeight);
-        runOnJS(snapTo)(finalIdx);
-      }
+    onMomentumEnd: (e) => {
+      scrollY.value = e.contentOffset.y;
+      runOnJS(settle)(Math.round(e.contentOffset.y / ROW_HEIGHT));
     },
   });
 
   return (
-    <View style={styles.columnWrapper}>
+    <View style={styles.column}>
       <Animated.ScrollView
-        ref={scrollRef}
+        ref={ref}
         showsVerticalScrollIndicator={false}
-        snapToOffsets={snapOffsets}
-        snapToAlignment="start"
+        snapToInterval={ROW_HEIGHT}
         decelerationRate="fast"
-        overScrollMode="never"
         bounces={false}
-        nestedScrollEnabled={true}
-        onScroll={scrollHandler}
+        overScrollMode="never"
         scrollEventThrottle={16}
-        contentOffset={{ x: 0, y: initialIndex * rowHeight }}
-        contentContainerStyle={{
-          paddingTop: rowHeight * 2,
-          paddingBottom: rowHeight * 2,
-        }}
+        onScroll={handler}
+        contentContainerStyle={{ paddingTop: ROW_HEIGHT * 2, paddingBottom: ROW_HEIGHT * 2 }}
       >
         {items.map((item, idx) => (
-          <WheelItem
-            key={item}
-            item={item}
-            index={idx}
-            scrollY={scrollY}
-            rowHeight={rowHeight}
-            isMinutes={isMinutes}
-            textColor={textColor}
-            onPress={snapTo}
-          />
+          <WheelItem key={item} item={item} index={idx} scrollY={scrollY} color={color} />
         ))}
       </Animated.ScrollView>
     </View>
   );
 });
 
-// ---------------------------------------------------------------------------
-// Main Modal
-// ---------------------------------------------------------------------------
-export function DurationDialerModal({
-  visible,
-  initialMinutes,
-  taskTitle,
-  onClose,
-  onSave,
-}: DurationDialerModalProps) {
+export function DurationDialerModal({ visible, initialMinutes, taskTitle, onClose, onSave }: DurationDialerModalProps) {
   const { theme, isDark } = useTheme();
 
-  // Parse initial minutes into hour & minute values
-  const { initialH, initialM, initialHIdx, initialMIdx } = useMemo(() => {
+  const { initialH, initialM } = useMemo(() => {
     const raw = initialMinutes || 45;
-    const h = Math.min(8, Math.max(0, Math.floor(raw / 60)));
-    const m = Math.max(0, raw % 60);
-    const roundedM = Math.min(55, Math.max(0, Math.round(m / 5) * 5));
-    const hIdx = Math.max(0, HOURS.indexOf(h));
-    const mIdx = Math.max(0, MINUTES.indexOf(roundedM));
-    return { initialH: h, initialM: roundedM, initialHIdx: hIdx, initialMIdx: mIdx };
+    return {
+      initialH: Math.min(8, Math.max(0, Math.floor(raw / 60))),
+      initialM: Math.min(55, Math.max(0, Math.round((raw % 60) / 5) * 5)),
+    };
   }, [initialMinutes]);
 
-  const [selectedHours, setSelectedHours] = useState(initialH);
-  const [selectedMins, setSelectedMins] = useState(initialM);
+  const [hours, setHours] = useState(initialH);
+  const [mins, setMins] = useState(initialM);
 
   useEffect(() => {
     if (visible) {
-      setSelectedHours(initialH);
-      setSelectedMins(initialM);
+      setHours(initialH);
+      setMins(initialM);
     }
   }, [visible, initialH, initialM]);
 
-  const totalCalculatedMinutes = selectedHours * 60 + selectedMins;
+  const total = hours * 60 + mins;
+  const display = hours <= 0 ? `${mins} min` : mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+  const sub = hours <= 0 ? `${mins} minutes` : mins === 0 ? (hours === 1 ? "1 hour" : `${hours} hours`) : `${hours} hr ${mins} min`;
+
+  const applyPreset = (p: number) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    setHours(Math.floor(p / 60));
+    setMins(p % 60);
+  };
 
   const handleDone = () => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
-    // Minimum 5 minutes
-    onSave(Math.max(5, totalCalculatedMinutes));
+    onSave(Math.max(5, total === 0 ? 5 : total));
   };
 
-  const numberColor = isDark ? "#ffffff" : theme.text;
+  const numColor = isDark ? "#fafafa" : theme.text;
+  const sheetBg = isDark ? "#141417" : "#ffffff";
+  const hairline = isDark ? "#26262c" : "#e8edf3";
 
   return (
-    <Modal
-      transparent={true}
-      animationType="slide"
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss timer sheet"
-        />
+    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.overlay}>
+        <Animated.View entering={FadeIn.duration(160)} style={StyleSheet.absoluteFill}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Dismiss duration picker" />
+        </Animated.View>
 
-        {/* Bottom Sheet Card Container */}
-        <View
-          style={[
-            styles.bottomSheetCard,
-            {
-              backgroundColor: isDark ? "#121216" : theme.surfaceElevated,
-              borderColor: isDark ? "#27272a" : theme.border,
-            },
-          ]}
-        >
-          {/* Sheet Drag Handle */}
-          <View
-            style={[
-              styles.dragHandle,
-              { backgroundColor: isDark ? "#3f3f46" : "#cbd5e1" },
-            ]}
-          />
+        <Animated.View entering={SlideInDown.duration(240)} style={[styles.sheet, { backgroundColor: sheetBg }]}>
+          <View style={[styles.handle, { backgroundColor: isDark ? "#3a3a41" : "#dbe2ea" }]} />
 
-          {/* Top Action Bar: Cancel · Title · Done */}
-          <View style={styles.sheetHeader}>
-            <Pressable
-              onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel"
-              style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={[styles.cancelText, { color: theme.textMuted }]}>
-                Cancel
-              </Text>
+          <View style={styles.header}>
+            <Pressable onPress={onClose} hitSlop={12} style={({ pressed }) => [pressed && { opacity: 0.55 }]}>
+              <Text style={[styles.cancel, { color: theme.textMuted }]}>Cancel</Text>
             </Pressable>
-
-            <View style={styles.titleCenter}>
-              <Text
-                style={[
-                  styles.sheetTitle,
-                  { color: isDark ? "#fafafa" : theme.text },
-                ]}
-                numberOfLines={1}
-              >
-                {taskTitle || "Timer Duration"}
-              </Text>
-            </View>
-
-            <Pressable
-              onPress={handleDone}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel={`Done, set duration to ${totalCalculatedMinutes} minutes`}
-              style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={[styles.doneText, { color: theme.accent }]}>
-                Done
-              </Text>
-            </Pressable>
+            <Text style={[styles.title, { color: numColor }]} numberOfLines={1}>
+              {taskTitle || "Duration"}
+            </Text>
+            <View style={styles.headerSpacer} />
           </View>
 
-          {/* Dual 3D Rolling Wheels Frame */}
-          <View
-            style={[
-              styles.wheelOuterFrame,
-              {
-                backgroundColor: isDark ? "#09090c" : theme.surfaceSubtle,
-                borderColor: isDark ? "#1f1f25" : theme.borderMuted,
-              },
-            ]}
+          <View style={styles.readout}>
+            <Text style={[styles.total, { color: numColor }]}>{display}</Text>
+            <Text style={[styles.sub, { color: theme.textFaint }]}>{sub} of focus</Text>
+          </View>
+
+          <View style={styles.colHeads}>
+            <Text style={[styles.colHead, { color: theme.textFaint }]}>Hours</Text>
+            <Text style={[styles.colHead, { color: theme.textFaint }]}>Min</Text>
+          </View>
+
+          <View style={styles.wheelsWrap}>
+            <View pointerEvents="none" style={[styles.lens, { backgroundColor: isDark ? "rgba(255,255,255,0.055)" : "rgba(15,23,42,0.05)" }]} />
+            <View style={styles.cols}>
+              <WheelColumn items={HOURS} value={hours} color={numColor} onSettle={setHours} />
+              <WheelColumn items={MINUTES} value={mins} color={numColor} onSettle={setMins} />
+            </View>
+          </View>
+
+          <View style={styles.presets}>
+            {PRESETS.map((p) => {
+              const active = total === p;
+              const label = p >= 60 ? `${p / 60}h` : `${p}m`;
+              return (
+                <Pressable
+                  key={p}
+                  onPress={() => applyPreset(p)}
+                  style={({ pressed }) => [styles.preset, active && { backgroundColor: theme.accentSoft }, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.presetText, { color: active ? theme.accent : theme.textMuted }]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable
+            onPress={handleDone}
+            style={({ pressed }) => [styles.cta, { backgroundColor: theme.accent }, pressed && { opacity: 0.88, transform: [{ scale: 0.985 }] }]}
           >
-            {/* Center Focus Lens Bar spanning across both columns */}
-            <View
-              style={[
-                styles.centerLensBar,
-                {
-                  top: ROW_HEIGHT * 2,
-                  height: ROW_HEIGHT,
-                  backgroundColor: isDark
-                    ? "rgba(16, 185, 129, 0.08)"
-                    : "rgba(5, 150, 105, 0.06)",
-                  borderColor: isDark
-                    ? "rgba(16, 185, 129, 0.24)"
-                    : "rgba(5, 150, 105, 0.18)",
-                },
-              ]}
-              pointerEvents="none"
-            >
-              {/* Unit Label: Hours (Stationary next to active centered number) */}
-              <View style={styles.lensColumn}>
-                <Text
-                  style={[
-                    styles.lensUnitText,
-                    styles.hoursUnitOffset,
-                    { color: isDark ? theme.cyan : theme.accent },
-                  ]}
-                >
-                  hours
-                </Text>
-              </View>
-
-              {/* Unit Label: Min (Stationary next to active centered number) */}
-              <View style={styles.lensColumn}>
-                <Text
-                  style={[
-                    styles.lensUnitText,
-                    styles.minsUnitOffset,
-                    { color: isDark ? theme.cyan : theme.accent },
-                  ]}
-                >
-                  min
-                </Text>
-              </View>
-            </View>
-
-            {/* Wheels Columns Row */}
-            <View style={styles.wheelsColumnsRow}>
-              {/* Hours Column */}
-              <WheelColumn
-                items={HOURS}
-                initialIndex={initialHIdx}
-                rowHeight={ROW_HEIGHT}
-                textColor={numberColor}
-                onSelect={setSelectedHours}
-              />
-
-              {/* Minutes Column */}
-              <WheelColumn
-                items={MINUTES}
-                initialIndex={initialMIdx}
-                rowHeight={ROW_HEIGHT}
-                isMinutes={true}
-                textColor={numberColor}
-                onSelect={setSelectedMins}
-              />
-            </View>
-          </View>
-
-          {/* Real-time Duration Readout Pill */}
-          <View style={styles.summaryFooter}>
-            <View
-              style={[
-                styles.totalPill,
-                {
-                  backgroundColor: isDark
-                    ? "rgba(16, 185, 129, 0.10)"
-                    : "rgba(5, 150, 105, 0.08)",
-                  borderColor: isDark
-                    ? "rgba(16, 185, 129, 0.25)"
-                    : "rgba(5, 150, 105, 0.18)",
-                },
-              ]}
-            >
-              <Ionicons name="time-outline" size={14} color={theme.accent} />
-              <Text style={[styles.totalPillText, { color: theme.accent }]}>
-                {selectedHours > 0
-                  ? `${selectedHours} hr ${selectedMins} min`
-                  : `${selectedMins} minutes`}
-              </Text>
-            </View>
-          </View>
-        </View>
+            <Text style={[styles.ctaText, { color: isDark ? "#09090b" : "#ffffff" }]}>Set · {display}</Text>
+          </Pressable>
+          <View style={[styles.hairline, { backgroundColor: hairline }]} />
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "flex-end",
   },
-  bottomSheetCard: {
-    width: "100%",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderTopWidth: 1,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-    ...shadows.lg,
+  sheet: {
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 8,
+    paddingBottom: 22,
+    paddingHorizontal: 22,
+    gap: 12,
   },
-  dragHandle: {
+  handle: {
     width: 38,
-    height: 4,
-    borderRadius: 2,
+    height: 5,
+    borderRadius: 3,
     alignSelf: "center",
-    marginBottom: 4,
   },
-  sheetHeader: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.xxs,
-    paddingBottom: spacing.xxs,
+    paddingTop: 4,
   },
-  headerBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-  },
-  cancelText: {
+  cancel: {
     ...typography.body,
     fontSize: 15,
-    fontWeight: "500",
+    minWidth: 64,
   },
-  titleCenter: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sheetTitle: {
+  title: {
     ...typography.subheading,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  doneText: {
-    ...typography.body,
     fontSize: 15,
-    fontWeight: "800",
-  },
-  wheelOuterFrame: {
-    height: WHEEL_HEIGHT,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    position: "relative",
-    overflow: "hidden",
-  },
-  centerLensBar: {
-    position: "absolute",
-    left: 8,
-    right: 8,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    zIndex: 2,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  lensColumn: {
-    flex: 1,
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  lensUnitText: {
-    ...typography.caption,
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.4,
-  },
-  hoursUnitOffset: {
-    position: "absolute",
-    left: "50%",
-    marginLeft: 22,
-  },
-  minsUnitOffset: {
-    position: "absolute",
-    left: "50%",
-    marginLeft: 32,
-  },
-  wheelsColumnsRow: {
-    flexDirection: "row",
-    height: "100%",
-  },
-  columnWrapper: {
-    flex: 1,
-    height: "100%",
-  },
-  itemTouchArea: {
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  itemContent: {
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  numberText: {
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
+    fontWeight: "600",
+    maxWidth: 200,
     textAlign: "center",
   },
-  summaryFooter: {
+  headerSpacer: {
+    minWidth: 64,
+  },
+  readout: {
     alignItems: "center",
-    justifyContent: "center",
+    gap: 2,
     paddingTop: 2,
   },
-  totalPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  totalPillText: {
-    ...typography.caption,
-    fontSize: 12.5,
+  total: {
+    fontSize: 34,
+    lineHeight: 38,
     fontWeight: "700",
+    letterSpacing: -0.8,
+    fontVariant: ["tabular-nums"],
+  },
+  sub: {
+    fontSize: 12.5,
+    fontWeight: "500",
+  },
+  wheelsWrap: {
+    height: WHEEL_HEIGHT,
+    position: "relative",
+    marginTop: 2,
+  },
+  lens: {
+    position: "absolute",
+    top: (WHEEL_HEIGHT - ROW_HEIGHT) / 2,
+    left: 0,
+    right: 0,
+    height: ROW_HEIGHT,
+    borderRadius: 14,
+    zIndex: 1,
+  },
+  cols: {
+    flexDirection: "row",
+    height: "100%",
+    zIndex: 2,
+  },
+  column: {
+    flex: 1,
+    height: "100%",
+  },
+  colHeads: {
+    flexDirection: "row",
+    marginBottom: -4,
+  },
+  colHead: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  item: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  number: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  presets: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  preset: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  presetText: {
+    fontSize: 13,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  cta: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: 52,
+    borderRadius: 15,
+    marginTop: 2,
+  },
+  ctaText: {
+    fontSize: 15,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  hairline: {
+    height: 0,
   },
 });
-
