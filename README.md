@@ -32,8 +32,9 @@ cd mobile && npm install && npx expo start
 Environment contracts live in each package's `.env.example`; deployment steps in
 [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) and [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md).
 
-## Operations
+## Documentation & Operations
 
+- **Architecture & Codebase Guide**: Comprehensive system topology, data flow, APIs, and module specs in [docs/CODEBASE_GUIDE.md](docs/CODEBASE_GUIDE.md).
 - Backups: weekly Monday 04:00 IST snapshot of every table into Cloudflare D1,
   or force one via `POST /api/backup/run`. Restore: [docs/RESTORE.md](docs/RESTORE.md)
 - Health: `GET /health`

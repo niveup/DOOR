@@ -16,6 +16,7 @@ import { useTheme } from "@/src/providers/theme-provider";
 import { radii, spacing, typography } from "@/src/theme/tokens";
 import { StudyLog, TrackerSubject } from "@/src/types/domain";
 import { shortDate, todayInKolkata } from "@/src/lib/format";
+import { WeeklyInsightCard } from "./StudyWeeklyInsight";
 
 export function formatLogDate(dateStr: string): string {
   try {
@@ -567,50 +568,10 @@ export function AllLogsContent({
       {/* 4. Weekly Coaching Analysis Footer */}
       {weeklyAnalysis ? (
         <View style={styles.sectionGroup}>
-          <Text style={[styles.fieldLabel, { color: theme.textFaint }]}>
-            WEEKLY COACHING ANALYSIS
-          </Text>
-          <Card
-            style={{
-              backgroundColor: isDark ? "#121216" : theme.surface,
-              borderColor: isDark ? "#1f1f25" : theme.border,
-            }}
-          >
-            <View style={styles.analysisHeader}>
-              <View
-                style={[
-                  styles.iconMiniBadge,
-                  {
-                    backgroundColor: isDark
-                      ? "rgba(124, 58, 237, 0.12)"
-                      : "rgba(124, 58, 237, 0.08)",
-                    borderColor: isDark
-                      ? "rgba(124, 58, 237, 0.25)"
-                      : "rgba(124, 58, 237, 0.15)",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="sparkles"
-                  size={12}
-                  color={theme.violet}
-                />
-              </View>
-              <Text style={[styles.analysisLabel, { color: theme.violet }]}>
-                WEEKLY MENTOR READ
-              </Text>
-            </View>
-            <Text
-              style={[
-                styles.analysis,
-                { color: isDark ? "#e4e4e7" : theme.text },
-              ]}
-            >
-              {weeklyAnalysis}
-            </Text>
-          </Card>
+          <WeeklyInsightCard weeklyAnalysis={weeklyAnalysis} />
         </View>
       ) : null}
+
     </Animated.ScrollView>
   );
 }
