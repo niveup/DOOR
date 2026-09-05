@@ -7,9 +7,9 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@/src/components/app-icon";
-import { Card } from "@/src/components/ui";
+import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/providers/theme-provider";
-import { fontWeights, layout, radii, spacing, typography } from "@/src/theme/tokens";
+import { fontWeights, radii, spacing, typography } from "@/src/theme/tokens";
 
 export type TodoTag = "GATE" | "College" | "Personal";
 
@@ -40,37 +40,81 @@ export function TodayAddTaskForm({
   customDuration,
   onOpenDurationDialer,
   onSave,
+  onCancel,
   tagConfig,
 }: TodayAddTaskFormProps) {
   const { theme, isDark } = useTheme();
   const hasText = newTodoText.trim().length > 0;
+  const activeCfg = tagConfig[selectedTag] || tagConfig.GATE;
+
+  const handleSelectTag = (t: TodoTag) => {
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+    onSelectTag(t);
+  };
+
+  const handleSave = () => {
+    if (!hasText) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    onSave();
+  };
 
   return (
-    <Card
+    <View
       style={[
         styles.card,
         {
-          backgroundColor: isDark ? "#141418" : theme.surface,
-          borderColor: isDark ? "#24242a" : theme.border,
+          backgroundColor: isDark ? "#121216" : theme.surface,
+          borderColor: hasText
+            ? isDark
+              ? "rgba(16, 185, 129, 0.4)"
+              : theme.accent
+            : isDark
+            ? "#27272a"
+            : theme.border,
         },
       ]}
     >
-      {/* Input Field Container */}
-      <View
-        style={[
-          styles.inputRowContainer,
-          {
-            backgroundColor: isDark ? "#09090b" : theme.canvas,
-            borderColor: hasText
-              ? isDark
-                ? theme.borderFocus
-                : theme.borderFocus
-              : theme.borderMuted,
-          },
-        ]}
-      >
+      {/* 1. Header Micro-Bar: Category context & quick cancel */}
+      <View style={styles.topBar}>
+        <View
+          style={[
+            styles.activeTagBadge,
+            {
+              backgroundColor: activeCfg.bg,
+              borderColor: isDark
+                ? "rgba(255, 255, 255, 0.08)"
+                : activeCfg.color,
+            },
+          ]}
+        >
+          <Ionicons name={activeCfg.icon} size={11} color={activeCfg.color} />
+          <Text style={[styles.activeTagBadgeText, { color: activeCfg.color }]}>
+            {activeCfg.label.toUpperCase()} FOCUS
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={onCancel}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel task creation"
+          style={({ pressed }) => [
+            styles.cancelIconBtn,
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Ionicons name="close" size={16} color={theme.textFaint} />
+        </Pressable>
+      </View>
+
+      {/* 2. Spacious Unboxed Input Row with Floating Submit Action */}
+      <View style={styles.inputContainer}>
         <TextInput
-          style={[styles.inputField, { color: theme.text }]}
+          style={[styles.inputField, { color: isDark ? "#fafafa" : theme.text }]}
           value={newTodoText}
           onChangeText={setNewTodoText}
           placeholder="What do you need to focus on?"
@@ -78,72 +122,90 @@ export function TodayAddTaskForm({
           autoFocus={true}
           autoCapitalize="sentences"
           returnKeyType="done"
-          onSubmitEditing={onSave}
+          onSubmitEditing={handleSave}
         />
 
         <Pressable
-          onPress={onSave}
+          onPress={handleSave}
           disabled={!hasText}
           accessibilityRole="button"
           accessibilityLabel="Save task"
           style={({ pressed }) => [
-            styles.doneButton,
+            styles.actionCircle,
             hasText
               ? {
                   backgroundColor: theme.accent,
                   borderColor: theme.accent,
+                  shadowColor: theme.accent,
+                  shadowOpacity: 0.35,
+                  shadowRadius: 6,
+                  elevation: 3,
                 }
               : {
-                  backgroundColor: isDark ? "rgba(255, 255, 255, 0.05)" : theme.raised,
-                  borderColor: theme.borderMuted,
-                  opacity: 0.4,
+                  backgroundColor: isDark
+                    ? "rgba(255, 255, 255, 0.04)"
+                    : "rgba(0, 0, 0, 0.04)",
+                  borderColor: isDark
+                    ? "rgba(255, 255, 255, 0.07)"
+                    : "rgba(0, 0, 0, 0.06)",
                 },
-            pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] },
+            pressed && hasText && { transform: [{ scale: 0.92 }], opacity: 0.88 },
           ]}
         >
           <Ionicons
-            name="checkmark"
+            name="arrow-up"
             size={16}
             color={hasText ? theme.solidTextDark : theme.textFaint}
           />
         </Pressable>
       </View>
 
-      {/* Tag Selection & Duration Trigger Row */}
-      <View style={styles.tagAndDurationRow}>
-        {/* 3 Tag Chips: GATE, College, Personal */}
-        <View style={styles.tagChipsContainer}>
+      {/* 3. Subtle Hairline Divider */}
+      <View
+        style={[
+          styles.divider,
+          { backgroundColor: isDark ? "#1f1f25" : theme.borderMuted },
+        ]}
+      />
+
+      {/* 4. Controls Toolbar: Category Pills & Duration Selector */}
+      <View style={styles.toolbarRow}>
+        {/* Category Pills */}
+        <View style={styles.pillsGroup}>
           {(["GATE", "College", "Personal"] as const).map((t) => {
             const active = selectedTag === t;
             const cfg = tagConfig[t];
             return (
               <Pressable
                 key={t}
-                onPress={() => onSelectTag(t)}
-                style={[
-                  styles.tagChip,
+                onPress={() => handleSelectTag(t)}
+                style={({ pressed }) => [
+                  styles.categoryPill,
                   {
                     backgroundColor: active
                       ? cfg.bg
                       : isDark
                       ? "#18181d"
-                      : theme.canvas,
+                      : theme.surfaceSubtle,
                     borderColor: active
                       ? cfg.color
-                      : theme.borderMuted,
+                      : isDark
+                      ? "#27272a"
+                      : theme.border,
                   },
+                  pressed && { opacity: 0.75 },
                 ]}
               >
                 <Ionicons
                   name={cfg.icon}
-                  size={13}
+                  size={12}
                   color={active ? cfg.color : theme.textFaint}
                 />
                 <Text
                   style={[
-                    styles.tagChipText,
+                    styles.categoryPillText,
                     { color: active ? cfg.color : theme.textMuted },
-                    active && { fontWeight: "800" },
+                    active && { fontWeight: "700" },
                   ]}
                   numberOfLines={1}
                 >
@@ -154,112 +216,145 @@ export function TodayAddTaskForm({
           })}
         </View>
 
-        {/* Target Duration Selector Button */}
+        {/* Target Duration Selector */}
         <Pressable
-          onPress={onOpenDurationDialer}
-          style={[
-            styles.durationTrigger,
+          onPress={() => {
+            try {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch {}
+            onOpenDurationDialer();
+          }}
+          style={({ pressed }) => [
+            styles.durationPill,
             {
-              backgroundColor: isDark ? "#18181d" : theme.raised,
-              borderColor: isDark ? "#2a2a32" : theme.border,
+              backgroundColor: isDark ? "#18181d" : theme.surfaceSubtle,
+              borderColor: isDark ? "#27272a" : theme.border,
             },
+            pressed && { opacity: 0.75 },
           ]}
         >
           <Ionicons
             name="time-outline"
-            size={13}
+            size={12}
             color={isDark ? theme.cyan : theme.accent}
           />
           <Text
             style={[
-              styles.durationTriggerText,
-              { color: theme.text },
+              styles.durationPillText,
+              { color: isDark ? "#fafafa" : theme.text },
             ]}
           >
             {customDuration}m
           </Text>
-          <Ionicons
-            name="chevron-down"
-            size={11}
-            color={theme.textFaint}
-          />
+          <Ionicons name="chevron-down" size={10} color={theme.textFaint} />
         </Pressable>
       </View>
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    padding: spacing.sm,
-    gap: spacing.sm,
-    borderRadius: radii.card,
+    borderRadius: radii.xl,
     borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    gap: spacing.xs + 2,
     width: "100%",
   },
-  inputRowContainer: {
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  activeTagBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.full,
     borderWidth: 1,
-    borderRadius: radii.control + 2,
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.xxs,
-    height: layout.inputHeightCompact + 4,
-    width: "100%",
+  },
+  activeTagBadgeText: {
+    ...typography.caption,
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  cancelIconBtn: {
+    padding: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
+    paddingVertical: 2,
   },
   inputField: {
     flex: 1,
     minWidth: 0,
-    height: "100%",
     ...typography.body,
-    paddingVertical: 0,
-    paddingRight: spacing.xxs,
+    fontSize: 15.5,
+    lineHeight: 21,
+    fontWeight: "500",
+    paddingVertical: 4,
+    paddingHorizontal: 0,
   },
-  doneButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.control,
+  actionCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  tagAndDurationRow: {
+  divider: {
+    height: 1,
+    width: "100%",
+  },
+  toolbarRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: spacing.xs,
+    paddingTop: 2,
   },
-  tagChipsContainer: {
-    flex: 1,
-    flexDirection: "row",
-    gap: spacing.xxs + 2,
-  },
-  tagChip: {
-    flex: 1,
+  pillsGroup: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.xxs,
-    paddingVertical: spacing.xs - 1,
-    borderRadius: radii.control,
+    gap: 6,
+    flex: 1,
+  },
+  categoryPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radii.full,
     borderWidth: 1,
   },
-  tagChipText: {
+  categoryPillText: {
     ...typography.caption,
+    fontSize: 11,
     fontWeight: fontWeights.semibold,
   },
-  durationTrigger: {
+  durationPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.sm - 2,
-    paddingVertical: spacing.xs - 2,
-    borderRadius: radii.control,
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radii.full,
     borderWidth: 1,
   },
-  durationTriggerText: {
+  durationPillText: {
     ...typography.caption,
+    fontSize: 11,
     fontWeight: fontWeights.bold,
   },
 });

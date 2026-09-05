@@ -529,22 +529,35 @@ export default function TodayScreen() {
                 hitSlop={8}
                 style={({ pressed }) => [
                   styles.addPillButton,
-                  {
-                    backgroundColor: isDark ? theme.surfaceElevated : theme.raised,
-                    borderColor: theme.border,
-                  },
-                  pressed && { opacity: 0.7 },
+                  showAddCard
+                    ? {
+                        backgroundColor: isDark
+                          ? "rgba(244, 63, 94, 0.08)"
+                          : "rgba(225, 29, 72, 0.06)",
+                        borderColor: isDark
+                          ? "rgba(244, 63, 94, 0.25)"
+                          : "rgba(225, 29, 72, 0.18)",
+                      }
+                    : {
+                        backgroundColor: isDark
+                          ? "rgba(16, 185, 129, 0.10)"
+                          : "rgba(5, 150, 105, 0.08)",
+                        borderColor: isDark
+                          ? "rgba(16, 185, 129, 0.25)"
+                          : "rgba(5, 150, 105, 0.15)",
+                      },
+                  pressed && { opacity: 0.75, transform: [{ scale: 0.97 }] },
                 ]}
               >
                 <Ionicons
                   name={showAddCard ? "close" : "add"}
-                  size={15}
-                  color={theme.text}
+                  size={14}
+                  color={showAddCard ? theme.rose : theme.accent}
                 />
                 <Text
                   style={[
                     styles.addPillText,
-                    { color: theme.text },
+                    { color: showAddCard ? theme.rose : theme.accent },
                   ]}
                 >
                   {showAddCard ? "Cancel" : "Add task"}
@@ -552,6 +565,7 @@ export default function TodayScreen() {
               </Pressable>
             }
           />
+
 
           {/* Inline Quick Add Task Form */}
           {showAddCard ? (
@@ -666,12 +680,13 @@ const styles = StyleSheet.create({
   addPillButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.sm - 1,
-    paddingVertical: spacing.xxs + 1,
-    borderRadius: radii.control,
+    gap: spacing.xxs + 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs + 2,
+    borderRadius: radii.full,
     borderWidth: 1,
   },
+
   addPillText: {
     ...typography.caption,
     fontWeight: fontWeights.bold,
