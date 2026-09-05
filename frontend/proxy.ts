@@ -14,7 +14,13 @@ export async function proxy(request: NextRequest) {
   );
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/_next") || pathname === "/favicon.ico" || pathname.startsWith("/passcode") || pathname.startsWith("/api/auth")) {
+  if (
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/passcode") ||
+    pathname.startsWith("/api/auth") ||
+    /\.(png|jpg|jpeg|gif|webp|svg|ico)$/i.test(pathname)
+  ) {
     return response;
   }
 
@@ -50,5 +56,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };
