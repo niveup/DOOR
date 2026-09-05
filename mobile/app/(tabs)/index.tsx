@@ -428,6 +428,7 @@ export default function TodayScreen() {
       }).format(new Date())}
       refreshing={routineQuery.isRefetching}
       onRefresh={routineQuery.refetch}
+      keyboardShouldPersistTaps="always"
       action={
         <Pressable
           onPress={toggleTheme}
@@ -508,10 +509,7 @@ export default function TodayScreen() {
         </>
       }
     >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.screenScrollContent}
-      >
+      <View style={styles.screenScrollContent}>
         {/* 1. Daily Focus & Progress Card */}
         <TodayProgressCard
           completedCount={completedCount}
@@ -651,7 +649,7 @@ export default function TodayScreen() {
             </View>
           ) : null}
         </View>
-      </ScrollView>
+      </View>
     </AppScreen>
   );
 }

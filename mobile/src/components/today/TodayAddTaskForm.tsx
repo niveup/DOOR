@@ -214,6 +214,7 @@ export function TodayAddTaskForm({
             <Pressable
               key={t}
               onPress={() => handleSelectTag(t)}
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
               accessibilityRole="radio"
               accessibilityState={{ selected: active }}
               accessibilityLabel={`${cfg.label} category`}

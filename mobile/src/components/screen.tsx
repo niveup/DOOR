@@ -11,9 +11,19 @@ type ScreenProps = PropsWithChildren<{
   refreshing?: boolean;
   onRefresh?: () => void;
   overlay?: ReactNode;
+  keyboardShouldPersistTaps?: "always" | "never" | "handled";
 }>;
 
-export function AppScreen({ title, subtitle, action, refreshing, onRefresh, overlay, children }: ScreenProps) {
+export function AppScreen({
+  title,
+  subtitle,
+  action,
+  refreshing,
+  onRefresh,
+  overlay,
+  keyboardShouldPersistTaps = "handled",
+  children,
+}: ScreenProps) {
   const { theme } = useTheme();
 
   return (
@@ -22,7 +32,8 @@ export function AppScreen({ title, subtitle, action, refreshing, onRefresh, over
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+
           refreshControl={
             onRefresh ? (
               <RefreshControl
