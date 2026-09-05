@@ -2480,6 +2480,10 @@ app.post("/api/finance/bill/pay", async (req: Request, res: Response) => {
     const { id, paymentDate } = req.body;
     if (!id) return res.status(400).json({ error: "Bill ID is required." });
 
+    if (paymentDate !== undefined && (typeof paymentDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate.trim()))) {
+      return res.status(400).json({ error: "paymentDate must be YYYY-MM-DD." });
+    }
+
     const { bill, expense } = getFinanceModels(prisma);
     if (!bill || !expense) {
       return res.json({ success: true });

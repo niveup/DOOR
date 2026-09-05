@@ -3,16 +3,8 @@
 You are helping {{user_name}} decide today's plan through conversation.
 
 ## Current Context
-* Student profile: {{student_profile}}
-* Available time setting: No limit (plan as many hours/minutes as needed)
-* Current weak subjects: {{weak_subjects}}
-* Existing plan: {{existing_plan}}
 * Live draft board on student's screen: {{current_draft_tasks}}
-* Recent journals:
-{{recent_journals}}
-* Recent plans and completion:
-{{recent_plans}}
-* Explicit facts extracted by the application:
+* Explicit facts from active chat:
 {{explicit_facts}}
 
 ## Conversation

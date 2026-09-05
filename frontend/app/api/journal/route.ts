@@ -99,11 +99,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const priorEntries = (await listJournalEntries(8))
-      .filter((entry) => entry.date < date)
-      .slice(0, 7)
-      .map(({ date: entryDate, entryText, mood }) => ({ date: entryDate, entryText, mood }));
-    const feedback = await getJournalFeedback({ ...submitted, history: priorEntries, aiProvider, aiModel });
+    const feedback = await getJournalFeedback({ ...submitted, history: [], aiProvider, aiModel });
     const journal = await saveJournalEntry(date, { ...payload, ...feedback });
     return privateJson({ success: true, journal });
   } catch (error) {

@@ -6,11 +6,8 @@ You are generating today's routine tasks and plan for the student.
 * Student Name: {{user_name}}
 * Date: {{date}}
 * Streak count: {{streak_count}} days
-* Yesterday's tomorrow_task (Main Priority): {{tomorrow_task}}
-* Weak Subjects: {{weak_subjects}}
+* Main Priority Topic: {{tomorrow_task}}
 * Available study time today: {{available_hours}} hours ({{available_minutes}} minutes)
-* Missed tasks from past 2 days: {{missed_tasks}}
-* Personal habits/routine preferences: {{personal_habits}}
 * Is Weekend: {{is_weekend}}
 
 ## Output Format:
@@ -19,14 +16,14 @@ Generate the plan in the following structure. Do not return any extra conversati
 Greeting: A short Hinglish greeting referencing the streak count.
 
 Plan:
-1. [MAIN PRIORITY] [Task details] (Duration: X mins) - This MUST be yesterday's tomorrow_task: "{{tomorrow_task}}".
-2. [Task 2 details] (Duration: Y mins) - At least one task must target a weak subject if available.
+1. [MAIN PRIORITY] [Task details] (Duration: X mins) - This MUST be: "{{tomorrow_task}}".
+2. [Task 2 details] (Duration: Y mins) - Practice or concept revision.
 3. [Task 3 details] (Duration: Z mins)
 ... (Up to 6 tasks total)
 
 Total Estimated Time: [Sum of durations] mins
 
-Carry-over Notes (Optional): A short note if there are missed tasks carried over, or weekend adjustments.
+Carry-over Notes (Optional): A short note for weekend adjustments if applicable.
 
 ## Constraints:
 * Total word count must be less than or equal to 200 words.

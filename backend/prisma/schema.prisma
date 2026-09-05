@@ -38,7 +38,6 @@ model Subject {
  progressRatings ProgressRating[]
  tasks Task[]
  topicStatuses TopicStatus[]
- explanations ConceptExplanation[]
  studyLogs StudyLog[]
 }
 
@@ -132,63 +131,17 @@ model WeeklyReport {
  generatedAt DateTime @default(now())
 }
 
-model AiCallLog {
- logId String @id @default(uuid())
- surface String
- latencyMs Int
- success Boolean
- errorMessage String?
- promptPreview String?
- responsePreview String?
- createdAt DateTime @default(now())
-}
-
 model AiProviderCredential {
- provider String @id
- encryptedApiKey String
- encryptionIv String
- authTag String
- keyHint String
- model String
- isActive Boolean @default(false)
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
- @@index([isActive])
-}
-
-model ConceptExplanation {
- explanationId String @id @default(uuid())
- topicInput String
- normalizedTopic String
- subjectId Int?
- subject Subject? @relation(fields: [subjectId], references: [subjectId])
- mode String
- difficulty String @default("Medium")
- explanationText String
- questions Json?
- finalScore Int?
- topicStatusSet Boolean @default(false)
- formulaGuardPassed Boolean @default(true)
- createdAt DateTime @default(now())
-}
-
-model InterviewAttempt {
- attemptId String @id @default(uuid())
- sessionId String
- company String
- mode String
- questionIndex Int
- questionText String
- userAnswer String
- skipped Boolean @default(false)
- score Float
- dimensions Json?
- missingPoints Json?
- improvedAnswer String?
- improvedAnswerViewed Boolean @default(false)
- createdAt DateTime @default(now())
- @@unique([sessionId, questionIndex])
- @@index([sessionId, createdAt])
+  provider String @id
+  encryptedApiKey String
+  encryptionIv String
+  authTag String
+  keyHint String
+  model String
+  isActive Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([isActive])
 }
 
 model StudyLog {
@@ -211,7 +164,7 @@ model FinanceExpense {
   id        String   @id @default(uuid())
   title     String
   category  String
-  amount    Float
+  amount    Decimal  @db.Decimal(12, 2)
   date      String   // "YYYY-MM-DD" format
   payment   String   // "UPI" | "Cash" | "Card"
   createdAt DateTime @default(now())
@@ -223,7 +176,7 @@ model FinanceExpense {
 
 model FinanceBudget {
   id        String   @id @default("default")
-  allowance Float    @default(0)
+  allowance Decimal  @default(0) @db.Decimal(12, 2)
   caps      Json     // Record<Category, number>
   updatedAt DateTime @updatedAt
 }
@@ -232,7 +185,7 @@ model FinanceBill {
   id        String   @id @default(uuid())
   title     String
   date      String   // "YYYY-MM-DD" format
-  amount    Float
+  amount    Decimal  @db.Decimal(12, 2)
   category  String
   paid      Boolean  @default(false)
   createdAt DateTime @default(now())

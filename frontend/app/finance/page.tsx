@@ -479,9 +479,9 @@ export default function FinancePage() {
     }
   }, [bills, isLoaded]);
 
-  const spending = useMemo(() => expenses.reduce((total, expense) => total + expense.amount, 0), [expenses]);
+  const spending = useMemo(() => Math.round(expenses.reduce((total, expense) => total + (Number(expense.amount) || 0), 0) * 100) / 100, [expenses]);
   const monthlyAllowance = budgetPlan.allowance;
-  const remaining = monthlyAllowance - spending;
+  const remaining = Math.round((monthlyAllowance - spending) * 100) / 100;
   const spendingPercent =
     monthlyAllowance > 0
       ? Math.min(100, Math.round((spending / monthlyAllowance) * 100))
@@ -495,9 +495,11 @@ export default function FinancePage() {
     const list = categoryOrder
       .map((category) => ({
         category,
-        spent: expenses
-          .filter((expense) => expense.category === category)
-          .reduce((total, expense) => total + expense.amount, 0),
+        spent: Math.round(
+          expenses
+            .filter((expense) => expense.category === category)
+            .reduce((total, expense) => total + (Number(expense.amount) || 0), 0) * 100
+        ) / 100,
         ...categoryMeta[category],
         budget: budgetPlan.caps[category] || 0,
       }))
@@ -1685,8 +1687,8 @@ function BudgetModal({
     caps: { ...budgetPlan.caps },
   });
 
-  const plannedTotal = categoryOrder.reduce((total, category) => total + (Number(draft.caps[category]) || 0), 0);
-  const unallocated = draft.allowance - plannedTotal;
+  const plannedTotal = Math.round(categoryOrder.reduce((total, category) => total + (Number(draft.caps[category]) || 0), 0) * 100) / 100;
+  const unallocated = Math.round((draft.allowance - plannedTotal) * 100) / 100;
   const computedDailySafe = draft.allowance > 0 ? Math.floor(draft.allowance / daysRemaining) : 0;
 
   const updateCap = (category: Category, value: string) => {
