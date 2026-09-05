@@ -73,10 +73,11 @@ export default function TodayScreen() {
       },
       College: {
         label: "College",
-        color: isDark ? theme.rose : "#e11d48",
-        bg: isDark ? "rgba(244, 63, 94, 0.12)" : "rgba(225, 29, 72, 0.08)",
+        color: isDark ? theme.blue : "#2563eb",
+        bg: isDark ? "rgba(59, 130, 246, 0.12)" : "rgba(37, 99, 235, 0.08)",
         icon: "book-outline",
       },
+
       Personal: {
         label: "Personal",
         color: isDark ? theme.emerald : "#059669",

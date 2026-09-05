@@ -78,7 +78,7 @@ export function TodayAddTaskForm({
         },
       ]}
     >
-      {/* 1. Header Micro-Bar: Category context & quick cancel */}
+      {/* 1. Header Micro-Bar: Category context, Duration Selector & Dismiss */}
       <View style={styles.topBar}>
         <View
           style={[
@@ -97,18 +97,55 @@ export function TodayAddTaskForm({
           </Text>
         </View>
 
-        <Pressable
-          onPress={onCancel}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel task creation"
-          style={({ pressed }) => [
-            styles.cancelIconBtn,
-            pressed && { opacity: 0.6 },
-          ]}
-        >
-          <Ionicons name="close" size={16} color={theme.textFaint} />
-        </Pressable>
+        <View style={styles.topBarRight}>
+          {/* Duration Selector placed in top bar to prevent any overlap with category pills */}
+          <Pressable
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              onOpenDurationDialer();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Set target duration, currently ${customDuration} minutes`}
+            style={({ pressed }) => [
+              styles.durationPill,
+              {
+                backgroundColor: isDark ? "#18181d" : theme.surfaceSubtle,
+                borderColor: isDark ? "#27272a" : theme.border,
+              },
+              pressed && { opacity: 0.75 },
+            ]}
+          >
+            <Ionicons
+              name="time-outline"
+              size={12}
+              color={isDark ? theme.cyan : theme.accent}
+            />
+            <Text
+              style={[
+                styles.durationPillText,
+                { color: isDark ? "#fafafa" : theme.text },
+              ]}
+            >
+              {customDuration}m
+            </Text>
+            <Ionicons name="chevron-down" size={10} color={theme.textFaint} />
+          </Pressable>
+
+          <Pressable
+            onPress={onCancel}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel task creation"
+            style={({ pressed }) => [
+              styles.cancelIconBtn,
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons name="close" size={16} color={theme.textFaint} />
+          </Pressable>
+        </View>
       </View>
 
       {/* 2. Spacious Unboxed Input Row with Floating Submit Action */}
@@ -168,86 +205,53 @@ export function TodayAddTaskForm({
         ]}
       />
 
-      {/* 4. Controls Toolbar: Category Pills & Duration Selector */}
-      <View style={styles.toolbarRow}>
-        {/* Category Pills */}
-        <View style={styles.pillsGroup}>
-          {(["GATE", "College", "Personal"] as const).map((t) => {
-            const active = selectedTag === t;
-            const cfg = tagConfig[t];
-            return (
-              <Pressable
-                key={t}
-                onPress={() => handleSelectTag(t)}
-                style={({ pressed }) => [
-                  styles.categoryPill,
-                  {
-                    backgroundColor: active
-                      ? cfg.bg
-                      : isDark
-                      ? "#18181d"
-                      : theme.surfaceSubtle,
-                    borderColor: active
-                      ? cfg.color
-                      : isDark
-                      ? "#27272a"
-                      : theme.border,
-                  },
-                  pressed && { opacity: 0.75 },
+      {/* 4. Category Selector Row (Full-width 3-segment pills, zero overlap!) */}
+      <View style={styles.categoryRow}>
+        {(["GATE", "College", "Personal"] as const).map((t) => {
+          const active = selectedTag === t;
+          const cfg = tagConfig[t];
+          return (
+            <Pressable
+              key={t}
+              onPress={() => handleSelectTag(t)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${cfg.label} category`}
+              style={({ pressed }) => [
+                styles.categoryPill,
+                {
+                  backgroundColor: active
+                    ? cfg.bg
+                    : isDark
+                    ? "#18181d"
+                    : theme.surfaceSubtle,
+                  borderColor: active
+                    ? cfg.color
+                    : isDark
+                    ? "#27272a"
+                    : theme.border,
+                },
+                pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
+              ]}
+            >
+              <Ionicons
+                name={cfg.icon}
+                size={13}
+                color={active ? cfg.color : theme.textFaint}
+              />
+              <Text
+                style={[
+                  styles.categoryPillText,
+                  { color: active ? cfg.color : theme.textMuted },
+                  active && { fontWeight: "700" },
                 ]}
+                numberOfLines={1}
               >
-                <Ionicons
-                  name={cfg.icon}
-                  size={12}
-                  color={active ? cfg.color : theme.textFaint}
-                />
-                <Text
-                  style={[
-                    styles.categoryPillText,
-                    { color: active ? cfg.color : theme.textMuted },
-                    active && { fontWeight: "700" },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {cfg.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Target Duration Selector */}
-        <Pressable
-          onPress={() => {
-            try {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            } catch {}
-            onOpenDurationDialer();
-          }}
-          style={({ pressed }) => [
-            styles.durationPill,
-            {
-              backgroundColor: isDark ? "#18181d" : theme.surfaceSubtle,
-              borderColor: isDark ? "#27272a" : theme.border,
-            },
-            pressed && { opacity: 0.75 },
-          ]}
-        >
-          <Ionicons
-            name="time-outline"
-            size={12}
-            color={isDark ? theme.cyan : theme.accent}
-          />
-          <Text
-            style={[
-              styles.durationPillText,
-              { color: isDark ? "#fafafa" : theme.text },
-            ]}
-          >
-            {customDuration}m
-          </Text>
-          <Ionicons name="chevron-down" size={10} color={theme.textFaint} />
-        </Pressable>
+                {cfg.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -268,6 +272,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  topBarRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
   activeTagBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -282,6 +291,20 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: "800",
     letterSpacing: 0.6,
+  },
+  durationPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: radii.full,
+    borderWidth: 1,
+  },
+  durationPillText: {
+    ...typography.caption,
+    fontSize: 10.5,
+    fontWeight: fontWeights.bold,
   },
   cancelIconBtn: {
     padding: 2,
@@ -316,45 +339,26 @@ const styles = StyleSheet.create({
     height: 1,
     width: "100%",
   },
-  toolbarRow: {
+  categoryRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: spacing.xs,
-    paddingTop: 2,
-  },
-  pillsGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flex: 1,
+    width: "100%",
   },
   categoryPill: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 4,
     borderRadius: radii.full,
     borderWidth: 1,
   },
   categoryPillText: {
     ...typography.caption,
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: fontWeights.semibold,
-  },
-  durationPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  durationPillText: {
-    ...typography.caption,
-    fontSize: 11,
-    fontWeight: fontWeights.bold,
   },
 });
