@@ -28,7 +28,6 @@ export interface TodayAddTaskFormProps {
   customDuration: number;
   onOpenDurationDialer: () => void;
   onSave: () => void;
-  onCancel: () => void;
   tagConfig: Record<TodoTag, TagConfigItem>;
 }
 
@@ -40,7 +39,6 @@ export function TodayAddTaskForm({
   customDuration,
   onOpenDurationDialer,
   onSave,
-  onCancel,
   tagConfig,
 }: TodayAddTaskFormProps) {
   const { theme, isDark } = useTheme();
@@ -133,18 +131,6 @@ export function TodayAddTaskForm({
             <Ionicons name="chevron-down" size={10} color={theme.textFaint} />
           </Pressable>
 
-          <Pressable
-            onPress={onCancel}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel task creation"
-            style={({ pressed }) => [
-              styles.cancelIconBtn,
-              pressed && { opacity: 0.6 },
-            ]}
-          >
-            <Ionicons name="close" size={16} color={theme.textFaint} />
-          </Pressable>
         </View>
       </View>
 
@@ -306,11 +292,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontSize: 10.5,
     fontWeight: fontWeights.bold,
-  },
-  cancelIconBtn: {
-    padding: 2,
-    alignItems: "center",
-    justifyContent: "center",
   },
   inputContainer: {
     flexDirection: "row",

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BackHandler,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,6 +34,7 @@ import {
 import { todayInKolkata } from "@/src/lib/format";
 import { api } from "@/src/services/api";
 import { useTheme } from "@/src/providers/theme-provider";
+import { useTabPagerLock } from "@/src/components/tab-pager-context";
 import { useNotify } from "@/src/providers/notification-provider";
 import { useAuth } from "@/src/providers/auth-provider";
 import { fontWeights, radii, shadows, spacing, typography } from "@/src/theme/tokens";
@@ -209,6 +211,23 @@ export default function TodayScreen() {
     setShowAddCard((prev) => !prev);
   };
 
+  const dismissAddCard = () => {
+    if (!showAddCard) return false;
+    Keyboard.dismiss();
+    setShowAddCard(false);
+    return true;
+  };
+
+  const { setLocked, setIntercept } = useTabPagerLock();
+
+  useEffect(() => {
+    setLocked(showAddCard);
+    setIntercept(showAddCard ? dismissAddCard : null);
+    return () => {
+      setIntercept(null);
+    };
+  }, [showAddCard, setLocked, setIntercept]);
+
   const handleTagSelect = (tag: TodoTag) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setSelectedTag(tag);
@@ -221,7 +240,7 @@ export default function TodayScreen() {
     if (!title) return;
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    const tempId = `temp-${Date.now()}`;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const tagChoice = selectedTag;
     const duration = customDuration || DEFAULT_DURATIONS[tagChoice];
 
@@ -274,15 +293,38 @@ export default function TodayScreen() {
               ),
             };
           });
-          const cleanedMap: Record<string, TodoTag> = { ...nextMap, [actualId]: tagChoice };
-          delete cleanedMap[tempId];
-          setTagMap(cleanedMap);
-          AsyncStorage.setItem("door_mobile_tags_map", JSON.stringify(cleanedMap)).catch(() => {});
+          setTagMap((prev) => {
+            const next: Record<string, TodoTag> = { ...prev, [actualId]: tagChoice };
+            delete next[tempId];
+            AsyncStorage.setItem("door_mobile_tags_map", JSON.stringify(next)).catch(() => {});
+            return next;
+          });
           AsyncStorage.removeItem(`door_todos_${date}`).catch(() => {});
         }
       })
       .catch(() => {
-        AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify([newEntry, ...todos])).catch(() => {});
+        setTodos((prev) => {
+          const next = prev.filter((t) => t.id !== tempId);
+          AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(next)).catch(() => {});
+          return next;
+        });
+        queryClient.setQueryData(["routine", date], (old: any) => {
+          if (!old || !Array.isArray(old.tasks)) return old;
+          return {
+            ...old,
+            tasks: old.tasks.filter((t: any) => t.taskId !== tempId),
+          };
+        });
+        setTagMap((prev) => {
+          if (!(tempId in prev) && !(title in prev)) return prev;
+          const next = { ...prev };
+          delete next[tempId];
+          delete next[title];
+          AsyncStorage.setItem("door_mobile_tags_map", JSON.stringify(next)).catch(() => {});
+          return next;
+        });
+        setToastText("Couldn't save task — check connection");
+        setTimeout(() => setToastText(null), 2500);
       });
 
     setTimeout(() => setRecentlyAddedId(null), 3000);
@@ -320,6 +362,30 @@ export default function TodayScreen() {
 
     if (!targetId.startsWith("temp-")) {
       api.routine.updateTask(targetId, { durationMin: newMinutes }).catch(() => {});
+    }
+  };
+
+  // Rename Task Title from Inline Tap-to-Edit
+  const handleRenameTodo = (id: string, title: string) => {
+    const clean = title.trim();
+    if (!clean) return;
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, text: clean } : t)));
+
+    queryClient.setQueryData(["routine", date], (old: any) => {
+      if (!old || !Array.isArray(old.tasks)) return old;
+      return {
+        ...old,
+        tasks: old.tasks.map((t: any) => (t.taskId === id ? { ...t, title: clean } : t)),
+      };
+    });
+
+    setTodos((current) => {
+      AsyncStorage.setItem(`door_todos_${date}`, JSON.stringify(current)).catch(() => {});
+      return current;
+    });
+
+    if (!id.startsWith("temp-")) {
+      api.routine.updateTask(id, { title: clean }).catch(() => {});
     }
   };
 
@@ -579,12 +645,12 @@ export default function TodayScreen() {
                 setIsAddingDurationDialerOpen(true);
               }}
               onSave={handleSaveNewTodo}
-              onCancel={() => setShowAddCard(false)}
               tagConfig={TAG_CONFIG}
             />
           ) : null}
 
           {/* Task List */}
+          <Pressable onPress={showAddCard ? () => { dismissAddCard(); } : undefined}>
           <View style={styles.tasksList}>
             {todos.length === 0 && !routineQuery.isLoading && !showAddCard ? (
               <Pressable
@@ -630,24 +696,26 @@ export default function TodayScreen() {
                 onToggle={() => toggleTodo(item.id)}
                 onLongPress={() => confirmDeleteTodo(item)}
                 onOpenDurationPicker={() => openDurationPicker(item)}
+                onRename={(title) => handleRenameTodo(item.id, title)}
                 tagConfig={TAG_CONFIG}
               />
             ))}
           </View>
 
-          {/* Clear Completed Action */}
-          {completedCount > 0 ? (
-            <View style={styles.clearContainer}>
-              <Pressable
-                onPress={clearCompletedTodos}
-                style={({ pressed }) => [styles.clearButton, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={[styles.clearButtonText, { color: theme.textFaint }]}>
-                  Clear {completedCount} completed {completedCount === 1 ? "task" : "tasks"}
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
+            {/* Clear Completed Action */}
+            {completedCount > 0 ? (
+              <View style={styles.clearContainer}>
+                <Pressable
+                  onPress={clearCompletedTodos}
+                  style={({ pressed }) => [styles.clearButton, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.clearButtonText, { color: theme.textFaint }]}>
+                    Clear {completedCount} completed {completedCount === 1 ? "task" : "tasks"}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </Pressable>
         </View>
       </View>
     </AppScreen>

@@ -30,28 +30,29 @@ export function AppScreen({
     <View style={[styles.safe, { backgroundColor: theme.canvas }]}>
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps={keyboardShouldPersistTaps}
 
-          refreshControl={
-            onRefresh ? (
-              <RefreshControl
-                refreshing={Boolean(refreshing)}
-                onRefresh={onRefresh}
-                tintColor={theme.accent}
-                colors={[theme.accent]}
-              />
-            ) : undefined
-          }
-        >
-          <View style={styles.header}>
-            <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-              {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl
+                  refreshing={Boolean(refreshing)}
+                  onRefresh={onRefresh}
+                  tintColor={theme.accent}
+                  colors={[theme.accent]}
+                />
+              ) : undefined
+            }
+          >
+            <View style={styles.header}>
+              <View style={styles.headerCopy}>
+                <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+                {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
+              </View>
+              {action}
             </View>
-            {action}
-          </View>
           {children}
         </ScrollView>
       </SafeAreaView>
@@ -62,6 +63,7 @@ export function AppScreen({
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  scroll: { flex: 1 },
   content: {
     padding: layout.screenPadding,
     paddingBottom: layout.bottomScrollPadding,

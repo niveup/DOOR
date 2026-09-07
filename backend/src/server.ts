@@ -1073,6 +1073,8 @@ app.patch("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
   const requested = typeof req.body?.status === "string" ? req.body.status.toLowerCase() : "";
   const status = statusMap[requested];
   const durationMin = typeof req.body?.durationMin === "number" ? Math.max(5, Math.min(480, Math.round(req.body.durationMin))) : undefined;
+  const rawTitle = typeof req.body?.title === "string" ? req.body.title.trim() : "";
+  const title = rawTitle.length >= 2 && rawTitle.length <= 180 ? rawTitle : undefined;
 
   const dataToUpdate: any = {};
   if (status) {
@@ -1082,9 +1084,13 @@ app.patch("/api/routine/tasks/:taskId", async (req: Request, res: Response) => {
   if (durationMin !== undefined) {
     dataToUpdate.durationMin = durationMin;
   }
+  if (title !== undefined) {
+    dataToUpdate.title = title;
+    dataToUpdate.taskType = inferTaskType(title);
+  }
 
   if (Object.keys(dataToUpdate).length === 0) {
-    return res.status(400).json({ error: "Provide a valid status or durationMin to update." });
+    return res.status(400).json({ error: "Provide a valid status, durationMin or title to update." });
   }
 
   try {

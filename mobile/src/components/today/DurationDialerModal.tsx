@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, ListRenderItemInfo, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Extrapolation,
   FadeIn,
@@ -62,76 +62,161 @@ interface WheelColumnProps {
   onSettle: (value: number) => void;
 }
 
+const REPEAT = 200;
+
+const mod = (n: number, m: number) => ((n % m) + m) % m;
+
 const WheelColumn = React.memo(function WheelColumn({ items, value, color, onSettle }: WheelColumnProps) {
-  const targetIdx = Math.max(0, items.indexOf(value));
-  const scrollY = useSharedValue(targetIdx * ROW_HEIGHT);
-  const lastTick = useSharedValue(targetIdx);
-  const ref = useRef<Animated.ScrollView>(null);
+  const len = items.length;
+  const MIDDLE = Math.floor(REPEAT / 2) * len;
+  const data = useMemo(() => Array.from({ length: REPEAT * len }, (_, i) => items[i % len]), [items, len]);
+  const startIdx = MIDDLE + Math.max(0, items.indexOf(value));
+  const scrollY = useSharedValue(startIdx * ROW_HEIGHT);
+  const lastTick = useSharedValue(startIdx);
+  const ref = useRef<FlatList<number>>(null);
   const lastTickAt = useRef(0);
+  const peaked = useRef(false);
   const mounted = useRef(false);
+  const currentIdx = useRef(startIdx);
   const onSettleRef = useRef(onSettle);
   onSettleRef.current = onSettle;
 
-  useEffect(() => {
-    const idx = Math.max(0, items.indexOf(value));
-    scrollY.value = idx * ROW_HEIGHT;
-    lastTick.value = idx;
-    ref.current?.scrollTo({ y: idx * ROW_HEIGHT, animated: mounted.current });
-    mounted.current = true;
-  }, [value]);
+  const scrollToIdx = useCallback((idx: number, animated: boolean) => {
+    ref.current?.scrollToOffset({ offset: idx * ROW_HEIGHT, animated });
+  }, []);
 
-  const tick = useCallback(() => {
+  useEffect(() => {
+    const want = items.indexOf(value);
+    if (want < 0) return;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    const cur = currentIdx.current;
+    let target = cur - mod(cur, len) + want;
+    while (target - cur > len / 2) target -= len;
+    while (cur - target > len / 2) target += len;
+    if (target === cur) return;
+    currentIdx.current = target;
+    scrollToIdx(target, true);
+  }, [value, items, len, scrollToIdx]);
+
+  const tick = useCallback((level: number) => {
     const now = Date.now();
-    if (now - lastTickAt.current < 70) return;
+    const gap = level >= 2 ? 30 : level === 1 ? 45 : 70;
+    if (now - lastTickAt.current < gap) return;
     lastTickAt.current = now;
     try {
-      Haptics.selectionAsync();
+      if (level >= 2) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      else if (level === 1) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      else Haptics.selectionAsync();
     } catch {}
+  }, []);
+
+  const peak = useCallback(() => {
+    if (peaked.current) return;
+    peaked.current = true;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } catch {}
+  }, []);
+
+  const resetPeak = useCallback(() => {
+    peaked.current = false;
   }, []);
 
   const settle = useCallback(
     (idx: number) => {
-      const clamped = Math.max(0, Math.min(items.length - 1, idx));
-      onSettleRef.current(items[clamped]);
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {}
+      const total = REPEAT * len;
+      const clamped = Math.max(0, Math.min(total - 1, idx));
+      const v = items[mod(clamped, len)];
+      currentIdx.current = clamped;
+      onSettleRef.current(v);
+      if (Date.now() - lastTickAt.current > 120) {
+        try {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch {}
+      }
     },
-    [items]
+    [items, len]
+  );
+
+  const snapAndSettle = useCallback(
+    (y: number) => {
+      const total = REPEAT * len;
+      const idx = Math.max(0, Math.min(total - 1, Math.round(y / ROW_HEIGHT)));
+      if (Math.abs(y - idx * ROW_HEIGHT) > 3) {
+        ref.current?.scrollToOffset({ offset: idx * ROW_HEIGHT, animated: true });
+      }
+      settle(idx);
+    },
+    [len, settle]
+  );
+
+  const handleDragEnd = useCallback(
+    (y: number, vy: number) => {
+      if (Math.abs(vy) > 0.4) return;
+      snapAndSettle(y);
+    },
+    [snapAndSettle]
   );
 
   const handler = useAnimatedScrollHandler({
+    onBeginDrag: () => {
+      runOnJS(resetPeak)();
+    },
     onScroll: (e) => {
       scrollY.value = e.contentOffset.y;
       const idx = Math.round(e.contentOffset.y / ROW_HEIGHT);
       if (idx !== lastTick.value) {
+        const jump = Math.abs(idx - lastTick.value);
         lastTick.value = idx;
-        runOnJS(tick)();
+        runOnJS(tick)(jump >= 4 ? 2 : jump >= 2 ? 1 : 0);
+        if (jump >= 4) runOnJS(peak)();
       }
+    },
+    onEndDrag: (e) => {
+      runOnJS(handleDragEnd)(e.contentOffset.y, e.velocity?.y ?? 0);
     },
     onMomentumEnd: (e) => {
       scrollY.value = e.contentOffset.y;
-      runOnJS(settle)(Math.round(e.contentOffset.y / ROW_HEIGHT));
+      runOnJS(snapAndSettle)(e.contentOffset.y);
     },
   });
 
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<number>) => (
+      <WheelItem item={item} index={index} scrollY={scrollY} color={color} />
+    ),
+    [scrollY, color]
+  );
+
+  const getItemLayout = useCallback(
+    (_: unknown, index: number) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index }),
+    []
+  );
+
   return (
     <View style={styles.column}>
-      <Animated.ScrollView
+      <Animated.FlatList
         ref={ref}
+        data={data}
+        renderItem={renderItem}
+        keyExtractor={(_, index) => `${index}`}
+        getItemLayout={getItemLayout}
+        initialScrollIndex={startIdx}
+        initialNumToRender={21}
+        maxToRenderPerBatch={21}
+        windowSize={7}
+        removeClippedSubviews
         showsVerticalScrollIndicator={false}
-        snapToInterval={ROW_HEIGHT}
-        decelerationRate="fast"
+        decelerationRate={0.992}
         bounces={false}
         overScrollMode="never"
         scrollEventThrottle={16}
         onScroll={handler}
         contentContainerStyle={{ paddingTop: ROW_HEIGHT * 2, paddingBottom: ROW_HEIGHT * 2 }}
-      >
-        {items.map((item, idx) => (
-          <WheelItem key={item} item={item} index={idx} scrollY={scrollY} color={color} />
-        ))}
-      </Animated.ScrollView>
+      />
     </View>
   );
 });

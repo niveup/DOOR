@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { Ionicons } from "@/src/components/app-icon";
 import { useTheme } from "@/src/providers/theme-provider";
 import { fontWeights, radii, spacing, typography } from "@/src/theme/tokens";
@@ -25,6 +27,7 @@ export interface TodayTaskItemProps {
   onToggle: () => void;
   onLongPress: () => void;
   onOpenDurationPicker: () => void;
+  onRename: (newTitle: string) => void;
   tagConfig: Record<TodoTag, TagConfigItem>;
 }
 
@@ -34,11 +37,34 @@ export function TodayTaskItem({
   onToggle,
   onLongPress,
   onOpenDurationPicker,
+  onRename,
   tagConfig,
 }: TodayTaskItemProps) {
   const { theme, isDark } = useTheme();
   const tagCfg = tagConfig[item.tag] || tagConfig.GATE;
   const duration = item.durationMin || 30;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.text);
+
+  const beginEdit = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setDraft(item.text);
+    setEditing(true);
+  };
+
+  const commitEdit = () => {
+    if (!editing) return;
+    setEditing(false);
+    const title = draft.trim();
+    if (title && title !== item.text) {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+      onRename(title);
+    }
+  };
 
   return (
     <Pressable
@@ -86,18 +112,49 @@ export function TodayTaskItem({
 
       {/* Task Content Block */}
       <View style={styles.copyBlock}>
-        <Text
-          style={[
-            styles.titleText,
-            { color: isDark ? "#f5f5f7" : theme.text },
-            item.completed && [
-              styles.titleCompleted,
-              { color: theme.textFaint, textDecorationColor: theme.accent },
-            ],
-          ]}
-        >
-          {item.text}
-        </Text>
+        {editing ? (
+          <TextInput
+            style={[
+              styles.titleText,
+              styles.titleInput,
+              {
+                color: isDark ? "#f5f5f7" : theme.text,
+                borderColor: theme.accent,
+              },
+            ]}
+            value={draft}
+            onChangeText={setDraft}
+            autoFocus
+            autoCapitalize="sentences"
+            returnKeyType="done"
+            maxLength={180}
+            onSubmitEditing={commitEdit}
+            onBlur={commitEdit}
+          />
+        ) : (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              beginEdit();
+            }}
+            hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit task ${item.text}`}
+          >
+            <Text
+              style={[
+                styles.titleText,
+                { color: isDark ? "#f5f5f7" : theme.text },
+                item.completed && [
+                  styles.titleCompleted,
+                  { color: theme.textFaint, textDecorationColor: theme.accent },
+                ],
+              ]}
+            >
+              {item.text}
+            </Text>
+          </Pressable>
+        )}
 
         <View style={styles.metaRow}>
           {/* Category Tag Badge */}
@@ -193,6 +250,11 @@ const styles = StyleSheet.create({
   },
   titleCompleted: {
     textDecorationLine: "line-through",
+  },
+  titleInput: {
+    borderBottomWidth: 1,
+    paddingVertical: 0,
+    paddingBottom: 1,
   },
   metaRow: {
     flexDirection: "row",

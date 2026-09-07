@@ -61,7 +61,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
-    updateTask: (taskId: string, input: RoutineStatus | { status?: RoutineStatus; durationMin?: number }) => {
+    updateTask: (taskId: string, input: RoutineStatus | { status?: RoutineStatus; durationMin?: number; title?: string }) => {
       const body: Record<string, any> = {};
       if (typeof input === "string") {
         body.status = input === "COMPLETED" ? "completed" : input === "PARTIAL" ? "partial" : "not_completed";
@@ -71,6 +71,9 @@ export const api = {
         }
         if (typeof input.durationMin === "number") {
           body.durationMin = input.durationMin;
+        }
+        if (typeof input.title === "string" && input.title.trim()) {
+          body.title = input.title.trim();
         }
       }
       return request<{ task: unknown }>(`/api/routine/tasks/${taskId}`, {

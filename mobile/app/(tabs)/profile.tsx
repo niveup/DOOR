@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@/src/components/app-icon";
 import * as Haptics from "expo-haptics";
@@ -458,6 +459,14 @@ export default function ProfileScreen() {
     }
   };
 
+  const wipeLocalTodoKeys = async () => {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const doomed = keys.filter((k) => k.startsWith("door_todos_") || k === "door_mobile_tags_map");
+      if (doomed.length > 0) await AsyncStorage.multiRemove(doomed);
+    } catch {}
+  };
+
   const handleClearCache = () => {
     notify.confirm({
       title: "Clear Offline Cache?",
@@ -468,6 +477,7 @@ export default function ProfileScreen() {
       onConfirm: async () => {
         client.clear();
         await queryPersister.removeClient();
+        await wipeLocalTodoKeys();
         notify.success("Cache Cleared", "Offline data flushed. Re-fetching fresh state…");
         client.invalidateQueries();
       },
@@ -486,6 +496,7 @@ export default function ProfileScreen() {
         await lock();
         client.clear();
         await queryPersister.removeClient();
+        await wipeLocalTodoKeys();
         router.replace("/passcode");
       },
     });
