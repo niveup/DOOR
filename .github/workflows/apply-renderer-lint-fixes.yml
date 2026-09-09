@@ -14,7 +14,7 @@ jobs:
   patch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: deploy/vercel-production-ready, fetch-depth: 0 }
       - run: python3 scripts/apply_renderer_lint_fixes.py
       - uses: actions/setup-node@v4
