@@ -1,6 +1,5 @@
 import { PropsWithChildren, ReactNode } from "react";
-import { RefreshControl, StyleSheet, Text, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { layout, spacing, typography } from "@/src/theme/tokens";
 import { useTheme } from "@/src/providers/theme-provider";

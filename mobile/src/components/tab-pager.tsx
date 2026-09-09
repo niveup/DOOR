@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -51,7 +52,6 @@ function initialIndex(segments: string[]): number {
 
 interface TabButtonProps {
   page: (typeof PAGES)[number];
-  index: number;
   focused: boolean;
   onPress: () => void;
   isDark: boolean;
@@ -71,14 +71,14 @@ function TabButton({
 
   const scale = useSharedValue(1);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (focused) {
       scale.value = withSequence(
-        withTiming(0.85, { duration: 60 }),
+        withTiming(0.86, { duration: 60 }),
         withSpring(1, { damping: 14, stiffness: 220 })
       );
     } else {
-      scale.value = withTiming(1, { duration: 90 });
+      scale.value = withTiming(1, { duration: 80 });
     }
   }, [focused]);
 
@@ -94,24 +94,21 @@ function TabButton({
       accessibilityLabel={page.title}
       style={({ pressed }) => [styles.tabItem, pressed && { opacity: 0.75 }]}
     >
-      <View style={styles.tabIconBox}>
-        {focused ? (
-          <View
-            style={[
-              styles.tabIconGlow,
-              {
-                backgroundColor: isDark
-                  ? "rgba(16, 185, 129, 0.14)"
-                  : "rgba(5, 150, 105, 0.10)",
-              },
-            ]}
-          />
-        ) : null}
+      <View
+        style={[
+          styles.tabIconBox,
+          focused && {
+            backgroundColor: isDark
+              ? "rgba(16, 185, 129, 0.15)"
+              : "rgba(5, 150, 105, 0.10)",
+          },
+        ]}
+      >
         <Animated.View style={animatedIconStyle}>
           <Ionicons
             name={focused ? icons.active : icons.inactive}
             color={focused ? activeColor : inactiveColor}
-            size={22}
+            size={21}
           />
         </Animated.View>
       </View>
@@ -139,16 +136,10 @@ export function TabPager() {
   const [active, setActive] = useState(startAt);
   const [locked, setLocked] = useState(false);
   const interceptRef = useRef<(() => boolean) | null>(null);
+  const pagerRef = useRef<ScrollView>(null);
 
   const { width: windowWidth } = useWindowDimensions();
   const width = windowWidth > 0 ? windowWidth : 375;
-
-  const translateX = useSharedValue(-startAt * width);
-  const startX = useSharedValue(-startAt * width);
-
-  useEffect(() => {
-    translateX.value = -active * width;
-  }, [width]);
 
   const lockApi = useMemo(
     () => ({
@@ -160,25 +151,13 @@ export function TabPager() {
     []
   );
 
-  const syncActiveTab = (index: number) => {
-    setActive(index);
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-  };
-
   const go = (index: number) => {
     if (index === active) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     setActive(index);
-    translateX.value = withSpring(-index * width, {
-      damping: 26,
-      stiffness: 240,
-      mass: 0.6,
-      overshootClamping: false,
-    });
+    pagerRef.current?.scrollTo({ x: index * width, animated: true });
   };
 
   const dismiss = () => {
@@ -187,64 +166,7 @@ export function TabPager() {
     } catch {}
   };
 
-  const panGesture = Gesture.Pan()
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-10, 10])
-    .enabled(!locked)
-    .onStart(() => {
-      "worklet";
-      startX.value = translateX.value;
-    })
-    .onUpdate((e) => {
-      "worklet";
-      const rawX = startX.value + e.translationX;
-      const minX = -(PAGES.length - 1) * width;
-      const maxX = 0;
-
-      if (rawX > maxX) {
-        // High-end rubberband resistance at left boundary
-        translateX.value = maxX + (rawX - maxX) * 0.28;
-      } else if (rawX < minX) {
-        // High-end rubberband resistance at right boundary
-        translateX.value = minX + (rawX - minX) * 0.28;
-      } else {
-        translateX.value = rawX;
-      }
-    })
-    .onEnd((e) => {
-      "worklet";
-      const currentPos = -translateX.value;
-      const progress = currentPos / width;
-      const velocity = -e.velocityX;
-
-      // Inertial snapping with gesture fling velocity
-      let target = Math.round(progress);
-      if (velocity > 350 && progress > target - 0.45) {
-        target = Math.ceil(progress);
-      } else if (velocity < -350 && progress < target + 0.45) {
-        target = Math.floor(progress);
-      }
-
-      target = Math.max(0, Math.min(PAGES.length - 1, target));
-
-      translateX.value = withSpring(
-        -target * width,
-        {
-          damping: 25,
-          stiffness: 230,
-          mass: 0.55,
-          velocity: -velocity,
-          overshootClamping: false,
-        },
-        (finished) => {
-          if (finished) {
-            runOnJS(syncActiveTab)(target);
-          }
-        }
-      );
-    });
-
-  const dismissPanGesture = Gesture.Pan()
+  const pan = Gesture.Pan()
     .activeOffsetX([-20, 20])
     .failOffsetY([-12, 12])
     .maxPointers(1)
@@ -257,36 +179,32 @@ export function TabPager() {
       }
     });
 
-  const composedGesture = Gesture.Race(panGesture, dismissPanGesture);
-
-  const containerAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
-  const tabWidth = width / PAGES.length;
-  const indicatorWidth = 32;
-  const indicatorOffset = (tabWidth - indicatorWidth) / 2;
-
-  const indicatorAnimatedStyle = useAnimatedStyle(() => {
-    const progress = -translateX.value / (width || 1);
-    const clamped = Math.max(0, Math.min(PAGES.length - 1, progress));
-    const tx = indicatorOffset + clamped * tabWidth;
-    return {
-      transform: [{ translateX: tx }],
-    };
-  });
-
   return (
     <TabPagerLockContext.Provider value={lockApi}>
       <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-        <GestureDetector gesture={composedGesture}>
+        <GestureDetector gesture={pan}>
           <View style={styles.flex}>
-            <Animated.View
-              style={[
-                styles.pagesRow,
-                { width: width * PAGES.length },
-                containerAnimatedStyle,
-              ]}
+            <ScrollView
+              ref={pagerRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              bounces={Platform.OS === "ios"}
+              overScrollMode="never"
+              scrollEnabled={!locked}
+              keyboardShouldPersistTaps="handled"
+              contentOffset={{ x: startAt * width, y: 0 }}
+              onMomentumScrollEnd={(e) => {
+                const i = Math.round(e.nativeEvent.contentOffset.x / width);
+                const clamped = Math.max(0, Math.min(PAGES.length - 1, i));
+                if (clamped !== active) {
+                  setActive(clamped);
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch {}
+                }
+              }}
+              style={styles.flex}
             >
               <View style={{ width, height: "100%" }}>
                 <TodayScreen />
@@ -300,7 +218,7 @@ export function TabPager() {
               <View style={{ width, height: "100%" }}>
                 <ProfileScreen />
               </View>
-            </Animated.View>
+            </ScrollView>
           </View>
         </GestureDetector>
 
@@ -309,30 +227,14 @@ export function TabPager() {
             styles.tabBar,
             {
               backgroundColor: isDark ? "#09090b" : "#ffffff",
-              borderTopColor: isDark ? "#1f1f23" : "#e2e8f0",
-              shadowColor: isDark ? "#000000" : "#64748b",
+              borderTopColor: isDark ? "#1a1a1e" : "#e2e8f0",
             },
           ]}
         >
-          {/* Top glowing accent bar tracking swipe 1:1 */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.topIndicator,
-              {
-                width: indicatorWidth,
-                backgroundColor: isDark ? "#10b981" : "#059669",
-                shadowColor: isDark ? "#10b981" : "#059669",
-              },
-              indicatorAnimatedStyle,
-            ]}
-          />
-
           {PAGES.map((page, i) => (
             <TabButton
               key={page.key}
               page={page}
-              index={i}
               focused={i === active}
               onPress={() => go(i)}
               isDark={isDark}
@@ -351,11 +253,6 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
-    overflow: "hidden",
-  },
-  pagesRow: {
-    flex: 1,
-    flexDirection: "row",
   },
   tabBar: {
     position: "absolute",
@@ -363,47 +260,26 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: "row",
-    height: Platform.select({ ios: 86, default: 68 }),
-    paddingTop: 8,
-    paddingBottom: Platform.select({ ios: 25, default: 9 }),
+    height: Platform.select({ ios: 84, default: 66 }),
+    paddingTop: 6,
+    paddingBottom: Platform.select({ ios: 24, default: 8 }),
     borderTopWidth: 1,
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  topIndicator: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    height: 3,
-    borderRadius: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 3,
   },
   tabItem: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 14,
+    gap: 2,
   },
   tabIconBox: {
     width: 44,
     height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
-  },
-  tabIconGlow: {
-    position: "absolute",
-    width: 40,
-    height: 28,
-    borderRadius: 14,
   },
   tabLabel: {
     fontSize: 11,
-    letterSpacing: 0.15,
-    marginTop: 2,
+    letterSpacing: 0.1,
   },
 });
