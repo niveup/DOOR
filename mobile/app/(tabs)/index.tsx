@@ -463,7 +463,9 @@ export default function TodayScreen() {
         if (!item.id.startsWith("temp-")) {
           api.routine.deleteTask(item.id).catch(() => {});
         }
-        notify.success("Task Removed", `"${item.text}" removed.`);
+        try {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } catch {}
       },
     });
   };
