@@ -1,24 +1,17 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
+  Dimensions,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSegments } from "expo-router";
 import * as Haptics from "expo-haptics";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import { runOnJS } from "react-native-reanimated";
 import { Ionicons } from "@/src/components/app-icon";
 import { useTheme } from "@/src/providers/theme-provider";
 import { TabPagerLockContext } from "@/src/components/tab-pager-context";
@@ -50,85 +43,6 @@ function initialIndex(segments: string[]): number {
   return idx >= 0 ? idx : 0;
 }
 
-interface TabButtonProps {
-  page: (typeof PAGES)[number];
-  focused: boolean;
-  onPress: () => void;
-  isDark: boolean;
-  theme: ReturnType<typeof useTheme>["theme"];
-}
-
-function TabButton({
-  page,
-  focused,
-  onPress,
-  isDark,
-  theme,
-}: TabButtonProps) {
-  const icons = tabIcons[page.key];
-  const activeColor = isDark ? "#10b981" : "#059669";
-  const inactiveColor = isDark ? "#71717a" : theme.textFaint;
-
-  const scale = useSharedValue(1);
-
-  React.useEffect(() => {
-    if (focused) {
-      scale.value = withSequence(
-        withTiming(0.86, { duration: 60 }),
-        withSpring(1, { damping: 14, stiffness: 220 })
-      );
-    } else {
-      scale.value = withTiming(1, { duration: 80 });
-    }
-  }, [focused]);
-
-  const animatedIconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: focused }}
-      accessibilityLabel={page.title}
-      style={({ pressed }) => [styles.tabItem, pressed && { opacity: 0.75 }]}
-    >
-      <View
-        style={[
-          styles.tabIconBox,
-          focused && {
-            backgroundColor: isDark
-              ? "rgba(16, 185, 129, 0.15)"
-              : "rgba(5, 150, 105, 0.10)",
-          },
-        ]}
-      >
-        <Animated.View style={animatedIconStyle}>
-          <Ionicons
-            name={focused ? icons.active : icons.inactive}
-            color={focused ? activeColor : inactiveColor}
-            size={21}
-          />
-        </Animated.View>
-      </View>
-
-      <Text
-        style={[
-          styles.tabLabel,
-          {
-            color: focused ? activeColor : inactiveColor,
-            fontWeight: focused ? "700" : "500",
-          },
-        ]}
-        numberOfLines={1}
-      >
-        {page.title}
-      </Text>
-    </Pressable>
-  );
-}
-
 export function TabPager() {
   const { theme, isDark } = useTheme();
   const segments = useSegments();
@@ -137,9 +51,7 @@ export function TabPager() {
   const [locked, setLocked] = useState(false);
   const interceptRef = useRef<(() => boolean) | null>(null);
   const pagerRef = useRef<ScrollView>(null);
-
-  const { width: windowWidth } = useWindowDimensions();
-  const width = windowWidth > 0 ? windowWidth : 375;
+  const width = Dimensions.get("window").width;
 
   const lockApi = useMemo(
     () => ({
@@ -178,6 +90,9 @@ export function TabPager() {
         runOnJS(dismiss)();
       }
     });
+
+  const activeColor = isDark ? "#10b981" : "#059669";
+  const inactiveColor = isDark ? "#71717a" : theme.textFaint;
 
   return (
     <TabPagerLockContext.Provider value={lockApi}>
@@ -227,20 +142,52 @@ export function TabPager() {
             styles.tabBar,
             {
               backgroundColor: isDark ? "#09090b" : "#ffffff",
-              borderTopColor: isDark ? "#1a1a1e" : "#e2e8f0",
+              borderTopColor: isDark ? "#18181b" : "#e2e8f0",
             },
           ]}
         >
-          {PAGES.map((page, i) => (
-            <TabButton
-              key={page.key}
-              page={page}
-              focused={i === active}
-              onPress={() => go(i)}
-              isDark={isDark}
-              theme={theme}
-            />
-          ))}
+          {PAGES.map((page, i) => {
+            const focused = i === active;
+            const icons = tabIcons[page.key];
+            const color = focused ? activeColor : inactiveColor;
+            return (
+              <Pressable
+                key={page.key}
+                onPress={() => go(i)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={page.title}
+                style={({ pressed }) => [styles.tabItem, pressed && { opacity: 0.65 }]}
+              >
+                <View
+                  style={[
+                    styles.tabIcon,
+                    focused && {
+                      backgroundColor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5",
+                      borderColor: isDark ? "rgba(16, 185, 129, 0.28)" : "#A7F3D0",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={focused ? icons.active : icons.inactive}
+                    color={color}
+                    size={20}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    {
+                      color,
+                      fontWeight: focused ? "700" : "500",
+                    },
+                  ]}
+                >
+                  {page.title}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
     </TabPagerLockContext.Provider>
@@ -260,26 +207,28 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: "row",
-    height: Platform.select({ ios: 84, default: 66 }),
-    paddingTop: 6,
-    paddingBottom: Platform.select({ ios: 24, default: 8 }),
+    height: Platform.select({ ios: 86, default: 68 }),
+    paddingTop: 7,
+    paddingBottom: Platform.select({ ios: 25, default: 9 }),
     borderTopWidth: 1,
   },
   tabItem: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
+    borderRadius: 14,
   },
-  tabIconBox: {
-    width: 44,
+  tabIcon: {
+    width: 36,
     height: 30,
-    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     letterSpacing: 0.1,
+    marginTop: 3,
   },
 });
