@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "iron-session": "^8.0.4",
+    "iron-session": "^9.0.1",
     "katex": "^0.17.0",
     "motion": "^12.42.2",
     "next": "16.2.9",
