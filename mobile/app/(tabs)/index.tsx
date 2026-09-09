@@ -9,12 +9,12 @@ import {
   View,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import { Ionicons } from "@/src/components/app-icon";
 import { AppScreen } from "@/src/components/screen";
-import { SectionTitle } from "@/src/components/ui";
 import { FullScreenGlitterOverlay } from "@/src/components/glitter-overlay";
 import {
   DurationDialerModal,
@@ -101,6 +101,7 @@ export default function TodayScreen() {
   // Wheel Dialer State
   const [editingTask, setEditingTask] = useState<PersonalTodoItem | null>(null);
   const [isAddingDurationDialerOpen, setIsAddingDurationDialerOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
   const [toastText, setToastText] = useState<string | null>(null);
@@ -182,8 +183,13 @@ export default function TodayScreen() {
 
   // Handle Android Back Button
   useEffect(() => {
-    if (!showAddCard && !editingTask && !isAddingDurationDialerOpen) return;
+    if (!showAddCard && !editingTask && !isAddingDurationDialerOpen && !editingId) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (editingId) {
+        setEditingId(null);
+        Keyboard.dismiss();
+        return true;
+      }
       if (editingTask) {
         setEditingTask(null);
         return true;
@@ -199,7 +205,7 @@ export default function TodayScreen() {
       return false;
     });
     return () => sub.remove();
-  }, [showAddCard, editingTask, isAddingDurationDialerOpen]);
+  }, [showAddCard, editingTask, isAddingDurationDialerOpen, editingId]);
 
   const toggleAddCard = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -215,6 +221,13 @@ export default function TodayScreen() {
     if (!showAddCard) return false;
     Keyboard.dismiss();
     setShowAddCard(false);
+    return true;
+  };
+
+  const deselectTask = () => {
+    if (!editingId) return false;
+    setEditingId(null);
+    Keyboard.dismiss();
     return true;
   };
 
@@ -586,51 +599,27 @@ export default function TodayScreen() {
 
         {/* 2. Today's Tasks Section */}
         <View style={styles.tasksSection}>
-          <SectionTitle
-            title="Today's Tasks"
-            trailing={
-              <Pressable
-                onPress={toggleAddCard}
-                hitSlop={8}
-                style={({ pressed }) => [
-                  styles.addPillButton,
-                  showAddCard
-                    ? {
-                        backgroundColor: isDark
-                          ? "rgba(244, 63, 94, 0.08)"
-                          : "rgba(225, 29, 72, 0.06)",
-                        borderColor: isDark
-                          ? "rgba(244, 63, 94, 0.25)"
-                          : "rgba(225, 29, 72, 0.18)",
-                      }
-                    : {
-                        backgroundColor: isDark
-                          ? "rgba(16, 185, 129, 0.10)"
-                          : "rgba(5, 150, 105, 0.08)",
-                        borderColor: isDark
-                          ? "rgba(16, 185, 129, 0.25)"
-                          : "rgba(5, 150, 105, 0.15)",
-                      },
-                  pressed && { opacity: 0.75, transform: [{ scale: 0.97 }] },
+          <View style={styles.tasksHeader}>
+            <Text style={[styles.tasksTitle, { color: theme.textMuted }]}>
+              Today's Tasks{totalCount > 0 ? ` · ${totalCount}` : ""}
+            </Text>
+            <Pressable
+              onPress={toggleAddCard}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={showAddCard ? "Cancel task creation" : "Add task"}
+              style={({ pressed }) => [pressed && { opacity: 0.55 }]}
+            >
+              <Text
+                style={[
+                  styles.tasksAction,
+                  { color: showAddCard ? theme.textFaint : theme.accent },
                 ]}
               >
-                <Ionicons
-                  name={showAddCard ? "close" : "add"}
-                  size={14}
-                  color={showAddCard ? theme.rose : theme.accent}
-                />
-                <Text
-                  style={[
-                    styles.addPillText,
-                    { color: showAddCard ? theme.rose : theme.accent },
-                  ]}
-                >
-                  {showAddCard ? "Cancel" : "Add task"}
-                </Text>
-              </Pressable>
-            }
-          />
-
+                {showAddCard ? "Cancel" : "+ Add"}
+              </Text>
+            </Pressable>
+          </View>
 
           {/* Inline Quick Add Task Form */}
           {showAddCard ? (
@@ -645,46 +634,36 @@ export default function TodayScreen() {
                 setIsAddingDurationDialerOpen(true);
               }}
               onSave={handleSaveNewTodo}
-              tagConfig={TAG_CONFIG}
             />
           ) : null}
 
           {/* Task List */}
-          <Pressable onPress={showAddCard ? () => { dismissAddCard(); } : undefined}>
+          <Pressable onPress={showAddCard ? () => { dismissAddCard(); } : () => { deselectTask(); Keyboard.dismiss(); }}>
           <View style={styles.tasksList}>
             {todos.length === 0 && !routineQuery.isLoading && !showAddCard ? (
               <Pressable
                 onPress={toggleAddCard}
-                style={({ pressed }) => [
-                  styles.emptyTasksBlock,
-                  {
-                    backgroundColor: isDark ? "#121216" : theme.surface,
-                    borderColor: theme.border,
-                  },
-                  pressed && { opacity: 0.82, transform: [{ scale: 0.99 }] },
-                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Add your first task"
+                style={({ pressed }) => [pressed && { opacity: 0.6 }]}
               >
-                <View
-                  style={[
-                    styles.emptyTasksIconBadge,
-                    {
-                      backgroundColor: isDark ? "rgba(59, 130, 246, 0.12)" : "rgba(37, 99, 235, 0.08)",
-                      borderColor: isDark ? "rgba(59, 130, 246, 0.25)" : "rgba(37, 99, 235, 0.15)",
-                    },
-                  ]}
+                <Animated.View
+                  entering={FadeInDown.duration(240)}
+                  style={styles.emptySimple}
                 >
                   <Ionicons
                     name="checkbox-outline"
                     size={20}
-                    color={theme.info}
+                    color={theme.textFaint}
+                    style={styles.emptySimpleIcon}
                   />
-                </View>
-                <Text style={[styles.emptyTasksHeadline, { color: theme.text }]}>
-                  No tasks set for today
-                </Text>
-                <Text style={[styles.emptyTasksSubtext, { color: theme.textMuted }]}>
-                  Tap to plan your focus blocks or daily goals
-                </Text>
+                  <Text style={[styles.emptySimpleTitle, { color: theme.textMuted }]}>
+                    No tasks yet
+                  </Text>
+                  <Text style={[styles.emptySimpleSub, { color: theme.textFaint }]}>
+                    Tap + Add above to plan your day
+                  </Text>
+                </Animated.View>
               </Pressable>
             ) : null}
 
@@ -696,6 +675,9 @@ export default function TodayScreen() {
                 onToggle={() => toggleTodo(item.id)}
                 onLongPress={() => confirmDeleteTodo(item)}
                 onOpenDurationPicker={() => openDurationPicker(item)}
+                editing={editingId === item.id}
+                onBeginEdit={() => setEditingId(item.id)}
+                onEndEdit={() => setEditingId((cur) => (cur === item.id ? null : cur))}
                 onRename={(title) => handleRenameTodo(item.id, title)}
                 tagConfig={TAG_CONFIG}
               />
@@ -744,52 +726,43 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xxs,
   },
-  addPillButton: {
+  tasksHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xxs + 1,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs + 2,
-    borderRadius: radii.full,
-    borderWidth: 1,
+    justifyContent: "space-between",
+    paddingBottom: spacing.xxs,
   },
-
-  addPillText: {
-    ...typography.caption,
+  tasksTitle: {
+    ...typography.bodySmall,
+    fontSize: 13,
+    fontWeight: fontWeights.semibold,
+  },
+  tasksAction: {
+    ...typography.bodySmall,
+    fontSize: 13.5,
     fontWeight: fontWeights.bold,
   },
   tasksList: {
     gap: spacing.xs,
   },
-  emptyTasksBlock: {
-    borderRadius: radii.card,
-    borderWidth: 1,
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
+  emptySimple: {
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xs - 2,
-    marginTop: spacing.xxs,
+    gap: 4,
+    paddingVertical: spacing.xxl,
   },
-  emptyTasksIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.xxs,
-  },
-  emptyTasksHeadline: {
+  emptySimpleTitle: {
     ...typography.body,
-    fontWeight: fontWeights.bold,
-    textAlign: "center",
+    fontSize: 15,
+    fontWeight: fontWeights.semibold,
   },
-  emptyTasksSubtext: {
+  emptySimpleSub: {
     ...typography.caption,
-    textAlign: "center",
-    lineHeight: 17,
-    maxWidth: 280,
+    fontSize: 12.5,
+    fontWeight: fontWeights.regular,
+  },
+  emptySimpleIcon: {
+    marginBottom: spacing.xxs,
   },
   clearContainer: {
     alignItems: "center",

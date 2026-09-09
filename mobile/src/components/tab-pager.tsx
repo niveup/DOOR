@@ -89,6 +89,7 @@ export function TabPager() {
               ref={pagerRef}
               horizontal
               pagingEnabled
+              keyboardShouldPersistTaps="handled"
               showsHorizontalScrollIndicator={false}
               bounces={false}
               overScrollMode="never"

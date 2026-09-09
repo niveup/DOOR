@@ -6,6 +6,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
 import { Ionicons } from "@/src/components/app-icon";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/providers/theme-provider";
@@ -28,8 +29,13 @@ export interface TodayAddTaskFormProps {
   customDuration: number;
   onOpenDurationDialer: () => void;
   onSave: () => void;
-  tagConfig: Record<TodoTag, TagConfigItem>;
 }
+
+const TAGS: { key: TodoTag; label: string }[] = [
+  { key: "GATE", label: "GATE" },
+  { key: "College", label: "College" },
+  { key: "Personal", label: "Personal" },
+];
 
 export function TodayAddTaskForm({
   newTodoText,
@@ -39,11 +45,9 @@ export function TodayAddTaskForm({
   customDuration,
   onOpenDurationDialer,
   onSave,
-  tagConfig,
 }: TodayAddTaskFormProps) {
   const { theme, isDark } = useTheme();
   const hasText = newTodoText.trim().length > 0;
-  const activeCfg = tagConfig[selectedTag] || tagConfig.GATE;
 
   const handleSelectTag = (t: TodoTag) => {
     try {
@@ -61,83 +65,20 @@ export function TodayAddTaskForm({
   };
 
   return (
-    <View
+    <Animated.View
+      entering={FadeInDown.duration(200)}
+      exiting={FadeOutDown.duration(140)}
       style={[
         styles.card,
         {
           backgroundColor: isDark ? "#121216" : theme.surface,
-          borderColor: hasText
-            ? isDark
-              ? "rgba(16, 185, 129, 0.4)"
-              : theme.accent
-            : isDark
-            ? "#27272a"
-            : theme.border,
+          borderColor: isDark ? "#27272a" : theme.border,
         },
       ]}
     >
-      {/* 1. Header Micro-Bar: Category context, Duration Selector & Dismiss */}
-      <View style={styles.topBar}>
-        <View
-          style={[
-            styles.activeTagBadge,
-            {
-              backgroundColor: activeCfg.bg,
-              borderColor: isDark
-                ? "rgba(255, 255, 255, 0.08)"
-                : activeCfg.color,
-            },
-          ]}
-        >
-          <Ionicons name={activeCfg.icon} size={11} color={activeCfg.color} />
-          <Text style={[styles.activeTagBadgeText, { color: activeCfg.color }]}>
-            {activeCfg.label.toUpperCase()} FOCUS
-          </Text>
-        </View>
-
-        <View style={styles.topBarRight}>
-          {/* Duration Selector placed in top bar to prevent any overlap with category pills */}
-          <Pressable
-            onPress={() => {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              onOpenDurationDialer();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Set target duration, currently ${customDuration} minutes`}
-            style={({ pressed }) => [
-              styles.durationPill,
-              {
-                backgroundColor: isDark ? "#18181d" : theme.surfaceSubtle,
-                borderColor: isDark ? "#27272a" : theme.border,
-              },
-              pressed && { opacity: 0.75 },
-            ]}
-          >
-            <Ionicons
-              name="time-outline"
-              size={12}
-              color={isDark ? theme.cyan : theme.accent}
-            />
-            <Text
-              style={[
-                styles.durationPillText,
-                { color: isDark ? "#fafafa" : theme.text },
-              ]}
-            >
-              {customDuration}m
-            </Text>
-            <Ionicons name="chevron-down" size={10} color={theme.textFaint} />
-          </Pressable>
-
-        </View>
-      </View>
-
-      {/* 2. Spacious Unboxed Input Row with Floating Submit Action */}
-      <View style={styles.inputContainer}>
+      <View style={styles.inputRow}>
         <TextInput
-          style={[styles.inputField, { color: isDark ? "#fafafa" : theme.text }]}
+          style={[styles.input, { color: isDark ? "#fafafa" : theme.text }]}
           value={newTodoText}
           onChangeText={setNewTodoText}
           placeholder="What do you need to focus on?"
@@ -149,98 +90,95 @@ export function TodayAddTaskForm({
         />
 
         <Pressable
+          onPress={() => {
+            try {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch {}
+            onOpenDurationDialer();
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Set target duration, currently ${customDuration} minutes`}
+          style={({ pressed }) => [
+            styles.durationPill,
+            { backgroundColor: isDark ? "#1b1b20" : theme.surfaceSubtle },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Text style={[styles.durationText, { color: theme.textMuted }]}>
+            {customDuration}m
+          </Text>
+        </Pressable>
+
+        <Pressable
           onPress={handleSave}
           disabled={!hasText}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Save task"
           style={({ pressed }) => [
             styles.actionCircle,
-            hasText
-              ? {
-                  backgroundColor: theme.accent,
-                  borderColor: theme.accent,
-                  shadowColor: theme.accent,
-                  shadowOpacity: 0.35,
-                  shadowRadius: 6,
-                  elevation: 3,
-                }
-              : {
-                  backgroundColor: isDark
-                    ? "rgba(255, 255, 255, 0.04)"
-                    : "rgba(0, 0, 0, 0.04)",
-                  borderColor: isDark
-                    ? "rgba(255, 255, 255, 0.07)"
-                    : "rgba(0, 0, 0, 0.06)",
-                },
-            pressed && hasText && { transform: [{ scale: 0.92 }], opacity: 0.88 },
+            {
+              backgroundColor: isDark
+                ? "rgba(255, 255, 255, 0.10)"
+                : "rgba(0, 0, 0, 0.07)",
+              opacity: hasText ? 1 : 0.45,
+            },
+            pressed && hasText && { transform: [{ scale: 0.92 }], opacity: 0.7 },
           ]}
         >
           <Ionicons
             name="arrow-up"
             size={16}
-            color={hasText ? theme.solidTextDark : theme.textFaint}
+            color={hasText ? (isDark ? "#fafafa" : theme.text) : theme.textFaint}
           />
         </Pressable>
       </View>
 
-      {/* 3. Subtle Hairline Divider */}
-      <View
-        style={[
-          styles.divider,
-          { backgroundColor: isDark ? "#1f1f25" : theme.borderMuted },
-        ]}
-      />
-
-      {/* 4. Category Selector Row (Full-width 3-segment pills, zero overlap!) */}
-      <View style={styles.categoryRow}>
-        {(["GATE", "College", "Personal"] as const).map((t) => {
-          const active = selectedTag === t;
-          const cfg = tagConfig[t];
-          return (
-            <Pressable
-              key={t}
-              onPress={() => handleSelectTag(t)}
-              hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`${cfg.label} category`}
-              style={({ pressed }) => [
-                styles.categoryPill,
-                {
-                  backgroundColor: active
-                    ? cfg.bg
-                    : isDark
-                    ? "#18181d"
-                    : theme.surfaceSubtle,
-                  borderColor: active
-                    ? cfg.color
-                    : isDark
-                    ? "#27272a"
-                    : theme.border,
-                },
-                pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
-              ]}
-            >
-              <Ionicons
-                name={cfg.icon}
-                size={13}
-                color={active ? cfg.color : theme.textFaint}
-              />
-              <Text
-                style={[
-                  styles.categoryPillText,
-                  { color: active ? cfg.color : theme.textMuted },
-                  active && { fontWeight: "700" },
+      {hasText ? (
+        <Animated.View
+          entering={FadeInDown.duration(180)}
+          exiting={FadeOutDown.duration(120)}
+          style={[
+            styles.segRow,
+            { backgroundColor: isDark ? "#18181d" : theme.surfaceSubtle },
+          ]}
+        >
+          {TAGS.map((t) => {
+            const active = selectedTag === t.key;
+            return (
+              <Pressable
+                key={t.key}
+                onPress={() => handleSelectTag(t.key)}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${t.label} category`}
+                style={({ pressed }) => [
+                  styles.segItem,
+                  active && {
+                    backgroundColor: isDark
+                      ? "rgba(255, 255, 255, 0.09)"
+                      : "rgba(0, 0, 0, 0.06)",
+                  },
+                  pressed && !active && { opacity: 0.6 },
                 ]}
-                numberOfLines={1}
               >
-                {cfg.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
+                <Text
+                  style={[
+                    styles.segText,
+                    { color: active ? (isDark ? "#fafafa" : theme.text) : theme.textMuted },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {t.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </Animated.View>
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -249,57 +187,16 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    gap: spacing.xs + 2,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
     width: "100%",
   },
-  topBar: {
+  inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: spacing.sm,
   },
-  topBarRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  activeTagBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  activeTagBadgeText: {
-    ...typography.caption,
-    fontSize: 9.5,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-  },
-  durationPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  durationPillText: {
-    ...typography.caption,
-    fontSize: 10.5,
-    fontWeight: fontWeights.bold,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    paddingVertical: 2,
-  },
-  inputField: {
+  input: {
     flex: 1,
     minWidth: 0,
     ...typography.body,
@@ -309,38 +206,44 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 0,
   },
+  durationPill: {
+    minWidth: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: radii.full,
+  },
+  durationText: {
+    ...typography.caption,
+    fontSize: 12.5,
+    fontWeight: fontWeights.semibold,
+    fontVariant: ["tabular-nums"],
+  },
   actionCircle: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  divider: {
-    height: 1,
-    width: "100%",
-  },
-  categoryRow: {
+  segRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
-    width: "100%",
+    padding: 3,
+    borderRadius: radii.full,
   },
-  categoryPill: {
+  segItem: {
     flex: 1,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
     paddingVertical: 7,
     paddingHorizontal: 4,
     borderRadius: radii.full,
-    borderWidth: 1,
   },
-  categoryPillText: {
+  segText: {
     ...typography.caption,
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: fontWeights.semibold,
   },
 });

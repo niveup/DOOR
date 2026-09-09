@@ -134,9 +134,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (!confirmDialog) return;
     setConfirmBusy(true);
     try {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      } catch {}
       await confirmDialog.onConfirm();
     } catch (e) {
       console.error("Confirm action error:", e);
@@ -311,61 +308,23 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             />
 
             <Animated.View
-              entering={FadeIn.duration(180)}
-              exiting={FadeOut.duration(140)}
+              entering={FadeIn.duration(160)}
+              exiting={FadeOut.duration(120)}
               style={[
                 styles.dialogCard,
                 {
-                  backgroundColor: isDark ? "#121215" : "#ffffff",
+                  backgroundColor: isDark ? "#141417" : "#ffffff",
                   borderColor: isDark ? "#24242A" : "#e2e8f0",
                 },
               ]}
             >
-              <View
-                style={[
-                  styles.dialogIconBox,
-                  {
-                    backgroundColor:
-                      confirmDialog.tone === "destructive"
-                        ? isDark
-                          ? "rgba(244, 63, 94, 0.12)"
-                          : "rgba(225, 29, 72, 0.08)"
-                        : isDark
-                        ? "rgba(16, 185, 129, 0.12)"
-                        : "rgba(5, 150, 105, 0.08)",
-                    borderColor:
-                      confirmDialog.tone === "destructive"
-                        ? isDark
-                          ? "rgba(244, 63, 94, 0.25)"
-                          : "rgba(225, 29, 72, 0.20)"
-                        : isDark
-                        ? "rgba(16, 185, 129, 0.25)"
-                        : "rgba(5, 150, 105, 0.20)",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={
-                    confirmDialog.icon ||
-                    (confirmDialog.tone === "destructive"
-                      ? "lock-closed-outline"
-                      : "help-circle-outline")
-                  }
-                  size={22}
-                  color={
-                    confirmDialog.tone === "destructive"
-                      ? colors.rose
-                      : colors.emerald
-                  }
-                />
-              </View>
-
               <View style={styles.dialogContent}>
                 <Text
                   style={[
                     styles.dialogTitle,
                     { color: isDark ? "#FAFAFA" : theme.text },
                   ]}
+                  numberOfLines={2}
                 >
                   {confirmDialog.title}
                 </Text>
@@ -375,68 +334,92 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                       styles.dialogMessage,
                       { color: isDark ? "#A1A1AA" : theme.textMuted },
                     ]}
+                    numberOfLines={3}
                   >
                     {confirmDialog.message}
                   </Text>
                 ) : null}
               </View>
 
-              <View style={styles.dialogActionsRow}>
-                <Pressable
-                  onPress={handleCancelAction}
-                  disabled={confirmBusy}
-                  accessibilityRole="button"
-                  accessibilityLabel={confirmDialog.cancelLabel || "Cancel"}
-                  style={({ pressed }) => [
-                    styles.dialogCancelButton,
+              <Pressable
+                onPress={handleConfirmAction}
+                disabled={confirmBusy}
+                accessibilityRole="button"
+                accessibilityLabel={confirmDialog.confirmLabel || "Confirm"}
+                style={({ pressed }) => [
+                  styles.dialogConfirmButton,
+                  {
+                    backgroundColor:
+                      confirmDialog.tone === "destructive"
+                        ? isDark
+                          ? "rgba(244, 63, 94, 0.14)"
+                          : "rgba(225, 29, 72, 0.08)"
+                        : confirmDialog.tone === "warning"
+                        ? isDark
+                          ? "rgba(245, 158, 11, 0.14)"
+                          : "rgba(217, 119, 6, 0.10)"
+                        : theme.accent,
+                  },
+                  pressed && { opacity: 0.8, transform: [{ scale: 0.985 }] },
+                  confirmBusy && { opacity: 0.5 },
+                ]}
+              >
+                {confirmDialog.icon ? (
+                  <Ionicons
+                    name={confirmDialog.icon}
+                    size={16}
+                    color={
+                      confirmDialog.tone === "destructive"
+                        ? colors.rose
+                        : confirmDialog.tone === "warning"
+                        ? colors.amber
+                        : isDark
+                        ? "#09090b"
+                        : "#ffffff"
+                    }
+                  />
+                ) : null}
+                <Text
+                  style={[
+                    styles.dialogConfirmText,
                     {
-                      backgroundColor: isDark ? "#18181D" : "#f1f5f9",
-                      borderColor: isDark ? "#26262D" : "#e2e8f0",
-                    },
-                    pressed && { opacity: 0.75 },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dialogCancelText,
-                      { color: isDark ? "#FAFAFA" : theme.text },
-                    ]}
-                  >
-                    {confirmDialog.cancelLabel || "Cancel"}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={handleConfirmAction}
-                  disabled={confirmBusy}
-                  accessibilityRole="button"
-                  accessibilityLabel={confirmDialog.confirmLabel || "Confirm"}
-                  style={({ pressed }) => [
-                    styles.dialogConfirmButton,
-                    {
-                      backgroundColor:
+                      color:
                         confirmDialog.tone === "destructive"
                           ? colors.rose
-                          : colors.emerald,
+                          : confirmDialog.tone === "warning"
+                          ? colors.amber
+                          : isDark
+                          ? "#09090b"
+                          : "#ffffff",
                     },
-                    pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-                    confirmBusy && { opacity: 0.5 },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.dialogConfirmText,
-                      {
-                        color: "#ffffff",
-                      },
-                    ]}
-                  >
-                    {confirmBusy
-                      ? "Processing…"
-                      : confirmDialog.confirmLabel || "Confirm"}
-                  </Text>
-                </Pressable>
-              </View>
+                  {confirmBusy
+                    ? "Working…"
+                    : confirmDialog.confirmLabel || "Confirm"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleCancelAction}
+                disabled={confirmBusy}
+                accessibilityRole="button"
+                accessibilityLabel={confirmDialog.cancelLabel || "Cancel"}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                style={({ pressed }) => [
+                  styles.dialogCancelButton,
+                  pressed && { opacity: 0.55 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.dialogCancelText,
+                    { color: isDark ? "#A1A1AA" : theme.textMuted },
+                  ]}
+                >
+                  {confirmDialog.cancelLabel || "Cancel"}
+                </Text>
+              </Pressable>
             </Animated.View>
           </View>
         </Modal>
@@ -513,19 +496,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.68)",
-    padding: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 36,
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
   },
   dialogCard: {
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 300,
     borderRadius: 20,
     borderWidth: 1,
-    padding: 20,
-    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 10,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 12 },
@@ -533,23 +517,17 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 20,
   },
-  dialogIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   dialogContent: {
     width: "100%",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
+    paddingHorizontal: 4,
+    paddingBottom: 2,
   },
   dialogTitle: {
-    fontSize: 16.5,
+    fontSize: 15,
     fontWeight: "700",
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
     textAlign: "center",
   },
   dialogMessage: {
@@ -558,33 +536,28 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "center",
   },
-  dialogActionsRow: {
-    flexDirection: "row",
-    gap: 10,
+  dialogConfirmButton: {
     width: "100%",
-    marginTop: 4,
+    height: 52,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  dialogConfirmText: {
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: -0.1,
   },
   dialogCancelButton: {
-    flex: 1,
+    width: "100%",
     height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   dialogCancelText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: "600",
-  },
-  dialogConfirmButton: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dialogConfirmText: {
-    fontSize: 13.5,
-    fontWeight: "700",
   },
 });
