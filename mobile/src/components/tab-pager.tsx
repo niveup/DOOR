@@ -1,6 +1,8 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
   Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -48,6 +50,9 @@ export function TabPager() {
   const segments = useSegments();
   const startAt = useRef(initialIndex(segments as unknown as string[])).current;
   const [active, setActive] = useState(startAt);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+
   const [locked, setLocked] = useState(false);
   const interceptRef = useRef<(() => boolean) | null>(null);
   const pagerRef = useRef<ScrollView>(null);
@@ -64,12 +69,35 @@ export function TabPager() {
   );
 
   const go = (index: number) => {
-    if (index === active) return;
+    if (index === activeRef.current) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+    activeRef.current = index;
     setActive(index);
     pagerRef.current?.scrollTo({ x: index * width, animated: true });
+  };
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const i = Math.round(x / width);
+    const clamped = Math.max(0, Math.min(PAGES.length - 1, i));
+    if (clamped !== activeRef.current) {
+      activeRef.current = clamped;
+      setActive(clamped);
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+    }
+  };
+
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / width);
+    const clamped = Math.max(0, Math.min(PAGES.length - 1, i));
+    if (clamped !== activeRef.current) {
+      activeRef.current = clamped;
+      setActive(clamped);
+    }
   };
 
   const dismiss = () => {
@@ -103,22 +131,15 @@ export function TabPager() {
               ref={pagerRef}
               horizontal
               pagingEnabled
+              scrollEventThrottle={16}
+              onScroll={handleScroll}
+              onMomentumScrollEnd={handleMomentumScrollEnd}
               showsHorizontalScrollIndicator={false}
               bounces={Platform.OS === "ios"}
               overScrollMode="never"
               scrollEnabled={!locked}
               keyboardShouldPersistTaps="handled"
               contentOffset={{ x: startAt * width, y: 0 }}
-              onMomentumScrollEnd={(e) => {
-                const i = Math.round(e.nativeEvent.contentOffset.x / width);
-                const clamped = Math.max(0, Math.min(PAGES.length - 1, i));
-                if (clamped !== active) {
-                  setActive(clamped);
-                  try {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  } catch {}
-                }
-              }}
               style={styles.flex}
             >
               <View style={{ width, height: "100%" }}>
@@ -163,8 +184,8 @@ export function TabPager() {
                   style={[
                     styles.tabIcon,
                     focused && {
-                      backgroundColor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5",
-                      borderColor: isDark ? "rgba(16, 185, 129, 0.28)" : "#A7F3D0",
+                      backgroundColor: isDark ? "rgba(16, 185, 129, 0.16)" : "#ECFDF5",
+                      borderColor: isDark ? "rgba(16, 185, 129, 0.32)" : "#A7F3D0",
                     },
                   ]}
                 >
@@ -218,7 +239,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   tabIcon: {
-    width: 36,
+    width: 38,
     height: 30,
     alignItems: "center",
     justifyContent: "center",
