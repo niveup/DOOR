@@ -32,27 +32,27 @@ export function AppScreen({
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-
-            refreshControl={
-              onRefresh ? (
-                <RefreshControl
-                  refreshing={Boolean(refreshing)}
-                  onRefresh={onRefresh}
-                  tintColor={theme.accent}
-                  colors={[theme.accent]}
-                />
-              ) : undefined
-            }
-          >
-            <View style={styles.header}>
-              <View style={styles.headerCopy}>
-                <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-                {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
-              </View>
-              {action}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+          nestedScrollEnabled={true}
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                refreshing={Boolean(refreshing)}
+                onRefresh={onRefresh}
+                tintColor={theme.accent}
+                colors={[theme.accent]}
+              />
+            ) : undefined
+          }
+        >
+          <View style={styles.header}>
+            <View style={styles.headerCopy}>
+              <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+              {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
             </View>
+            {action}
+          </View>
           {children}
         </ScrollView>
       </SafeAreaView>
@@ -88,4 +88,3 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 });
-

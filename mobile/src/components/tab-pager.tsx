@@ -1,9 +1,27 @@
 import React, { useMemo, useRef, useState } from "react";
-import { Dimensions, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSegments } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { runOnJS } from "react-native-reanimated";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  SharedValue,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import { Ionicons } from "@/src/components/app-icon";
 import { useTheme } from "@/src/providers/theme-provider";
 import { TabPagerLockContext } from "@/src/components/tab-pager-context";
@@ -19,7 +37,10 @@ const PAGES = [
   { key: "profile", title: "More" },
 ];
 
-const tabIcons: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+const tabIcons: Record<
+  string,
+  { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }
+> = {
   index: { active: "checkbox", inactive: "checkbox-outline" },
   finance: { active: "wallet", inactive: "wallet-outline" },
   study: { active: "book", inactive: "book-outline" },
@@ -32,6 +53,161 @@ function initialIndex(segments: string[]): number {
   return idx >= 0 ? idx : 0;
 }
 
+interface TabButtonProps {
+  page: (typeof PAGES)[number];
+  index: number;
+  scrollX: SharedValue<number>;
+  width: number;
+  onPress: () => void;
+  isDark: boolean;
+  theme: ReturnType<typeof useTheme>["theme"];
+}
+
+function TabButton({
+  page,
+  index,
+  scrollX,
+  width,
+  onPress,
+  isDark,
+  theme,
+}: TabButtonProps) {
+  const icons = tabIcons[page.key];
+  const activeColor = isDark ? "#18B887" : "#059669";
+  const inactiveColor = isDark ? "#71717A" : theme.textFaint;
+
+  const activeIconStyle = useAnimatedStyle(() => {
+    const w = width > 0 ? width : 1;
+    const progress = scrollX.value / w;
+    const opacity = interpolate(
+      progress,
+      [index - 0.7, index, index + 0.7],
+      [0, 1, 0],
+      Extrapolation.CLAMP
+    );
+    const scale = interpolate(
+      progress,
+      [index - 0.7, index, index + 0.7],
+      [0.9, 1.05, 0.9],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  const inactiveIconStyle = useAnimatedStyle(() => {
+    const w = width > 0 ? width : 1;
+    const progress = scrollX.value / w;
+    const opacity = interpolate(
+      progress,
+      [index - 0.7, index, index + 0.7],
+      [1, 0, 1],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity,
+    };
+  });
+
+  const activeLabelStyle = useAnimatedStyle(() => {
+    const w = width > 0 ? width : 1;
+    const progress = scrollX.value / w;
+    const opacity = interpolate(
+      progress,
+      [index - 0.6, index, index + 0.6],
+      [0, 1, 0],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity,
+    };
+  });
+
+  const inactiveLabelStyle = useAnimatedStyle(() => {
+    const w = width > 0 ? width : 1;
+    const progress = scrollX.value / w;
+    const opacity = interpolate(
+      progress,
+      [index - 0.6, index, index + 0.6],
+      [1, 0, 1],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity,
+    };
+  });
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityLabel={page.title}
+      style={({ pressed }) => [styles.tabItem, pressed && { opacity: 0.7 }]}
+    >
+      <View style={styles.tabIcon}>
+        <Animated.View style={[styles.tabIconLayer, inactiveIconStyle]}>
+          <Ionicons name={icons.inactive} color={inactiveColor} size={20} />
+        </Animated.View>
+        <Animated.View style={[styles.tabIconLayer, activeIconStyle]}>
+          <Ionicons name={icons.active} color={activeColor} size={20} />
+        </Animated.View>
+      </View>
+
+      <View style={styles.tabLabelContainer}>
+        <Animated.Text
+          style={[styles.tabLabel, { color: inactiveColor }, inactiveLabelStyle]}
+          numberOfLines={1}
+        >
+          {page.title}
+        </Animated.Text>
+        <Animated.Text
+          style={[
+            styles.tabLabel,
+            styles.tabLabelActiveOverlay,
+            { color: activeColor },
+            activeLabelStyle,
+          ]}
+          numberOfLines={1}
+        >
+          {page.title}
+        </Animated.Text>
+      </View>
+    </Pressable>
+  );
+}
+
+interface PagerScreenProps {
+  index: number;
+  scrollX: SharedValue<number>;
+  width: number;
+  children: React.ReactNode;
+}
+
+function PagerScreen({ index, scrollX, width, children }: PagerScreenProps) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const w = width > 0 ? width : 1;
+    const progress = scrollX.value / w;
+    const dist = Math.abs(progress - index);
+
+    // Subtle scale and soft depth focus for a silky transition
+    const scale = interpolate(dist, [0, 1], [1, 0.985], Extrapolation.CLAMP);
+    const opacity = interpolate(dist, [0, 1], [1, 0.94], Extrapolation.CLAMP);
+
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  return (
+    <View style={{ width, height: "100%" }}>
+      <Animated.View style={[styles.flex, animatedStyle]}>{children}</Animated.View>
+    </View>
+  );
+}
+
 export function TabPager() {
   const { theme, isDark } = useTheme();
   const segments = useSegments();
@@ -39,8 +215,18 @@ export function TabPager() {
   const [active, setActive] = useState(startAt);
   const [locked, setLocked] = useState(false);
   const interceptRef = useRef<(() => boolean) | null>(null);
-  const pagerRef = useRef<ScrollView>(null);
-  const width = Dimensions.get("window").width;
+
+  const { width: windowWidth } = useWindowDimensions();
+  const width = windowWidth > 0 ? windowWidth : 375;
+
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollX = useSharedValue(startAt * width);
+
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
 
   const lockApi = useMemo(
     () => ({
@@ -58,7 +244,19 @@ export function TabPager() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     setActive(index);
-    pagerRef.current?.scrollTo({ x: index * width, animated: true });
+    scrollRef.current?.scrollTo({ x: index * width, animated: true });
+  };
+
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const i = Math.round(offsetX / width);
+    const clamped = Math.max(0, Math.min(PAGES.length - 1, i));
+    if (clamped !== active) {
+      setActive(clamped);
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+    }
   };
 
   const dismiss = () => {
@@ -80,41 +278,51 @@ export function TabPager() {
       }
     });
 
+  const tabWidth = width / PAGES.length;
+  const pillWidth = 38;
+  const pillOffset = (tabWidth - pillWidth) / 2;
+
+  const indicatorAnimatedStyle = useAnimatedStyle(() => {
+    const pageProgress = width > 0 ? scrollX.value / width : 0;
+    const tx = pillOffset + pageProgress * tabWidth;
+    return {
+      transform: [{ translateX: tx }],
+    };
+  });
+
   return (
     <TabPagerLockContext.Provider value={lockApi}>
       <View style={[styles.root, { backgroundColor: theme.canvas }]}>
         <GestureDetector gesture={pan}>
           <View style={styles.flex}>
-            <ScrollView
-              ref={pagerRef}
+            <Animated.ScrollView
+              ref={scrollRef}
               horizontal
               pagingEnabled
+              scrollEventThrottle={16}
+              onScroll={onScroll}
+              onMomentumScrollEnd={handleMomentumScrollEnd}
               keyboardShouldPersistTaps="handled"
               showsHorizontalScrollIndicator={false}
-              bounces={false}
+              bounces={Platform.OS === "ios"}
               overScrollMode="never"
-              decelerationRate="fast"
               scrollEnabled={!locked}
               contentOffset={{ x: startAt * width, y: 0 }}
-              onMomentumScrollEnd={(e) => {
-                const i = Math.round(e.nativeEvent.contentOffset.x / width);
-                setActive(Math.max(0, Math.min(PAGES.length - 1, i)));
-              }}
               style={styles.flex}
             >
-              <View style={{ width, height: "100%" }}>
+              <PagerScreen index={0} scrollX={scrollX} width={width}>
                 <TodayScreen />
-              </View>
-              <View style={{ width, height: "100%" }}>
+              </PagerScreen>
+              <PagerScreen index={1} scrollX={scrollX} width={width}>
                 <FinanceScreen />
-              </View>
-              <View style={{ width, height: "100%" }}>
+              </PagerScreen>
+              <PagerScreen index={2} scrollX={scrollX} width={width}>
                 <StudyScreen />
-              </View>
-              <View style={{ width, height: "100%" }}>
+              </PagerScreen>
+              <PagerScreen index={3} scrollX={scrollX} width={width}>
                 <ProfileScreen />
-              </View>
-            </ScrollView>
+              </PagerScreen>
+            </Animated.ScrollView>
           </View>
         </GestureDetector>
 
@@ -128,37 +336,32 @@ export function TabPager() {
             },
           ]}
         >
-          {PAGES.map((page, i) => {
-            const focused = i === active;
-            const icons = tabIcons[page.key];
-            const color = focused ? (isDark ? "#18B887" : "#059669") : isDark ? "#71717A" : theme.textFaint;
-            return (
-              <Pressable
-                key={page.key}
-                onPress={() => go(i)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: focused }}
-                accessibilityLabel={page.title}
-                style={({ pressed }) => [styles.tabItem, pressed && { opacity: 0.7 }]}
-              >
-                <View
-                  style={[
-                    styles.tabIcon,
-                    focused && [
-                      styles.tabIconActive,
-                      {
-                        backgroundColor: isDark ? "rgba(24, 184, 135, 0.17)" : "#ECFDF5",
-                        borderColor: isDark ? "rgba(78, 211, 166, 0.2)" : "#A7F3D0",
-                      },
-                    ],
-                  ]}
-                >
-                  <Ionicons name={focused ? icons.active : icons.inactive} color={color} size={20} />
-                </View>
-                <Text style={[styles.tabLabel, { color }]}>{page.title}</Text>
-              </Pressable>
-            );
-          })}
+          {/* Real-time 120fps synchronized sliding pill indicator */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.indicatorPill,
+              {
+                width: pillWidth,
+                backgroundColor: isDark ? "rgba(24, 184, 135, 0.17)" : "#ECFDF5",
+                borderColor: isDark ? "rgba(78, 211, 166, 0.2)" : "#A7F3D0",
+              },
+              indicatorAnimatedStyle,
+            ]}
+          />
+
+          {PAGES.map((page, i) => (
+            <TabButton
+              key={page.key}
+              page={page}
+              index={i}
+              scrollX={scrollX}
+              width={width}
+              onPress={() => go(i)}
+              isDark={isDark}
+              theme={theme}
+            />
+          ))}
         </View>
       </View>
     </TabPagerLockContext.Provider>
@@ -186,6 +389,19 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
+  indicatorPill: {
+    position: "absolute",
+    top: 7,
+    left: 0,
+    height: 30,
+    borderRadius: 10,
+    borderWidth: 1,
+    shadowColor: "#18B887",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   tabItem: {
     flex: 1,
     alignItems: "center",
@@ -197,20 +413,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "transparent",
   },
-  tabIconActive: {
-    shadowColor: "#18B887",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 2,
+  tabIconLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabLabelContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 3,
   },
   tabLabel: {
     fontSize: 10.5,
     fontWeight: "700",
     letterSpacing: 0.1,
-    marginTop: 3,
+  },
+  tabLabelActiveOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    textAlign: "center",
   },
 });
