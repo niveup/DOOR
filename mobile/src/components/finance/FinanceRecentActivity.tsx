@@ -1,35 +1,31 @@
-import React, { useState } from "react";
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from "react-native";
+import React from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@/src/components/app-icon";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useTheme } from "@/src/providers/theme-provider";
-import { formatINR, shortDate } from "@/src/lib/format";
 import { Expense } from "@/src/types/domain";
-import { CategoryIconBadge } from "@/src/components/finance/CategoryIconBadge";
 import { radii, spacing, typography } from "@/src/theme/tokens";
 
 export interface FinanceRecentActivityProps {
   expensesList: Expense[];
-  groupedTop5Expenses: { dateLabel: string; items: Expense[] }[];
+  groupedTop5Expenses?: { dateLabel: string; items: Expense[] }[];
   onOpenAllActivity: () => void;
   onLogExpense: () => void;
 }
 
 export function FinanceRecentActivity({
   expensesList,
-  groupedTop5Expenses,
   onOpenAllActivity,
   onLogExpense,
 }: FinanceRecentActivityProps) {
   const { theme, isDark } = useTheme();
-  const [isExpanded, setIsExpanded] = useState(false);
 
-  const toggleExpand = () => {
-    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
+  const handleViewMore = () => {
+    if (expensesList.length > 0) {
+      onOpenAllActivity();
+    } else {
+      onLogExpense();
     }
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIsExpanded((prev) => !prev);
   };
 
   return (
@@ -39,175 +35,78 @@ export function FinanceRecentActivity({
     >
       <View
         style={[
-          styles.unifiedCard,
+          styles.mainCard,
           {
-            backgroundColor: isDark ? "#121216" : theme.surface,
-            borderColor: isDark ? "#1f1f25" : theme.border,
+            borderColor: isDark ? "#282834" : "#cbd5e1",
           },
         ]}
       >
-        {/* Centered Box Header */}
-        <Pressable
-          onPress={expensesList.length > 0 ? toggleExpand : onLogExpense}
-          accessibilityRole="button"
-          accessibilityLabel={
-            expensesList.length > 0
-              ? isExpanded
-                ? "Hide recent activity"
-                : "View more activity"
-              : "No transactions yet, tap to log expense"
-          }
-          style={({ pressed }) => [
-            styles.centeredHeaderBox,
-            pressed && { opacity: 0.75 },
-            isExpanded && [
-              styles.hairlineDivider,
-              { borderBottomColor: isDark ? "#1f1f25" : theme.divider, borderBottomWidth: StyleSheet.hairlineWidth },
-            ],
+        {/* Top Section: Recent Activity with its own boundary and distinct grey shading */}
+        <View
+          style={[
+            styles.topSection,
+            {
+              backgroundColor: isDark ? "#141419" : "#f1f5f9",
+              borderBottomColor: isDark ? "#242430" : "#cbd5e1",
+            },
           ]}
         >
           <Text
             style={[
-              styles.centeredTitleText,
+              styles.sectionTitleText,
               { color: isDark ? "#fafafa" : theme.text },
             ]}
           >
             Recent Activity
           </Text>
-
           {expensesList.length > 0 ? (
-            <View style={styles.toggleRow}>
-              <Text style={[styles.toggleActionText, { color: theme.cyan }]}>
-                {isExpanded ? "Hide activity" : "View more activity"}
-              </Text>
-              <Ionicons
-                name={isExpanded ? "chevron-up" : "chevron-down"}
-                size={14}
-                color={theme.cyan}
-              />
-            </View>
+            <Text style={[styles.sectionSubtitleText, { color: isDark ? "#8e8e99" : theme.textMuted }]}>
+              {expensesList.length} transaction{expensesList.length === 1 ? "" : "s"} recorded
+            </Text>
           ) : (
-            <Text style={[styles.emptyHintText, { color: theme.textMuted }]}>
-              No transactions yet · Tap to log
+            <Text style={[styles.sectionSubtitleText, { color: isDark ? "#8e8e99" : theme.textMuted }]}>
+              No transactions logged yet
             </Text>
           )}
-        </Pressable>
+        </View>
 
-        {/* Revealed Content: generally hidden, shown only after clicking view more activity */}
-        {isExpanded && expensesList.length > 0 ? (
-          <View>
-            {groupedTop5Expenses.map((group, gIdx) => (
-              <View key={group.dateLabel}>
-                {/* Date Group Header */}
-                <View
-                  style={[
-                    styles.dateHeaderRow,
-                    {
-                      backgroundColor: isDark
-                        ? theme.surfaceElevated
-                        : theme.surfaceSubtle,
-                      borderTopColor: isDark
-                        ? theme.borderMuted
-                        : theme.divider,
-                      borderTopWidth: gIdx > 0 ? StyleSheet.hairlineWidth : 0,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dateHeaderText,
-                      { color: theme.textFaint },
-                    ]}
-                  >
-                    {group.dateLabel}
-                  </Text>
-                </View>
-
-                {/* Transaction Items in Date Group */}
-                {group.items.map((item, idx) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={onOpenAllActivity}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${item.title}: expense of ${formatINR(item.amount)}, ${
-                      item.date ? shortDate(item.date) : ""
-                    }. Category: ${item.category}.`}
-                    style={({ pressed }) => [
-                      styles.unifiedItemRow,
-                      idx > 0 && [
-                        styles.hairlineDivider,
-                        {
-                          borderTopColor: isDark
-                            ? theme.borderMuted
-                            : theme.divider,
-                        },
-                      ],
-                      pressed && { opacity: 0.8 },
-                    ]}
-                  >
-                    <View style={styles.itemLeftBlock}>
-                      <CategoryIconBadge
-                        category={item.category}
-                        isDark={isDark}
-                      />
-
-                      <View style={styles.itemDetails}>
-                        <Text
-                          style={[
-                            styles.itemTitle,
-                            { color: isDark ? "#fafafa" : theme.text },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {item.title}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.itemSubtext,
-                            { color: theme.textMuted },
-                          ]}
-                        >
-                          {item.date ? `${shortDate(item.date)} · ` : ""}
-                          {item.category}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Text
-                      style={[
-                        styles.itemAmount,
-                        { color: isDark ? "#fafafa" : theme.text },
-                      ]}
-                    >
-                      - {formatINR(item.amount)}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ))}
-
-            {expensesList.length > 5 ? (
-              <Pressable
-                onPress={onOpenAllActivity}
-                accessibilityRole="button"
-                accessibilityLabel={`View all ${expensesList.length} transactions`}
-                style={({ pressed }) => [
-                  styles.collapseBottomButton,
-                  {
-                    borderTopColor: isDark
-                      ? theme.borderMuted
-                      : theme.divider,
-                  },
-                  pressed && { opacity: 0.65 },
-                ]}
-              >
-                <Text style={[styles.collapseBottomText, { color: theme.cyan }]}>
-                  View all {expensesList.length} transactions →
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
+        {/* Bottom Section: View Activities with differentiated grey shading, boundary, and grey button */}
+        <View
+          style={[
+            styles.bottomSection,
+            {
+              backgroundColor: isDark ? "#1b1b23" : "#e9eef5",
+            },
+          ]}
+        >
+          <Pressable
+            onPress={handleViewMore}
+            accessibilityRole="button"
+            accessibilityLabel={expensesList.length > 0 ? "View more activity" : "Log an expense"}
+            style={({ pressed }) => [
+              styles.greyButton,
+              {
+                backgroundColor: isDark ? "#2a2a36" : "#d8e0ea",
+                borderColor: isDark ? "#3c3c4e" : "#bcc8d8",
+              },
+              pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            <Text
+              style={[
+                styles.greyButtonText,
+                { color: isDark ? "#f4f4f6" : "#1e293b" },
+              ]}
+            >
+              {expensesList.length > 0 ? "View more activity" : "Log an expense"}
+            </Text>
+            <Ionicons
+              name={expensesList.length > 0 ? "arrow-down" : "add"}
+              size={14}
+              color={isDark ? "#f4f4f6" : "#1e293b"}
+            />
+          </Pressable>
+        </View>
       </View>
     </Animated.View>
   );
@@ -217,97 +116,53 @@ const styles = StyleSheet.create({
   sectionGroup: {
     gap: spacing.xs,
   },
-  centeredHeaderBox: {
+  mainCard: {
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  topSection: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
     paddingHorizontal: 16,
-    gap: 4,
+    borderBottomWidth: 1,
+    gap: 3,
   },
-  centeredTitleText: {
+  sectionTitleText: {
     ...typography.subheading,
     fontSize: 15,
     fontWeight: "700",
     letterSpacing: -0.2,
     textAlign: "center",
   },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-  },
-  toggleActionText: {
-    ...typography.caption,
-    fontSize: 12.5,
-    fontWeight: "700",
-  },
-  emptyHintText: {
-    ...typography.caption,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  unifiedCard: {
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  dateHeaderRow: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-  },
-  dateHeaderText: {
-    ...typography.label,
-    fontSize: 10.5,
-    letterSpacing: 0.6,
-  },
-  unifiedItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-  },
-  hairlineDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  itemLeftBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    flex: 1,
-  },
-  itemDetails: {
-    gap: 2,
-    flex: 1,
-  },
-  itemTitle: {
-    ...typography.bodyMedium,
-    fontSize: 13.5,
-    fontWeight: "600",
-  },
-  itemSubtext: {
+  sectionSubtitleText: {
     ...typography.caption,
     fontSize: 11.5,
+    fontWeight: "500",
+    textAlign: "center",
   },
-  itemAmount: {
-    ...typography.metric,
-    fontSize: 14,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-  },
-  collapseBottomButton: {
-    paddingVertical: spacing.sm,
+  bottomSection: {
     alignItems: "center",
     justifyContent: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  collapseBottomText: {
+  greyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    minWidth: 180,
+  },
+  greyButtonText: {
     ...typography.caption,
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: "700",
+    letterSpacing: 0.1,
   },
 });
