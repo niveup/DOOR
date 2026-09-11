@@ -7,6 +7,7 @@ import { useTheme } from "@/src/providers/theme-provider";
 import { todayInKolkata } from "@/src/lib/format";
 import { Expense, FinanceCategory } from "@/src/types/domain";
 import { CategoryPicker } from "@/src/components/finance/CategoryPicker";
+import { CATEGORY_TOKENS } from "@/src/components/finance/FinanceConstants";
 import { radii, spacing, typography } from "@/src/theme/tokens";
 
 export interface ExpenseFormProps {
@@ -36,6 +37,11 @@ export function ExpenseForm({
     payment: "UPI" as Expense["payment"],
     date: todayInKolkata(),
   });
+
+  const categoryMeta =
+    CATEGORY_TOKENS[form.category] ||
+    CATEGORY_TOKENS.Other ||
+    CATEGORY_TOKENS.Others;
 
   const isFormValid = form.title.trim().length > 0 && Number(form.amount) > 0;
 
@@ -135,6 +141,24 @@ export function ExpenseForm({
             accessibilityLabel="Expense amount in Rupees"
             maxLength={7}
           />
+
+          {/* Selected Category Logo on the far right */}
+          <View
+            style={[
+              styles.amountCategoryLogoBadge,
+              {
+                backgroundColor: isDark ? categoryMeta.darkBg : categoryMeta.lightBg,
+                borderColor: isDark ? categoryMeta.darkBorder : categoryMeta.lightBorder,
+              },
+            ]}
+            accessibilityLabel={`Selected category: ${form.category}`}
+          >
+            <Ionicons
+              name={categoryMeta.icon}
+              size={18}
+              color={isDark ? categoryMeta.darkIcon : categoryMeta.lightIcon}
+            />
+          </View>
         </View>
       </View>
 
@@ -283,6 +307,15 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     paddingVertical: 0,
     fontVariant: ["tabular-nums"],
+  },
+  amountCategoryLogoBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
   },
   fieldGroup: {
     gap: 6,
