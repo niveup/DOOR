@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
   NativeScrollEvent,
@@ -163,6 +163,14 @@ export function TabPager() {
     []
   );
 
+  useEffect(() => {
+    if (startAt > 0) {
+      requestAnimationFrame(() => {
+        pagerRef.current?.scrollTo({ x: startAt * width, animated: false });
+      });
+    }
+  }, [width, startAt]);
+
   const go = (index: number) => {
     if (index === activeRef.current) return;
     try {
@@ -173,8 +181,7 @@ export function TabPager() {
     pagerRef.current?.scrollTo({ x: index * width, animated: true });
   };
 
-  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = e.nativeEvent.contentOffset.x;
+  const syncActivePage = (x: number) => {
     const i = Math.round(x / width);
     const clamped = Math.max(0, Math.min(PAGES.length - 1, i));
     if (clamped !== activeRef.current) {
@@ -184,6 +191,14 @@ export function TabPager() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch {}
     }
+  };
+
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    syncActivePage(e.nativeEvent.contentOffset.x);
+  };
+
+  const handleScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    syncActivePage(e.nativeEvent.contentOffset.x);
   };
 
   const dismiss = () => {
@@ -215,42 +230,51 @@ export function TabPager() {
     };
   });
 
+  const scrollElement = (
+    <Animated.ScrollView
+      ref={pagerRef}
+      horizontal
+      pagingEnabled={false}
+      snapToInterval={width}
+      snapToAlignment="start"
+      decelerationRate="fast"
+      disableIntervalMomentum={true}
+      scrollEventThrottle={16}
+      onScroll={scrollHandler}
+      onMomentumScrollEnd={handleMomentumScrollEnd}
+      onScrollEndDrag={handleScrollEndDrag}
+      showsHorizontalScrollIndicator={false}
+      bounces={false}
+      overScrollMode="never"
+      scrollEnabled={!locked}
+      keyboardShouldPersistTaps="handled"
+      style={styles.flex}
+    >
+      <View style={{ width, height: "100%" }}>
+        <MemoTodayScreen />
+      </View>
+      <View style={{ width, height: "100%" }}>
+        <MemoFinanceScreen />
+      </View>
+      <View style={{ width, height: "100%" }}>
+        <MemoStudyScreen />
+      </View>
+      <View style={{ width, height: "100%" }}>
+        <MemoProfileScreen />
+      </View>
+    </Animated.ScrollView>
+  );
+
   return (
     <TabPagerLockContext.Provider value={lockApi}>
       <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-        <GestureDetector gesture={pan}>
-          <View style={styles.flex}>
-            <Animated.ScrollView
-              ref={pagerRef}
-              horizontal
-              pagingEnabled
-              scrollEventThrottle={16}
-              onScroll={scrollHandler}
-              onMomentumScrollEnd={handleMomentumScrollEnd}
-              showsHorizontalScrollIndicator={false}
-              bounces={Platform.OS === "ios"}
-              overScrollMode="never"
-              decelerationRate={Platform.OS === "ios" ? "normal" : "fast"}
-              scrollEnabled={!locked}
-              keyboardShouldPersistTaps="handled"
-              contentOffset={{ x: startAt * width, y: 0 }}
-              style={styles.flex}
-            >
-              <View style={{ width, height: "100%" }}>
-                <MemoTodayScreen />
-              </View>
-              <View style={{ width, height: "100%" }}>
-                <MemoFinanceScreen />
-              </View>
-              <View style={{ width, height: "100%" }}>
-                <MemoStudyScreen />
-              </View>
-              <View style={{ width, height: "100%" }}>
-                <MemoProfileScreen />
-              </View>
-            </Animated.ScrollView>
-          </View>
-        </GestureDetector>
+        {locked ? (
+          <GestureDetector gesture={pan}>
+            <View style={styles.flex}>{scrollElement}</View>
+          </GestureDetector>
+        ) : (
+          <View style={styles.flex}>{scrollElement}</View>
+        )}
 
         <View
           style={[
