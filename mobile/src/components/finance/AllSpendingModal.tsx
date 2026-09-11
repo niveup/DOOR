@@ -118,24 +118,14 @@ export function AllSpendingModal({
           })}
         </View>
 
-        {/* Minimal Total Section */}
-        <View
-          style={[
-            styles.totalCard,
-            {
-              backgroundColor: isDark ? "#111113" : "#ffffff",
-              borderColor: isDark ? "#1F1F24" : "#e2e8f0",
-            },
-          ]}
-        >
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: isDark ? "#FAFAFA" : theme.text }]}>
-              Total
-            </Text>
-            <Text style={[styles.totalAmount, { color: isDark ? "#FAFAFA" : theme.text }]}>
-              {formatINR(grandTotal)}
-            </Text>
-          </View>
+        {/* Minimal Total Section (No plate, no border) */}
+        <View style={styles.totalRow}>
+          <Text style={[styles.totalLabel, { color: isDark ? "#FAFAFA" : theme.text }]}>
+            TOTAL
+          </Text>
+          <Text style={[styles.totalAmount, { color: isDark ? "#FAFAFA" : theme.text }]}>
+            {formatINR(grandTotal)}
+          </Text>
         </View>
 
         <View style={styles.footerHintRow}>
@@ -204,26 +194,24 @@ const styles = StyleSheet.create({
   envelopeProgressWrapper: {
     marginLeft: 48,
   },
-  totalCard: {
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
   totalRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingLeft: 62,
+    paddingRight: 14,
+    paddingVertical: 10,
   },
   totalLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: -0.2,
+    fontSize: 17.5,
+    fontWeight: "800",
+    letterSpacing: 0.4,
   },
   totalAmount: {
-    fontSize: 16,
+    fontSize: 16.5,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
+    letterSpacing: -0.3,
   },
   footerHintRow: {
     flexDirection: "row",
