@@ -63,16 +63,47 @@ export function FinanceRecentActivity({
       entering={FadeInDown.delay(200).duration(320)}
       style={styles.sectionGroup}
     >
-      <View
-        style={[
-          styles.mainCard,
-          {
-            borderColor: isDark ? "#23232b" : "#e2e8f0",
-          },
-        ]}
-      >
-        {/* Top Section: Recent Activity with its own boundary and distinct grey shading */}
-        {isExpanded ? (
+      {!isExpanded ? (
+        <View style={styles.collapsedButtonWrapper}>
+          <Pressable
+            onPress={expensesList.length > 0 ? toggleExpand : onLogExpense}
+            accessibilityRole="button"
+            accessibilityLabel={expensesList.length > 0 ? "View more activity" : "Log an expense"}
+            style={({ pressed }) => [
+              styles.standaloneGreyButton,
+              {
+                backgroundColor: isDark ? "#22222b" : "#e2e8f0",
+                borderColor: isDark ? "#2f2f3c" : "#cbd5e1",
+              },
+              pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            <Text
+              style={[
+                styles.standaloneGreyButtonText,
+                { color: isDark ? "#f4f4f6" : "#1e293b" },
+              ]}
+            >
+              {expensesList.length > 0 ? "View more activity" : "Log an expense"}
+            </Text>
+            <Ionicons
+              name={expensesList.length > 0 ? "arrow-down" : "add"}
+              size={13}
+              color={isDark ? "#f4f4f6" : "#1e293b"}
+            />
+          </Pressable>
+        </View>
+      ) : (
+        <View
+          style={[
+            styles.mainCard,
+            {
+              backgroundColor: isDark ? "#17171e" : "#f1f5f9",
+              borderColor: isDark ? "#23232b" : "#e2e8f0",
+            },
+          ]}
+        >
+          {/* Top Bar: Left collapse button, Right "View more" button */}
           <View
             style={[
               styles.topSectionExpanded,
@@ -86,49 +117,29 @@ export function FinanceRecentActivity({
               onPress={toggleExpand}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Collapse recent activity"
+              accessibilityLabel="Collapse transactions"
               style={styles.headerLeftCollapseRow}
             >
-              <Text
-                style={[
-                  styles.sectionTitleText,
-                  { color: isDark ? "#fafafa" : theme.text },
-                ]}
-              >
-                Recent Activity
-              </Text>
-              {expensesList.length > 0 ? (
-                <View
-                  style={[
-                    styles.countBadge,
-                    {
-                      backgroundColor: isDark ? "#202028" : "#e2e8f0",
-                      borderColor: isDark ? "#2a2a35" : "#cbd5e1",
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.countBadgeText,
-                      { color: isDark ? "#9d9da8" : "#64748b" },
-                    ]}
-                  >
-                    {expensesList.length}
-                  </Text>
-                </View>
-              ) : null}
               <Ionicons
                 name="chevron-up"
                 size={13}
                 color={isDark ? "#8e8e99" : theme.textMuted}
               />
+              <Text
+                style={[
+                  styles.collapseText,
+                  { color: isDark ? "#8e8e99" : theme.textMuted },
+                ]}
+              >
+                Collapse
+              </Text>
             </Pressable>
 
             {/* "View More Activity" button shifts to far right side and becomes "View more" */}
             <Pressable
               onPress={onOpenAllActivity}
               accessibilityRole="button"
-              accessibilityLabel="View more transactions on dedicated page"
+              accessibilityLabel="View all transactions on dedicated page"
               style={({ pressed }) => [
                 styles.farRightGreyButton,
                 {
@@ -153,59 +164,9 @@ export function FinanceRecentActivity({
               />
             </Pressable>
           </View>
-        ) : (
-          <View
-            style={[
-              styles.topSectionCollapsed,
-              {
-                backgroundColor: isDark ? "#131317" : "#f8fafc",
-                borderBottomColor: isDark ? "#1e1e26" : "#e2e8f0",
-              },
-            ]}
-          >
-            <View style={styles.titleWithBadgeRow}>
-              <Text
-                style={[
-                  styles.sectionTitleText,
-                  { color: isDark ? "#fafafa" : theme.text },
-                ]}
-              >
-                Recent Activity
-              </Text>
-              {expensesList.length > 0 ? (
-                <View
-                  style={[
-                    styles.countBadge,
-                    {
-                      backgroundColor: isDark ? "#202028" : "#e2e8f0",
-                      borderColor: isDark ? "#2a2a35" : "#cbd5e1",
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.countBadgeText,
-                      { color: isDark ? "#9d9da8" : "#64748b" },
-                    ]}
-                  >
-                    {expensesList.length}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
-        )}
 
-        {/* Bottom Section: Differentiated grey shading */}
-        {isExpanded && expensesList.length > 0 ? (
-          <View
-            style={[
-              styles.activitiesContainer,
-              {
-                backgroundColor: isDark ? "#17171e" : "#f1f5f9",
-              },
-            ]}
-          >
+          {/* Bottom Section: 5 latest activities */}
+          <View style={styles.activitiesContainer}>
             {activeGroups.map((group, gIdx) => (
               <View key={group.dateLabel}>
                 {/* Date Group Header */}
@@ -280,45 +241,8 @@ export function FinanceRecentActivity({
               </View>
             ))}
           </View>
-        ) : (
-          <View
-            style={[
-              styles.bottomSection,
-              {
-                backgroundColor: isDark ? "#17171e" : "#f1f5f9",
-              },
-            ]}
-          >
-            <Pressable
-              onPress={expensesList.length > 0 ? toggleExpand : onLogExpense}
-              accessibilityRole="button"
-              accessibilityLabel={expensesList.length > 0 ? "View more activity" : "Log an expense"}
-              style={({ pressed }) => [
-                styles.greyButton,
-                {
-                  backgroundColor: isDark ? "#22222b" : "#e2e8f0",
-                  borderColor: isDark ? "#2f2f3c" : "#cbd5e1",
-                },
-                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.greyButtonText,
-                  { color: isDark ? "#f4f4f6" : "#1e293b" },
-                ]}
-              >
-                {expensesList.length > 0 ? "View more activity" : "Log an expense"}
-              </Text>
-              <Ionicons
-                name={expensesList.length > 0 ? "arrow-down" : "add"}
-                size={12}
-                color={isDark ? "#f4f4f6" : "#1e293b"}
-              />
-            </Pressable>
-          </View>
-        )}
-      </View>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -327,17 +251,31 @@ const styles = StyleSheet.create({
   sectionGroup: {
     gap: spacing.xs,
   },
+  collapsedButtonWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.xs,
+  },
+  standaloneGreyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: radii.full,
+    borderWidth: 1,
+  },
+  standaloneGreyButtonText: {
+    ...typography.caption,
+    fontSize: 12.5,
+    fontWeight: "600",
+    letterSpacing: 0.1,
+  },
   mainCard: {
     borderRadius: radii.md,
     borderWidth: 1,
     overflow: "hidden",
-  },
-  topSectionCollapsed: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   topSectionExpanded: {
     flexDirection: "row",
@@ -347,34 +285,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  titleWithBadgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
   headerLeftCollapseRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
   },
-  sectionTitleText: {
-    ...typography.subheading,
-    fontSize: 13.5,
-    fontWeight: "600",
-    letterSpacing: -0.1,
-  },
-  countBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  countBadgeText: {
+  collapseText: {
     ...typography.caption,
-    fontSize: 10.5,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
+    fontSize: 11.5,
+    fontWeight: "600",
   },
   farRightGreyButton: {
     flexDirection: "row",
@@ -387,28 +308,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   farRightGreyButtonText: {
-    ...typography.caption,
-    fontSize: 11.5,
-    fontWeight: "600",
-    letterSpacing: 0.1,
-  },
-  bottomSection: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-  },
-  greyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingVertical: 4.5,
-    paddingHorizontal: 13,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  greyButtonText: {
     ...typography.caption,
     fontSize: 11.5,
     fontWeight: "600",
