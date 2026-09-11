@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
   Keyboard,
@@ -51,16 +51,40 @@ export function BudgetFormModal({
   const originalScrollY = useRef(0);
   const hasShiftedUp = useRef(false);
   const keyboardHeightRef = useRef(0);
-  const cardOffsetY = useRef<number>(240);
+  const focusedFieldRef = useRef<string | null>(null);
+
+  // Layout positions relative to ScrollView
+  const allowanceSectionY = useRef(0);
+  const categoriesSectionY = useRef(0);
+  const cardInsideSectionY = useRef(0);
   const rowOffsets = useRef<Record<string, number>>({});
+  const rowHeights = useRef<Record<string, number>>({});
+
+  // Direct element refs for live coordinate measurement
+  const allowanceBoxRef = useRef<View | null>(null);
+  const rowRefs = useRef<Record<string, View | null>>({});
+
   const windowHeight = Dimensions.get("window").height;
 
-  const scrollTarget = (y: number) => {
+  const scrollTarget = useCallback((y: number) => {
+    const safeY = Math.max(0, Math.round(y));
+    try {
+      if (scrollRef.current) {
+        const refObj = scrollRef.current as any;
+        if (typeof refObj.scrollTo === "function") {
+          refObj.scrollTo({ y: safeY, animated: true });
+        } else if (typeof refObj.getNode === "function" && typeof refObj.getNode().scrollTo === "function") {
+          refObj.getNode().scrollTo({ y: safeY, animated: true });
+        }
+      }
+    } catch {
+      // fallback to worklet
+    }
     runOnUI(() => {
       "worklet";
-      scrollTo(scrollRef, 0, y, true);
+      scrollTo(scrollRef, 0, safeY, true);
     })();
-  };
+  }, [scrollRef]);
 
   const combinedScrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -76,18 +100,90 @@ export function BudgetFormModal({
     },
   });
 
+  const adjustScroll = useCallback(
+    (fieldKey: string | null, kbHeight: number) => {
+      if (!fieldKey || kbHeight <= 0) return;
+
+      const curScroll = currentScrollY.value || 0;
+      const modalHeaderHeight = insets.top + 64;
+      const keyboardTopOnScreen = windowHeight - kbHeight;
+      const desiredBottomLimit = keyboardTopOnScreen - 24;
+
+      const applyShift = (rowBottomOnScreen: number, rowTopOnScreen: number) => {
+        // 1. If row is behind or clipped by the keyboard:
+        if (rowBottomOnScreen > desiredBottomLimit) {
+          const delta = rowBottomOnScreen - desiredBottomLimit;
+          if (!hasShiftedUp.current) {
+            originalScrollY.current = curScroll;
+            hasShiftedUp.current = true;
+          }
+          scrollTarget(curScroll + delta);
+        }
+        // 2. If row was shifted too far up and clipped under header:
+        else if (rowTopOnScreen < modalHeaderHeight + 10 && hasShiftedUp.current) {
+          const delta = modalHeaderHeight + 10 - rowTopOnScreen;
+          const newTarget = Math.max(0, curScroll - delta);
+          scrollTarget(newTarget);
+        }
+        // 3. Otherwise: already fully visible between header and keyboard. Do nothing!
+      };
+
+      const calculateViaLayout = () => {
+        let rowTopInScroll = 0;
+        let rowH = 52;
+
+        if (fieldKey === "allowance") {
+          rowTopInScroll = allowanceSectionY.current;
+          rowH = 56;
+        } else {
+          const rowRelY = rowOffsets.current[fieldKey] ?? 0;
+          rowH = rowHeights.current[fieldKey] ?? 52;
+          rowTopInScroll = categoriesSectionY.current + cardInsideSectionY.current + rowRelY;
+        }
+
+        const rowTopOnScreen = modalHeaderHeight + rowTopInScroll - curScroll;
+        const rowBottomOnScreen = rowTopOnScreen + rowH;
+        applyShift(rowBottomOnScreen, rowTopOnScreen);
+      };
+
+      // Method 1: measureInWindow (with collapsable={false})
+      const targetRef = fieldKey === "allowance" ? allowanceBoxRef.current : rowRefs.current[fieldKey];
+      if (targetRef && typeof targetRef.measureInWindow === "function") {
+        targetRef.measureInWindow((x, y, width, height) => {
+          if (y !== undefined && !isNaN(y) && y > 0) {
+            applyShift(y + height, y);
+          } else {
+            calculateViaLayout();
+          }
+        });
+      } else {
+        calculateViaLayout();
+      }
+    },
+    [insets.top, windowHeight, scrollTarget, currentScrollY]
+  );
+
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSub = Keyboard.addListener(showEvent, (e) => {
-      keyboardHeightRef.current = e.endCoordinates.height;
-      setKeyboardHeight(e.endCoordinates.height);
+      const kbH = e.endCoordinates.height;
+      keyboardHeightRef.current = kbH;
+      setKeyboardHeight(kbH);
+
+      // Delay slightly so layout re-renders with new paddingBottom
+      setTimeout(() => {
+        if (focusedFieldRef.current) {
+          adjustScroll(focusedFieldRef.current, kbH);
+        }
+      }, Platform.OS === "ios" ? 40 : 90);
     });
 
     const hideSub = Keyboard.addListener(hideEvent, () => {
       keyboardHeightRef.current = 0;
       setKeyboardHeight(0);
+      focusedFieldRef.current = null;
       if (hasShiftedUp.current) {
         scrollTarget(originalScrollY.current);
         hasShiftedUp.current = false;
@@ -98,37 +194,16 @@ export function BudgetFormModal({
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [adjustScroll, scrollTarget]);
 
-  const handleCategoryFocus = (category: string, idx: number) => {
+  const handleCategoryFocus = (category: string) => {
     setFocusedField(category);
+    focusedFieldRef.current = category;
 
-    const rowY = rowOffsets.current[category] ?? (idx * 56);
-    const totalY = cardOffsetY.current + rowY;
-    const modalHeaderHeight = 75;
-    const currentScroll = currentScrollY.value || 0;
-
-    // Bottom position of the tapped category row on the screen
-    const rowBottomOnScreen = modalHeaderHeight + totalY + 56 - currentScroll;
-
-    // Top edge of the keyboard
-    const kbHeight = keyboardHeightRef.current || 300;
-    const keyboardTopOnScreen = windowHeight - kbHeight;
-    const threshold = keyboardTopOnScreen - 20;
-
-    // Only move if this section would be hidden behind or clipped by the keyboard!
-    if (rowBottomOnScreen > threshold) {
-      const delta = rowBottomOnScreen - threshold;
-      const targetScrollY = currentScroll + delta;
-
-      if (!hasShiftedUp.current) {
-        originalScrollY.current = currentScroll;
-        hasShiftedUp.current = true;
-      }
-
+    if (keyboardHeightRef.current > 0) {
       setTimeout(() => {
-        scrollTarget(targetScrollY);
-      }, Platform.OS === "ios" ? 50 : 100);
+        adjustScroll(category, keyboardHeightRef.current);
+      }, 50);
     }
   };
 
@@ -226,15 +301,27 @@ export function BudgetFormModal({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           contentContainerStyle,
-          { paddingBottom: Math.max(keyboardHeight + 90, insets.bottom + 90) },
+          {
+            paddingBottom:
+              keyboardHeight > 0
+                ? keyboardHeight + 220
+                : Math.max(insets.bottom + 90, 90),
+          },
         ]}
       >
-        <View style={styles.budgetSectionGroup}>
+        <View
+          onLayout={(e) => {
+            allowanceSectionY.current = e.nativeEvent.layout.y;
+          }}
+          style={styles.budgetSectionGroup}
+        >
           <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
             MONTHLY ALLOWANCE
           </Text>
 
           <View
+            ref={allowanceBoxRef}
+            collapsable={false}
             style={[
               styles.allowanceInputBox,
               {
@@ -256,12 +343,19 @@ export function BudgetFormModal({
               onChangeText={handleAllowanceTextChange}
               onFocus={() => {
                 setFocusedField("allowance");
-                if (hasShiftedUp.current) {
-                  scrollTarget(originalScrollY.current);
-                  hasShiftedUp.current = false;
+                focusedFieldRef.current = "allowance";
+                if (keyboardHeightRef.current > 0) {
+                  setTimeout(() => {
+                    adjustScroll("allowance", keyboardHeightRef.current);
+                  }, 50);
                 }
               }}
-              onBlur={() => setFocusedField(null)}
+              onBlur={() => {
+                if (focusedFieldRef.current === "allowance") {
+                  focusedFieldRef.current = null;
+                }
+                setFocusedField(null);
+              }}
               placeholder="0"
               placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
               keyboardType="numeric"
@@ -311,14 +405,19 @@ export function BudgetFormModal({
           </View>
         </View>
 
-        <View style={styles.budgetSectionGroup}>
+        <View
+          onLayout={(e) => {
+            categoriesSectionY.current = e.nativeEvent.layout.y;
+          }}
+          style={styles.budgetSectionGroup}
+        >
           <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
             CATEGORY BUDGETS
           </Text>
 
           <View
             onLayout={(e) => {
-              cardOffsetY.current = e.nativeEvent.layout.y;
+              cardInsideSectionY.current = e.nativeEvent.layout.y;
             }}
             style={[
               styles.budgetUnifiedCard,
@@ -335,8 +434,13 @@ export function BudgetFormModal({
               return (
                 <View
                   key={category}
+                  collapsable={false}
+                  ref={(el) => {
+                    rowRefs.current[category] = el;
+                  }}
                   onLayout={(e) => {
                     rowOffsets.current[category] = e.nativeEvent.layout.y;
+                    rowHeights.current[category] = e.nativeEvent.layout.height;
                   }}
                   style={[
                     styles.categoryRowItem,
@@ -373,8 +477,13 @@ export function BudgetFormModal({
                       style={[styles.categoryNumericInput, { color: isDark ? "#F5F5F7" : theme.text }]}
                       value={valStr}
                       onChangeText={(text) => handleCapTextChange(category, text)}
-                      onFocus={() => handleCategoryFocus(category, idx)}
-                      onBlur={() => setFocusedField(null)}
+                      onFocus={() => handleCategoryFocus(category)}
+                      onBlur={() => {
+                        if (focusedFieldRef.current === category) {
+                          focusedFieldRef.current = null;
+                        }
+                        setFocusedField(null);
+                      }}
                       placeholder="0"
                       placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
                       keyboardType="numeric"
