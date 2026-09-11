@@ -142,21 +142,15 @@ export function ExpenseForm({
             maxLength={7}
           />
 
-          {/* Selected Category Logo on the far right */}
+          {/* Selected Category Logo on the far right (pure icon, no box, no outline, neutral tone) */}
           <View
-            style={[
-              styles.amountCategoryLogoBadge,
-              {
-                backgroundColor: isDark ? categoryMeta.darkBg : categoryMeta.lightBg,
-                borderColor: isDark ? categoryMeta.darkBorder : categoryMeta.lightBorder,
-              },
-            ]}
+            style={styles.amountCategoryLogoWrapper}
             accessibilityLabel={`Selected category: ${form.category}`}
           >
             <Ionicons
               name={categoryMeta.icon}
-              size={18}
-              color={isDark ? categoryMeta.darkIcon : categoryMeta.lightIcon}
+              size={22}
+              color={isDark ? "#A1A1AA" : theme.textMuted}
             />
           </View>
         </View>
@@ -308,11 +302,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     fontVariant: ["tabular-nums"],
   },
-  amountCategoryLogoBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
-    borderWidth: 1,
+  amountCategoryLogoWrapper: {
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 8,
