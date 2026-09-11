@@ -4,7 +4,7 @@ import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@/src/components/app-icon";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/src/providers/theme-provider";
-import { shortDate, todayInKolkata } from "@/src/lib/format";
+import { todayInKolkata } from "@/src/lib/format";
 import { Expense, FinanceCategory } from "@/src/types/domain";
 import { CategoryPicker } from "@/src/components/finance/CategoryPicker";
 import { radii, spacing, typography } from "@/src/theme/tokens";
@@ -22,8 +22,6 @@ export interface ExpenseFormProps {
   busy: boolean;
 }
 
-const PAYMENT_METHODS: Expense["payment"][] = ["UPI", "Cash", "Card"];
-
 export function ExpenseForm({
   initialCategory,
   onSave,
@@ -39,26 +37,11 @@ export function ExpenseForm({
     date: todayInKolkata(),
   });
 
-  const todayStr = todayInKolkata();
-  const yesterdayDate = new Date();
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
-
   const isFormValid = form.title.trim().length > 0 && Number(form.amount) > 0;
 
   const handleAmountChange = (text: string) => {
     const clean = text.replace(/[^0-9]/g, "");
     setForm((prev) => ({ ...prev, amount: clean }));
-  };
-
-  const handleDateSelect = (date: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setForm((prev) => ({ ...prev, date }));
-  };
-
-  const handlePaymentSelect = (payment: Expense["payment"]) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setForm((prev) => ({ ...prev, payment }));
   };
 
   const handleSubmit = () => {
@@ -199,165 +182,7 @@ export function ExpenseForm({
         />
       </View>
 
-      {/* 5. Date & Payment Selection Grid */}
-      <View style={styles.dualOptionsRow}>
-        {/* Date Column */}
-        <View style={styles.halfColumn}>
-          <Text
-            style={[
-              styles.fieldLabel,
-              { color: isDark ? "#71717A" : theme.textFaint },
-            ]}
-          >
-            DATE
-          </Text>
-          <View style={styles.pillSelectorRow}>
-            <Pressable
-              onPress={() => handleDateSelect(todayStr)}
-              accessibilityRole="button"
-              accessibilityLabel={`Set date to today, ${shortDate(todayStr)}`}
-              style={[
-                styles.optionPill,
-                {
-                  backgroundColor:
-                    form.date === todayStr
-                      ? isDark
-                        ? "#1E293B"
-                        : "#EFF6FF"
-                      : isDark
-                      ? "#121216"
-                      : theme.surface,
-                  borderColor:
-                    form.date === todayStr
-                      ? theme.cyan
-                      : isDark
-                      ? "#1F1F26"
-                      : theme.border,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.optionPillText,
-                  {
-                    color:
-                      form.date === todayStr
-                        ? theme.cyan
-                        : isDark
-                        ? "#A1A1AA"
-                        : theme.textMuted,
-                    fontWeight: form.date === todayStr ? "700" : "500",
-                  },
-                ]}
-              >
-                Today
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => handleDateSelect(yesterdayStr)}
-              accessibilityRole="button"
-              accessibilityLabel={`Set date to yesterday, ${shortDate(yesterdayStr)}`}
-              style={[
-                styles.optionPill,
-                {
-                  backgroundColor:
-                    form.date === yesterdayStr
-                      ? isDark
-                        ? "#1E293B"
-                        : "#EFF6FF"
-                      : isDark
-                      ? "#121216"
-                      : theme.surface,
-                  borderColor:
-                    form.date === yesterdayStr
-                      ? theme.cyan
-                      : isDark
-                      ? "#1F1F26"
-                      : theme.border,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.optionPillText,
-                  {
-                    color:
-                      form.date === yesterdayStr
-                        ? theme.cyan
-                        : isDark
-                        ? "#A1A1AA"
-                        : theme.textMuted,
-                    fontWeight: form.date === yesterdayStr ? "700" : "500",
-                  },
-                ]}
-              >
-                Yesterday
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Payment Method Column */}
-        <View style={styles.halfColumn}>
-          <Text
-            style={[
-              styles.fieldLabel,
-              { color: isDark ? "#71717A" : theme.textFaint },
-            ]}
-          >
-            PAYMENT MODE
-          </Text>
-          <View style={styles.pillSelectorRow}>
-            {PAYMENT_METHODS.map((method) => {
-              const active = form.payment === method;
-              return (
-                <Pressable
-                  key={method}
-                  onPress={() => handlePaymentSelect(method)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Payment method ${method}`}
-                  style={[
-                    styles.optionPill,
-                    {
-                      backgroundColor: active
-                        ? isDark
-                          ? "#1E293B"
-                          : "#EFF6FF"
-                        : isDark
-                        ? "#121216"
-                        : theme.surface,
-                      borderColor: active
-                        ? theme.cyan
-                        : isDark
-                        ? "#1F1F26"
-                        : theme.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.optionPillText,
-                      {
-                        color: active
-                          ? theme.cyan
-                          : isDark
-                          ? "#A1A1AA"
-                          : theme.textMuted,
-                        fontWeight: active ? "700" : "500",
-                      },
-                    ]}
-                  >
-                    {method}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      </View>
-
-      {/* 6. Primary Action: Add to Ledger */}
+      {/* 5. Primary Action: Add to Ledger */}
       <Pressable
         onPress={handleSubmit}
         disabled={busy || !isFormValid}
@@ -475,33 +300,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     fontSize: 14,
-  },
-  dualOptionsRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-  },
-  halfColumn: {
-    flex: 1,
-    gap: 6,
-  },
-  pillSelectorRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  optionPill: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  optionPillText: {
-    ...typography.caption,
-    fontSize: 12,
-    textAlign: "center",
   },
   submitButton: {
     flexDirection: "row",

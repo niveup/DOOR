@@ -409,7 +409,7 @@ export default function FinanceScreen() {
           {/* Quick Form Bottom Sheet (Log Expense & Add Bill) */}
           <BottomSheetModal
             ref={formSheetRef}
-            snapPoints={formMode === "bill" ? ["75%", "94%"] : ["80%", "95%"]}
+            snapPoints={formMode === "bill" ? ["75%", "94%"] : ["65%", "94%"]}
             topInset={insets.top + 16}
             enablePanDownToClose={true}
             backdropComponent={renderBackdrop}
