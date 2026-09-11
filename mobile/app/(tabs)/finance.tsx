@@ -32,7 +32,8 @@ type DetailMode = "budget" | "all-spending" | "all-bills" | "all-activity" | nul
 
 export default function FinanceScreen() {
   const client = useQueryClient();
-  const formSheetRef = useRef<BottomSheetModal>(null);
+  const expenseSheetRef = useRef<BottomSheetModal>(null);
+  const billSheetRef = useRef<BottomSheetModal>(null);
 
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [detailMode, setDetailMode] = useState<DetailMode>(null);
@@ -68,7 +69,11 @@ export default function FinanceScreen() {
         return true;
       }
       if (formMode) {
-        formSheetRef.current?.dismiss();
+        if (formMode === "bill") {
+          billSheetRef.current?.dismiss();
+        } else {
+          expenseSheetRef.current?.dismiss();
+        }
         setFormMode(null);
         return true;
       }
@@ -104,7 +109,11 @@ export default function FinanceScreen() {
     setFormMode(mode);
     setPreselectedCategory(initialCategory);
     setFormSessionKey((prev) => prev + 1);
-    formSheetRef.current?.present();
+    if (mode === "bill") {
+      billSheetRef.current?.present();
+    } else {
+      expenseSheetRef.current?.present();
+    }
   };
 
   const openDetail = (mode: NonNullable<DetailMode>) => {
@@ -119,7 +128,7 @@ export default function FinanceScreen() {
   const expenseMutation = useMutation({
     mutationFn: api.finance.saveExpense,
     onMutate: async (newExpense) => {
-      formSheetRef.current?.dismiss();
+      expenseSheetRef.current?.dismiss();
       setFormMode(null);
 
       await client.cancelQueries({ queryKey: ["finance"] });
@@ -180,7 +189,7 @@ export default function FinanceScreen() {
   const billMutation = useMutation({
     mutationFn: api.finance.saveBill,
     onMutate: async (newBill) => {
-      formSheetRef.current?.dismiss();
+      billSheetRef.current?.dismiss();
       setFormMode(null);
 
       await client.cancelQueries({ queryKey: ["finance"] });
@@ -406,10 +415,10 @@ export default function FinanceScreen() {
       onRefresh={finance.refetch}
       overlay={
         <>
-          {/* Quick Form Bottom Sheet (Log Expense & Add Bill) */}
+          {/* Quick Form Bottom Sheet: Log Expense */}
           <BottomSheetModal
-            ref={formSheetRef}
-            snapPoints={formMode === "bill" ? ["94%"] : ["65%", "94%"]}
+            ref={expenseSheetRef}
+            snapPoints={["65%", "94%"]}
             topInset={insets.top + 16}
             enablePanDownToClose={true}
             backdropComponent={renderBackdrop}
@@ -417,7 +426,9 @@ export default function FinanceScreen() {
             keyboardBlurBehavior="none"
             android_keyboardInputMode="adjustResize"
             handleComponent={() => null}
-            onDismiss={() => setFormMode(null)}
+            onDismiss={() => {
+              if (formMode === "expense") setFormMode(null);
+            }}
             backgroundStyle={{
               backgroundColor: isDark ? "#121216" : theme.surface,
               borderTopLeftRadius: radii.xl,
@@ -441,12 +452,12 @@ export default function FinanceScreen() {
                 />
               </View>
 
-              {formMode === "expense" ? (
+              {formMode === "expense" && (
                 <ExpenseForm
                   key={`expense-${formSessionKey}`}
                   initialCategory={preselectedCategory}
                   onClose={() => {
-                    formSheetRef.current?.dismiss();
+                    expenseSheetRef.current?.dismiss();
                     setFormMode(null);
                   }}
                   onSave={(expense) => {
@@ -458,11 +469,52 @@ export default function FinanceScreen() {
                   }}
                   busy={expenseMutation.isPending}
                 />
-              ) : formMode === "bill" ? (
+              )}
+            </BottomSheetScrollView>
+          </BottomSheetModal>
+
+          {/* Quick Form Bottom Sheet: Add Bill (Dedicated full upward at 94%) */}
+          <BottomSheetModal
+            ref={billSheetRef}
+            snapPoints={["94%"]}
+            topInset={insets.top + 16}
+            enablePanDownToClose={true}
+            backdropComponent={renderBackdrop}
+            keyboardBehavior="extend"
+            keyboardBlurBehavior="none"
+            android_keyboardInputMode="adjustResize"
+            handleComponent={() => null}
+            onDismiss={() => {
+              if (formMode === "bill") setFormMode(null);
+            }}
+            backgroundStyle={{
+              backgroundColor: isDark ? "#121216" : theme.surface,
+              borderTopLeftRadius: radii.xl,
+              borderTopRightRadius: radii.xl,
+            }}
+          >
+            <BottomSheetScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[
+                styles.sheetContent,
+                { paddingBottom: insets.bottom + 120 },
+              ]}
+            >
+              <View style={styles.sheetDragHandleWrapper}>
+                <View
+                  style={[
+                    styles.sheetDragHandleBar,
+                    { backgroundColor: isDark ? theme.borderHover : theme.borderMuted },
+                  ]}
+                />
+              </View>
+
+              {formMode === "bill" && (
                 <BillForm
                   key={`bill-${formSessionKey}`}
                   onClose={() => {
-                    formSheetRef.current?.dismiss();
+                    billSheetRef.current?.dismiss();
                     setFormMode(null);
                   }}
                   onSave={(bill) => {
@@ -474,7 +526,7 @@ export default function FinanceScreen() {
                   }}
                   busy={billMutation.isPending}
                 />
-              ) : null}
+              )}
             </BottomSheetScrollView>
           </BottomSheetModal>
 
