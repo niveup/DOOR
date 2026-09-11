@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Dimensions,
   Keyboard,
-  LayoutAnimation,
   Platform,
   Pressable,
   StyleSheet,
@@ -9,7 +9,13 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, {
+  runOnUI,
+  scrollTo,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProgressBar } from "@/src/components/ui";
 import { useTheme } from "@/src/providers/theme-provider";
@@ -40,26 +46,52 @@ export function BudgetFormModal({
   const insets = useSafeAreaInsets();
 
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const scrollViewRef = useRef<any>(null);
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const currentScrollY = useSharedValue(0);
+  const originalScrollY = useRef(0);
+  const hasShiftedUp = useRef(false);
+  const keyboardHeightRef = useRef(0);
   const cardOffsetY = useRef<number>(240);
   const rowOffsets = useRef<Record<string, number>>({});
+  const windowHeight = Dimensions.get("window").height;
+
+  const scrollTarget = (y: number) => {
+    runOnUI(() => {
+      "worklet";
+      scrollTo(scrollRef, 0, y, true);
+    })();
+  };
+
+  const combinedScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      "worklet";
+      currentScrollY.value = event.contentOffset.y;
+      if (scrollHandler) {
+        if (typeof (scrollHandler as any)?.onScroll === "function") {
+          (scrollHandler as any).onScroll(event);
+        } else if (typeof scrollHandler === "function") {
+          (scrollHandler as any)(event);
+        }
+      }
+    },
+  });
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSub = Keyboard.addListener(showEvent, (e) => {
-      if (Platform.OS === "ios") {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      }
+      keyboardHeightRef.current = e.endCoordinates.height;
       setKeyboardHeight(e.endCoordinates.height);
     });
 
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      if (Platform.OS === "ios") {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      }
+      keyboardHeightRef.current = 0;
       setKeyboardHeight(0);
+      if (hasShiftedUp.current) {
+        scrollTarget(originalScrollY.current);
+        hasShiftedUp.current = false;
+      }
     });
 
     return () => {
@@ -68,24 +100,36 @@ export function BudgetFormModal({
     };
   }, []);
 
-  const scrollTarget = (y: number) => {
-    if (!scrollViewRef.current) return;
-    if (typeof scrollViewRef.current.scrollTo === "function") {
-      scrollViewRef.current.scrollTo({ y, animated: true });
-    } else if (typeof scrollViewRef.current.getNode === "function") {
-      scrollViewRef.current.getNode()?.scrollTo({ y, animated: true });
-    }
-  };
-
   const handleCategoryFocus = (category: string, idx: number) => {
     setFocusedField(category);
+
     const rowY = rowOffsets.current[category] ?? (idx * 56);
     const totalY = cardOffsetY.current + rowY;
-    const targetScrollY = Math.max(0, totalY - 50);
+    const modalHeaderHeight = 75;
+    const currentScroll = currentScrollY.value || 0;
 
-    setTimeout(() => {
-      scrollTarget(targetScrollY);
-    }, Platform.OS === "ios" ? 60 : 120);
+    // Bottom position of the tapped category row on the screen
+    const rowBottomOnScreen = modalHeaderHeight + totalY + 56 - currentScroll;
+
+    // Top edge of the keyboard
+    const kbHeight = keyboardHeightRef.current || 300;
+    const keyboardTopOnScreen = windowHeight - kbHeight;
+    const threshold = keyboardTopOnScreen - 20;
+
+    // Only move if this section would be hidden behind or clipped by the keyboard!
+    if (rowBottomOnScreen > threshold) {
+      const delta = rowBottomOnScreen - threshold;
+      const targetScrollY = currentScroll + delta;
+
+      if (!hasShiftedUp.current) {
+        originalScrollY.current = currentScroll;
+        hasShiftedUp.current = true;
+      }
+
+      setTimeout(() => {
+        scrollTarget(targetScrollY);
+      }, Platform.OS === "ios" ? 50 : 100);
+    }
   };
 
   const [allowanceText, setAllowanceText] = useState<string>(
@@ -174,8 +218,8 @@ export function BudgetFormModal({
   return (
     <View style={{ flex: 1 }}>
       <Animated.ScrollView
-        ref={scrollViewRef}
-        onScroll={scrollHandler}
+        ref={scrollRef}
+        onScroll={combinedScrollHandler}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -212,7 +256,10 @@ export function BudgetFormModal({
               onChangeText={handleAllowanceTextChange}
               onFocus={() => {
                 setFocusedField("allowance");
-                scrollTarget(0);
+                if (hasShiftedUp.current) {
+                  scrollTarget(originalScrollY.current);
+                  hasShiftedUp.current = false;
+                }
               }}
               onBlur={() => setFocusedField(null)}
               placeholder="0"
@@ -349,9 +396,7 @@ export function BudgetFormModal({
           {
             backgroundColor: isDark ? "#111113" : "#ffffff",
             borderTopColor: isDark ? "#18181D" : "#e2e8f0",
-            bottom: keyboardHeight,
-            paddingTop: keyboardHeight > 0 ? 8 : 12,
-            paddingBottom: keyboardHeight > 0 ? 8 : Math.max(insets.bottom, 12),
+            paddingBottom: Math.max(insets.bottom, 12),
           },
         ]}
       >
@@ -363,7 +408,6 @@ export function BudgetFormModal({
             {
               backgroundColor: isDark ? "#FAFBFD" : "#0f172a",
               borderColor: isDark ? "#FAFBFD" : "#0f172a",
-              height: keyboardHeight > 0 ? 42 : 48,
             },
             pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
             busy && { opacity: 0.5 },
