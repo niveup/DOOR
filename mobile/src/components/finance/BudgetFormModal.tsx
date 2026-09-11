@@ -197,14 +197,9 @@ export function BudgetFormModal({
         </View>
 
         <View style={styles.budgetSectionGroup}>
-          <View style={{ gap: 2 }}>
-            <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
-              CATEGORY BUDGETS
-            </Text>
-            <Text style={[styles.budgetSectionSubhead, { color: isDark ? "#A1A1AA" : theme.textMuted }]}>
-              Set a monthly limit for each category.
-            </Text>
-          </View>
+          <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
+            CATEGORY BUDGETS
+          </Text>
 
           <View
             style={[
@@ -349,9 +344,6 @@ const styles = StyleSheet.create({
   allocationRemainingText: {
     fontSize: 12,
     fontVariant: ["tabular-nums"],
-  },
-  budgetSectionSubhead: {
-    fontSize: 12,
   },
   budgetUnifiedCard: {
     borderRadius: radii.lg,
