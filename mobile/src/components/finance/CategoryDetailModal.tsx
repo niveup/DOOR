@@ -7,7 +7,7 @@ import { useTheme } from "@/src/providers/theme-provider";
 import { useNotify } from "@/src/providers/notification-provider";
 import { formatINR, shortDate } from "@/src/lib/format";
 import { Expense, FinanceCategory } from "@/src/types/domain";
-import { CATEGORY_TOKENS, getDateLabel, SEMANTIC } from "@/src/components/finance/FinanceConstants";
+import { CATEGORY_TOKENS, getDateLabel, SEMANTIC, getBudgetHealthColor } from "@/src/components/finance/FinanceConstants";
 import { CategoryIconBadge } from "@/src/components/finance/CategoryIconBadge";
 import { radii } from "@/src/theme/tokens";
 
@@ -98,7 +98,7 @@ export function CategoryDetailModal({
               <ProgressBar
                 value={stats.percent}
                 height={6}
-                tone={stats.isOver ? SEMANTIC.crimson : stats.percent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
+                tone={getBudgetHealthColor(stats.percent, stats.isOver)}
               />
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text

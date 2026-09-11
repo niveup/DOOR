@@ -6,7 +6,7 @@ import { ProgressBar } from "@/src/components/ui";
 import { useTheme } from "@/src/providers/theme-provider";
 import { formatINR } from "@/src/lib/format";
 import { FinanceCategory } from "@/src/types/domain";
-import { CATEGORY_TOKENS, SEMANTIC } from "@/src/components/finance/FinanceConstants";
+import { CATEGORY_TOKENS, SEMANTIC, getBudgetHealthColor } from "@/src/components/finance/FinanceConstants";
 import { CategoryIconBadge } from "@/src/components/finance/CategoryIconBadge";
 import { radii, spacing, typography } from "@/src/theme/tokens";
 
@@ -81,46 +81,19 @@ export function FinanceSpendingOverview({
             },
           ]}
         >
-          {/* Segmented Category Allocation Strip */}
-          <View style={styles.spendingBarContainer}>
-            <View style={styles.segmentedProgressBar}>
-              {allCategoryStats
-                .filter((item) => item.total > 0)
-                .map((item) => {
-                  const flexShare = Math.max(item.total / spent, 0.05);
-                  const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
-                  return (
-                    <View
-                      key={`seg-${item.category}`}
-                      style={[
-                        styles.segmentBarSlice,
-                        {
-                          flex: flexShare,
-                          backgroundColor: meta.barColor,
-                        },
-                      ]}
-                    />
-                  );
-                })}
-            </View>
-          </View>
-
           {/* Top 3 Spending Categories */}
           {top3Spending.map((item, idx) => {
-            const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Other || CATEGORY_TOKENS.Others;
-            const sharePercent = spent > 0 ? Math.round((item.total / spent) * 100) : 0;
-
             return (
               <Pressable
                 key={item.category}
                 onPress={() => onSelectCategory(item.category)}
                 accessibilityRole="button"
-                accessibilityLabel={`${item.category}: ${formatINR(item.total)} spent (${sharePercent}% of total). ${
+                accessibilityLabel={`${item.category}: ${formatINR(item.total)} spent (${item.cap > 0 ? `${item.percent}% of budget` : "no budget set"}). ${
                   item.cap > 0
                     ? item.isOver
-                      ? `${formatINR(item.total - item.cap)} over limit`
-                      : `${formatINR(item.cap - item.total)} remaining of ${formatINR(item.cap)} limit`
-                    : "No limit set"
+                      ? `${formatINR(item.total - item.cap)} over ${formatINR(item.cap)} budget`
+                      : `${formatINR(item.cap - item.total)} remaining of ${formatINR(item.cap)} budget`
+                    : "No budget set"
                 }`}
                 style={({ pressed }) => [
                   styles.spendingRowItem,
@@ -156,7 +129,7 @@ export function FinanceSpendingOverview({
                             { color: SEMANTIC.crimson, fontWeight: "600" },
                           ]}
                         >
-                          {formatINR(item.total - item.cap)} over limit · Cap: {formatINR(item.cap)}
+                          {formatINR(item.total - item.cap)} over {formatINR(item.cap)} budget
                         </Text>
                       ) : (
                         <Text
@@ -166,8 +139,8 @@ export function FinanceSpendingOverview({
                           ]}
                         >
                           {item.total > 0
-                            ? `${formatINR(item.cap - item.total)} left of ${formatINR(item.cap)} limit`
-                            : `Limit: ${formatINR(item.cap)} · ₹0 spent`}
+                            ? `${formatINR(item.cap - item.total)} remaining of ${formatINR(item.cap)} budget`
+                            : `Budget: ${formatINR(item.cap)} · ₹0 spent`}
                         </Text>
                       )
                     ) : (
@@ -177,7 +150,7 @@ export function FinanceSpendingOverview({
                           { color: theme.textFaint },
                         ]}
                       >
-                        No limit set
+                        No budget set
                       </Text>
                     )}
 
@@ -186,13 +159,7 @@ export function FinanceSpendingOverview({
                         <ProgressBar
                           value={item.percent}
                           height={4}
-                          tone={
-                            item.isOver
-                              ? SEMANTIC.crimson
-                              : item.percent >= 80
-                              ? SEMANTIC.amber
-                              : SEMANTIC.emerald
-                          }
+                          tone={getBudgetHealthColor(item.percent, item.isOver)}
                         />
                       </View>
                     ) : null}
@@ -209,33 +176,12 @@ export function FinanceSpendingOverview({
                     {formatINR(item.total)}
                   </Text>
                   <Text style={[styles.itemShareText, { color: theme.textMuted }]}>
-                    {sharePercent}%
+                    {item.cap > 0 ? `${item.percent}%` : "—"}
                   </Text>
                 </View>
               </Pressable>
             );
           })}
-
-          {allCategoryStats.length > 3 ? (
-            <Pressable
-              onPress={onOpenAllSpending}
-              accessibilityRole="button"
-              accessibilityLabel={`View all ${allCategoryStats.length} categories`}
-              style={({ pressed }) => [
-                styles.collapseBottomButton,
-                {
-                  borderTopColor: isDark
-                    ? theme.borderMuted
-                    : theme.divider,
-                },
-                pressed && { opacity: 0.65 },
-              ]}
-            >
-              <Text style={[styles.collapseBottomText, { color: theme.cyan }]}>
-                View all {allCategoryStats.length} categories →
-              </Text>
-            </Pressable>
-          ) : null}
         </View>
       ) : (
         <Pressable
@@ -317,27 +263,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden",
   },
-  spendingBarContainer: {
-    padding: spacing.sm,
-    paddingBottom: spacing.xxs,
-  },
-  segmentedProgressBar: {
-    flexDirection: "row",
-    height: 6,
-    borderRadius: 3,
-    overflow: "hidden",
-    gap: 2,
-  },
-  segmentBarSlice: {
-    height: "100%",
-    borderRadius: 2,
-  },
   spendingRowItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingVertical: 10,
     gap: spacing.sm,
   },
   hairlineDivider: {
@@ -350,7 +281,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryInfoBlock: {
-    gap: 2,
+    gap: 3,
     flex: 1,
   },
   categoryTitleText: {
@@ -380,17 +311,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "500",
     fontVariant: ["tabular-nums"],
-  },
-  collapseBottomButton: {
-    paddingVertical: spacing.sm,
-    alignItems: "center",
-    justifyContent: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  collapseBottomText: {
-    ...typography.caption,
-    fontSize: 12.5,
-    fontWeight: "700",
   },
   emptyStateBlock: {
     padding: spacing.lg,

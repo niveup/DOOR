@@ -4,9 +4,17 @@ import { shortDate, todayInKolkata } from "@/src/lib/format";
 
 export const SEMANTIC = {
   crimson: "#D94A62", // Muted crimson for over-budget & warnings (financial state ONLY)
-  amber: "#C58A2A",   // Muted amber for near-limit
-  emerald: "#18B887", // Restrained accent green for on-track / positive state
+  amber: "#F59E0B",   // Warm amber for 70-89% budget utilization
+  orange: "#F97316",  // High-visibility orange for 90-99% near limit
+  emerald: "#18B887", // Restrained accent green for < 70% on-track
 };
+
+export function getBudgetHealthColor(percent: number, isOver: boolean): string {
+  if (isOver || percent >= 100) return SEMANTIC.crimson;
+  if (percent >= 90) return SEMANTIC.orange;
+  if (percent >= 70) return SEMANTIC.amber;
+  return SEMANTIC.emerald;
+}
 
 export const CATEGORY_TOKENS: Record<
   FinanceCategory,

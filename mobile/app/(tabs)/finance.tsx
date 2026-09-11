@@ -401,6 +401,7 @@ export default function FinanceScreen() {
       subtitleStyle={styles.screenSubtitle}
       headerCopyStyle={styles.screenHeaderCopy}
       headerStyle={styles.screenHeader}
+      contentContainerStyle={{ paddingBottom: Math.max(150, insets.bottom + 110) }}
       refreshing={finance.isRefetching}
       onRefresh={finance.refetch}
       overlay={

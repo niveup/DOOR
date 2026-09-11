@@ -31,16 +31,16 @@ export function CategoryIconBadge({
         },
       ]}
     >
-      <Ionicons name={iconName} size={18} color={iconColor} />
+      <Ionicons name={iconName} size={17} color={iconColor} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   categoryIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",

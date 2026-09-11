@@ -196,7 +196,7 @@ export function FinanceUpcomingBills({
       ) : (
         <View
           style={[
-            styles.emptyStateBlock,
+            styles.emptyStateBanner,
             {
               backgroundColor: isDark ? "#121216" : theme.surface,
               borderColor: isDark ? "#1f1f25" : theme.border,
@@ -205,37 +205,39 @@ export function FinanceUpcomingBills({
         >
           <View
             style={[
-              styles.emptyStateIconBadge,
+              styles.emptyStateIconCircle,
               {
                 backgroundColor: isDark
-                  ? theme.surfaceElevated
-                  : theme.surfaceSubtle,
-                borderColor: isDark ? theme.borderMuted : theme.borderMuted,
+                  ? "rgba(24, 184, 135, 0.12)"
+                  : "rgba(5, 150, 105, 0.08)",
+                borderColor: isDark ? "rgba(24, 184, 135, 0.25)" : "rgba(5, 150, 105, 0.2)",
               },
             ]}
           >
             <Ionicons
-              name="checkmark-circle-outline"
-              size={20}
+              name="checkmark-circle"
+              size={18}
               color={SEMANTIC.emerald}
             />
           </View>
-          <Text
-            style={[
-              styles.emptyStateHeadline,
-              { color: isDark ? "#fafafa" : theme.text },
-            ]}
-          >
-            All clear · No upcoming bills
-          </Text>
-          <Text
-            style={[
-              styles.emptyStateSubtext,
-              { color: theme.textMuted },
-            ]}
-          >
-            You have no unpaid bills scheduled for this month.
-          </Text>
+          <View style={styles.emptyStateTextCol}>
+            <Text
+              style={[
+                styles.emptyStateHeadline,
+                { color: isDark ? "#fafafa" : theme.text },
+              ]}
+            >
+              No upcoming bills
+            </Text>
+            <Text
+              style={[
+                styles.emptyStateSubtext,
+                { color: theme.textMuted },
+              ]}
+            >
+              You're all clear for this month.
+            </Text>
+          </View>
         </View>
       )}
     </Animated.View>
@@ -339,31 +341,35 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "700",
   },
-  emptyStateBlock: {
-    padding: spacing.lg,
+  emptyStateBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: radii.lg,
     borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xxs,
+    gap: spacing.sm,
+    minHeight: 64,
   },
-  emptyStateIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  emptyStateIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: spacing.xxs,
+  },
+  emptyStateTextCol: {
+    flex: 1,
+    gap: 2,
   },
   emptyStateHeadline: {
     ...typography.bodyMedium,
-    fontSize: 14.5,
-    fontWeight: "700",
+    fontSize: 13.5,
+    fontWeight: "600",
   },
   emptyStateSubtext: {
     ...typography.caption,
-    fontSize: 12,
-    textAlign: "center",
+    fontSize: 11.5,
   },
 });

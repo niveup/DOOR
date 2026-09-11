@@ -6,7 +6,7 @@ import { ProgressBar } from "@/src/components/ui";
 import { useTheme } from "@/src/providers/theme-provider";
 import { formatINR } from "@/src/lib/format";
 import { FinanceCategory } from "@/src/types/domain";
-import { CATEGORY_TOKENS, SEMANTIC } from "@/src/components/finance/FinanceConstants";
+import { CATEGORY_TOKENS, SEMANTIC, getBudgetHealthColor } from "@/src/components/finance/FinanceConstants";
 import { CategoryIconBadge } from "@/src/components/finance/CategoryIconBadge";
 import { CategoryStat } from "@/src/components/finance/FinanceSpendingOverview";
 import { radii } from "@/src/theme/tokens";
@@ -68,29 +68,34 @@ export function AllSpendingModal({
                         {item.cap > 0 ? (
                           item.isOver ? (
                             <Text style={{ color: SEMANTIC.crimson, fontWeight: "600" }}>
-                              {formatINR(item.total - item.cap)} over limit (Cap: {formatINR(item.cap)})
+                              {formatINR(item.total - item.cap)} over {formatINR(item.cap)} budget
                             </Text>
                           ) : (
                             <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
                               {item.total > 0
-                                ? `${formatINR(item.cap - item.total)} left of ${formatINR(item.cap)} limit`
-                                : `Limit: ${formatINR(item.cap)} · ₹0 spent`}
+                                ? `${formatINR(item.cap - item.total)} remaining of ${formatINR(item.cap)} budget`
+                                : `Budget: ${formatINR(item.cap)} · ₹0 spent`}
                             </Text>
                           )
                         ) : (
                           <Text style={{ color: isDark ? "#71717A" : theme.textFaint, fontWeight: "500" }}>
-                            No limit set
+                            No budget set
                           </Text>
                         )}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
-                      {formatINR(item.total)}
+                  <View style={{ alignItems: "flex-end", gap: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Text style={[styles.itemAmount, { color: isDark ? "#F5F5F7" : theme.text }]}>
+                        {formatINR(item.total)}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={13} color={isDark ? "#71717A" : theme.textFaint} />
+                    </View>
+                    <Text style={[styles.itemShareText, { color: isDark ? "#71717A" : theme.textMuted }]}>
+                      {item.cap > 0 ? `${item.percent}%` : "—"}
                     </Text>
-                    <Ionicons name="chevron-forward" size={14} color={isDark ? "#71717A" : theme.textFaint} />
                   </View>
                 </View>
 
@@ -99,7 +104,7 @@ export function AllSpendingModal({
                     <ProgressBar
                       value={item.percent}
                       height={4}
-                      tone={item.isOver ? SEMANTIC.crimson : item.percent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
+                      tone={getBudgetHealthColor(item.percent, item.isOver)}
                     />
                   </View>
                 ) : null}
@@ -164,6 +169,11 @@ const styles = StyleSheet.create({
   itemAmount: {
     fontSize: 14,
     fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  itemShareText: {
+    fontSize: 11,
+    fontWeight: "500",
     fontVariant: ["tabular-nums"],
   },
   envelopeProgressWrapper: {

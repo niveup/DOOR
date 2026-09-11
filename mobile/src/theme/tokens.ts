@@ -463,7 +463,7 @@ export const layout = {
   tabBarHeight: 62,
   screenPadding: spacing.md,
   cardPadding: spacing.md,
-  bottomScrollPadding: 120, // Offset for floating navigation bar
+  bottomScrollPadding: 140, // Offset for floating navigation bar + comfortable tap margin
 } as const;
 
 export type LayoutTokens = typeof layout;

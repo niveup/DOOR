@@ -1,6 +1,6 @@
 import { PropsWithChildren, ReactNode } from "react";
 import { RefreshControl, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { layout, spacing, typography } from "@/src/theme/tokens";
 import { useTheme } from "@/src/providers/theme-provider";
 
@@ -16,6 +16,7 @@ type ScreenProps = PropsWithChildren<{
   subtitleStyle?: StyleProp<TextStyle>;
   headerCopyStyle?: StyleProp<ViewStyle>;
   headerStyle?: StyleProp<ViewStyle>;
+  contentContainerStyle?: StyleProp<ViewStyle>;
 }>;
 
 export function AppScreen({
@@ -30,16 +31,23 @@ export function AppScreen({
   subtitleStyle,
   headerCopyStyle,
   headerStyle,
+  contentContainerStyle,
   children,
 }: ScreenProps) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomInsetPad = Math.max(layout.bottomScrollPadding, insets.bottom + 100);
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.canvas }]}>
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: bottomInsetPad },
+            contentContainerStyle,
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps={keyboardShouldPersistTaps}
           nestedScrollEnabled={true}
