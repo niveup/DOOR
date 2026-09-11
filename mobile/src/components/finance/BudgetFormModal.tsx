@@ -14,6 +14,7 @@ import Animated, {
   scrollTo,
   useAnimatedRef,
   useAnimatedScrollHandler,
+  useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,11 +48,16 @@ export function BudgetFormModal({
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const currentScrollY = useSharedValue(0);
+  const keyboardSpacerHeight = useSharedValue(0);
   const originalScrollY = useRef(0);
   const hasShiftedUp = useRef(false);
   const keyboardHeightRef = useRef(0);
   const focusedFieldRef = useRef<string | null>(null);
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const animatedSpacerStyle = useAnimatedStyle(() => ({
+    height: keyboardSpacerHeight.value,
+  }));
 
   // Layout positions relative to ScrollView
   const allowanceSectionY = useRef(0);
@@ -153,6 +159,11 @@ export function BudgetFormModal({
         scrollTarget(originalScrollY.current);
         hasShiftedUp.current = false;
       }
+      setTimeout(() => {
+        if (!focusedFieldRef.current) {
+          keyboardSpacerHeight.value = 0;
+        }
+      }, 220);
     });
 
     return () => {
@@ -162,7 +173,7 @@ export function BudgetFormModal({
         clearTimeout(blurTimeoutRef.current);
       }
     };
-  }, [performSmoothScroll, scrollTarget]);
+  }, [performSmoothScroll, scrollTarget, keyboardSpacerHeight]);
 
   const handleCategoryFocus = (category: string) => {
     if (blurTimeoutRef.current) {
@@ -171,6 +182,9 @@ export function BudgetFormModal({
     }
     setFocusedField(category);
     focusedFieldRef.current = category;
+
+    // Expand keyboard spacer dynamically only while keyboard is active
+    keyboardSpacerHeight.value = 280;
 
     // Immediately trigger smooth scroll in parallel with keyboard opening!
     performSmoothScroll(category);
@@ -186,9 +200,16 @@ export function BudgetFormModal({
       clearTimeout(blurTimeoutRef.current);
     }
     blurTimeoutRef.current = setTimeout(() => {
-      if (!focusedFieldRef.current && hasShiftedUp.current) {
-        scrollTarget(originalScrollY.current);
-        hasShiftedUp.current = false;
+      if (!focusedFieldRef.current) {
+        if (hasShiftedUp.current) {
+          scrollTarget(originalScrollY.current);
+          hasShiftedUp.current = false;
+        }
+        setTimeout(() => {
+          if (!focusedFieldRef.current) {
+            keyboardSpacerHeight.value = 0;
+          }
+        }, 220);
       }
     }, 120);
   };
@@ -288,7 +309,7 @@ export function BudgetFormModal({
         contentContainerStyle={[
           contentContainerStyle,
           {
-            paddingBottom: Math.max(insets.bottom + 280, 280),
+            paddingBottom: Math.max(insets.bottom + 90, 90),
           },
         ]}
       >
@@ -329,6 +350,7 @@ export function BudgetFormModal({
                 }
                 setFocusedField("allowance");
                 focusedFieldRef.current = "allowance";
+                keyboardSpacerHeight.value = 280;
                 performSmoothScroll("allowance");
               }}
               onBlur={() => handleFieldBlur("allowance")}
@@ -464,6 +486,9 @@ export function BudgetFormModal({
             })}
           </View>
         </View>
+
+        {/* Dynamic keyboard spacer: 0 when no keyboard, 280 only when editing */}
+        <Animated.View style={animatedSpacerStyle} />
       </Animated.ScrollView>
 
       <View
