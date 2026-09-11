@@ -1,5 +1,14 @@
-import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Keyboard,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProgressBar } from "@/src/components/ui";
@@ -29,6 +38,55 @@ export function BudgetFormModal({
   const { theme, isDark } = useTheme();
   const notify = useNotify();
   const insets = useSafeAreaInsets();
+
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<any>(null);
+  const cardOffsetY = useRef<number>(240);
+  const rowOffsets = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      if (Platform.OS === "ios") {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      if (Platform.OS === "ios") {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const scrollTarget = (y: number) => {
+    if (!scrollViewRef.current) return;
+    if (typeof scrollViewRef.current.scrollTo === "function") {
+      scrollViewRef.current.scrollTo({ y, animated: true });
+    } else if (typeof scrollViewRef.current.getNode === "function") {
+      scrollViewRef.current.getNode()?.scrollTo({ y, animated: true });
+    }
+  };
+
+  const handleCategoryFocus = (category: string, idx: number) => {
+    setFocusedField(category);
+    const rowY = rowOffsets.current[category] ?? (idx * 56);
+    const totalY = cardOffsetY.current + rowY;
+    const targetScrollY = Math.max(0, totalY - 50);
+
+    setTimeout(() => {
+      scrollTarget(targetScrollY);
+    }, Platform.OS === "ios" ? 60 : 120);
+  };
 
   const [allowanceText, setAllowanceText] = useState<string>(
     initialBudget?.allowance ? String(initialBudget.allowance) : ""
@@ -116,11 +174,16 @@ export function BudgetFormModal({
   return (
     <View style={{ flex: 1 }}>
       <Animated.ScrollView
+        ref={scrollViewRef}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[contentContainerStyle, { paddingBottom: insets.bottom + 90 }]}
+        contentContainerStyle={[
+          contentContainerStyle,
+          { paddingBottom: Math.max(keyboardHeight + 90, insets.bottom + 90) },
+        ]}
       >
         <View style={styles.budgetSectionGroup}>
           <Text style={[styles.fieldLabel, { color: isDark ? "#71717A" : theme.textFaint }]}>
@@ -147,11 +210,16 @@ export function BudgetFormModal({
               style={[styles.allowanceInput, { color: isDark ? "#F5F5F7" : theme.text }]}
               value={allowanceText}
               onChangeText={handleAllowanceTextChange}
-              onFocus={() => setFocusedField("allowance")}
+              onFocus={() => {
+                setFocusedField("allowance");
+                scrollTarget(0);
+              }}
               onBlur={() => setFocusedField(null)}
               placeholder="0"
               placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
               keyboardType="numeric"
+              returnKeyType="done"
+              onSubmitEditing={() => Keyboard.dismiss()}
               selectTextOnFocus
             />
           </View>
@@ -202,6 +270,9 @@ export function BudgetFormModal({
           </Text>
 
           <View
+            onLayout={(e) => {
+              cardOffsetY.current = e.nativeEvent.layout.y;
+            }}
             style={[
               styles.budgetUnifiedCard,
               {
@@ -217,6 +288,9 @@ export function BudgetFormModal({
               return (
                 <View
                   key={category}
+                  onLayout={(e) => {
+                    rowOffsets.current[category] = e.nativeEvent.layout.y;
+                  }}
                   style={[
                     styles.categoryRowItem,
                     idx > 0 && [
@@ -252,11 +326,13 @@ export function BudgetFormModal({
                       style={[styles.categoryNumericInput, { color: isDark ? "#F5F5F7" : theme.text }]}
                       value={valStr}
                       onChangeText={(text) => handleCapTextChange(category, text)}
-                      onFocus={() => setFocusedField(category)}
+                      onFocus={() => handleCategoryFocus(category, idx)}
                       onBlur={() => setFocusedField(null)}
                       placeholder="0"
                       placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
                       keyboardType="numeric"
+                      returnKeyType="done"
+                      onSubmitEditing={() => Keyboard.dismiss()}
                       selectTextOnFocus
                     />
                   </View>
@@ -273,7 +349,9 @@ export function BudgetFormModal({
           {
             backgroundColor: isDark ? "#111113" : "#ffffff",
             borderTopColor: isDark ? "#18181D" : "#e2e8f0",
-            paddingBottom: Math.max(insets.bottom, 12),
+            bottom: keyboardHeight,
+            paddingTop: keyboardHeight > 0 ? 8 : 12,
+            paddingBottom: keyboardHeight > 0 ? 8 : Math.max(insets.bottom, 12),
           },
         ]}
       >
@@ -285,6 +363,7 @@ export function BudgetFormModal({
             {
               backgroundColor: isDark ? "#FAFBFD" : "#0f172a",
               borderColor: isDark ? "#FAFBFD" : "#0f172a",
+              height: keyboardHeight > 0 ? 42 : 48,
             },
             pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
             busy && { opacity: 0.5 },
