@@ -67,7 +67,7 @@ export function FinanceRecentActivity({
         style={[
           styles.mainCard,
           {
-            borderColor: isDark ? "#282834" : "#cbd5e1",
+            borderColor: isDark ? "#23232b" : "#e2e8f0",
           },
         ]}
       >
@@ -77,8 +77,8 @@ export function FinanceRecentActivity({
             style={[
               styles.topSectionExpanded,
               {
-                backgroundColor: isDark ? "#141419" : "#f1f5f9",
-                borderBottomColor: isDark ? "#242430" : "#cbd5e1",
+                backgroundColor: isDark ? "#131317" : "#f8fafc",
+                borderBottomColor: isDark ? "#1e1e26" : "#e2e8f0",
               },
             ]}
           >
@@ -97,9 +97,29 @@ export function FinanceRecentActivity({
               >
                 Recent Activity
               </Text>
+              {expensesList.length > 0 ? (
+                <View
+                  style={[
+                    styles.countBadge,
+                    {
+                      backgroundColor: isDark ? "#202028" : "#e2e8f0",
+                      borderColor: isDark ? "#2a2a35" : "#cbd5e1",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.countBadgeText,
+                      { color: isDark ? "#9d9da8" : "#64748b" },
+                    ]}
+                  >
+                    {expensesList.length}
+                  </Text>
+                </View>
+              ) : null}
               <Ionicons
                 name="chevron-up"
-                size={14}
+                size={13}
                 color={isDark ? "#8e8e99" : theme.textMuted}
               />
             </Pressable>
@@ -112,8 +132,8 @@ export function FinanceRecentActivity({
               style={({ pressed }) => [
                 styles.farRightGreyButton,
                 {
-                  backgroundColor: isDark ? "#2a2a36" : "#d8e0ea",
-                  borderColor: isDark ? "#3c3c4e" : "#bcc8d8",
+                  backgroundColor: isDark ? "#22222b" : "#e2e8f0",
+                  borderColor: isDark ? "#2f2f3c" : "#cbd5e1",
                 },
                 pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
               ]}
@@ -128,7 +148,7 @@ export function FinanceRecentActivity({
               </Text>
               <Ionicons
                 name="arrow-forward"
-                size={12}
+                size={11}
                 color={isDark ? "#f4f4f6" : "#1e293b"}
               />
             </Pressable>
@@ -138,29 +158,41 @@ export function FinanceRecentActivity({
             style={[
               styles.topSectionCollapsed,
               {
-                backgroundColor: isDark ? "#141419" : "#f1f5f9",
-                borderBottomColor: isDark ? "#242430" : "#cbd5e1",
+                backgroundColor: isDark ? "#131317" : "#f8fafc",
+                borderBottomColor: isDark ? "#1e1e26" : "#e2e8f0",
               },
             ]}
           >
-            <Text
-              style={[
-                styles.sectionTitleText,
-                { color: isDark ? "#fafafa" : theme.text },
-                { textAlign: "center" },
-              ]}
-            >
-              Recent Activity
-            </Text>
-            {expensesList.length > 0 ? (
-              <Text style={[styles.sectionSubtitleText, { color: isDark ? "#8e8e99" : theme.textMuted }]}>
-                {expensesList.length} transaction{expensesList.length === 1 ? "" : "s"} recorded
+            <View style={styles.titleWithBadgeRow}>
+              <Text
+                style={[
+                  styles.sectionTitleText,
+                  { color: isDark ? "#fafafa" : theme.text },
+                ]}
+              >
+                Recent Activity
               </Text>
-            ) : (
-              <Text style={[styles.sectionSubtitleText, { color: isDark ? "#8e8e99" : theme.textMuted }]}>
-                No transactions logged yet
-              </Text>
-            )}
+              {expensesList.length > 0 ? (
+                <View
+                  style={[
+                    styles.countBadge,
+                    {
+                      backgroundColor: isDark ? "#202028" : "#e2e8f0",
+                      borderColor: isDark ? "#2a2a35" : "#cbd5e1",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.countBadgeText,
+                      { color: isDark ? "#9d9da8" : "#64748b" },
+                    ]}
+                  >
+                    {expensesList.length}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         )}
 
@@ -170,7 +202,7 @@ export function FinanceRecentActivity({
             style={[
               styles.activitiesContainer,
               {
-                backgroundColor: isDark ? "#1b1b23" : "#e9eef5",
+                backgroundColor: isDark ? "#17171e" : "#f1f5f9",
               },
             ]}
           >
@@ -181,8 +213,8 @@ export function FinanceRecentActivity({
                   style={[
                     styles.dateHeaderRow,
                     {
-                      backgroundColor: isDark ? "#16161f" : "#e2e8f0",
-                      borderTopColor: isDark ? "#242430" : "#cbd5e1",
+                      backgroundColor: isDark ? "#131317" : "#e9eef5",
+                      borderTopColor: isDark ? "#1e1e26" : "#cbd5e1",
                       borderTopWidth: gIdx > 0 ? StyleSheet.hairlineWidth : 0,
                     },
                   ]}
@@ -203,7 +235,7 @@ export function FinanceRecentActivity({
                       styles.unifiedItemRow,
                       idx > 0 && [
                         styles.hairlineDivider,
-                        { borderTopColor: isDark ? "#242430" : "#cbd5e1" },
+                        { borderTopColor: isDark ? "#1e1e26" : "#e2e8f0" },
                       ],
                       pressed && { opacity: 0.8 },
                     ]}
@@ -253,7 +285,7 @@ export function FinanceRecentActivity({
             style={[
               styles.bottomSection,
               {
-                backgroundColor: isDark ? "#1b1b23" : "#e9eef5",
+                backgroundColor: isDark ? "#17171e" : "#f1f5f9",
               },
             ]}
           >
@@ -264,8 +296,8 @@ export function FinanceRecentActivity({
               style={({ pressed }) => [
                 styles.greyButton,
                 {
-                  backgroundColor: isDark ? "#2a2a36" : "#d8e0ea",
-                  borderColor: isDark ? "#3c3c4e" : "#bcc8d8",
+                  backgroundColor: isDark ? "#22222b" : "#e2e8f0",
+                  borderColor: isDark ? "#2f2f3c" : "#cbd5e1",
                 },
                 pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
               ]}
@@ -280,7 +312,7 @@ export function FinanceRecentActivity({
               </Text>
               <Ionicons
                 name={expensesList.length > 0 ? "arrow-down" : "add"}
-                size={14}
+                size={12}
                 color={isDark ? "#f4f4f6" : "#1e293b"}
               />
             </Pressable>
@@ -296,25 +328,30 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   mainCard: {
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderWidth: 1,
     overflow: "hidden",
   },
   topSectionCollapsed: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    gap: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   topSectionExpanded: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  titleWithBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
   },
   headerLeftCollapseRow: {
     flexDirection: "row",
@@ -323,74 +360,79 @@ const styles = StyleSheet.create({
   },
   sectionTitleText: {
     ...typography.subheading,
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: -0.2,
+    fontSize: 13.5,
+    fontWeight: "600",
+    letterSpacing: -0.1,
   },
-  sectionSubtitleText: {
+  countBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: radii.full,
+    borderWidth: 1,
+  },
+  countBadgeText: {
     ...typography.caption,
-    fontSize: 11.5,
-    fontWeight: "500",
-    textAlign: "center",
+    fontSize: 10.5,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
   farRightGreyButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: radii.md,
+    gap: 4,
+    paddingVertical: 3.5,
+    paddingHorizontal: 9,
+    borderRadius: radii.full,
     borderWidth: 1,
   },
   farRightGreyButtonText: {
     ...typography.caption,
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 11.5,
+    fontWeight: "600",
     letterSpacing: 0.1,
   },
   bottomSection: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
   },
   greyButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
-    paddingVertical: 10,
-    paddingHorizontal: 22,
-    borderRadius: radii.md,
+    gap: 5,
+    paddingVertical: 4.5,
+    paddingHorizontal: 13,
+    borderRadius: radii.full,
     borderWidth: 1,
-    minWidth: 180,
   },
   greyButtonText: {
     ...typography.caption,
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 11.5,
+    fontWeight: "600",
     letterSpacing: 0.1,
   },
   activitiesContainer: {
     overflow: "hidden",
   },
   dateHeaderRow: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   dateHeaderText: {
     ...typography.label,
-    fontSize: 10.5,
-    letterSpacing: 0.6,
+    fontSize: 10,
+    letterSpacing: 0.5,
   },
   unifiedItemRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 10,
   },
   hairlineDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -398,26 +440,26 @@ const styles = StyleSheet.create({
   itemLeftBlock: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: 10,
     flex: 1,
   },
   itemDetails: {
-    gap: 2,
+    gap: 1,
     flex: 1,
   },
   itemTitle: {
     ...typography.bodyMedium,
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: "600",
   },
   itemSubtext: {
     ...typography.caption,
-    fontSize: 11.5,
+    fontSize: 11,
   },
   itemAmount: {
     ...typography.metric,
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 13.5,
+    fontWeight: "700",
     fontVariant: ["tabular-nums"],
   },
 });
