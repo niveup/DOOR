@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@/src/components/app-icon";
 import Animated from "react-native-reanimated";
@@ -6,7 +6,7 @@ import { ProgressBar } from "@/src/components/ui";
 import { useTheme } from "@/src/providers/theme-provider";
 import { formatINR } from "@/src/lib/format";
 import { FinanceCategory } from "@/src/types/domain";
-import { CATEGORY_TOKENS, SEMANTIC, getBudgetHealthColor } from "@/src/components/finance/FinanceConstants";
+import { SEMANTIC, getBudgetHealthColor } from "@/src/components/finance/FinanceConstants";
 import { CategoryIconBadge } from "@/src/components/finance/CategoryIconBadge";
 import { CategoryStat } from "@/src/components/finance/FinanceSpendingOverview";
 import { radii } from "@/src/theme/tokens";
@@ -26,6 +26,23 @@ export function AllSpendingModal({
 }: AllSpendingModalProps) {
   const { theme, isDark } = useTheme();
 
+  const grandTotal = useMemo(
+    () => allStats.reduce((sum, item) => sum + (Number(item.total) || 0), 0),
+    [allStats]
+  );
+  const totalBudget = useMemo(
+    () => allStats.reduce((sum, item) => sum + (Number(item.cap) || 0), 0),
+    [allStats]
+  );
+  const activeCount = useMemo(
+    () => allStats.filter((item) => item.total > 0).length,
+    [allStats]
+  );
+  const budgetPercent = useMemo(
+    () => (totalBudget > 0 ? Math.round((grandTotal / totalBudget) * 100) : 0),
+    [grandTotal, totalBudget]
+  );
+
   return (
     <Animated.ScrollView
       onScroll={scrollHandler}
@@ -33,7 +50,7 @@ export function AllSpendingModal({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
     >
-      <View style={{ gap: 12 }}>
+      <View style={{ gap: 14 }}>
         <View
           style={[
             styles.unifiedCard,
@@ -113,6 +130,126 @@ export function AllSpendingModal({
           })}
         </View>
 
+        {/* Apple-Style Total Spending Summary Section */}
+        <View
+          style={[
+            styles.totalCard,
+            {
+              backgroundColor: isDark ? "#111113" : "#ffffff",
+              borderColor: isDark ? "#1F1F24" : "#e2e8f0",
+            },
+          ]}
+        >
+          <View style={styles.totalHeaderRow}>
+            <View style={styles.totalLeftInfo}>
+              <View
+                style={[
+                  styles.totalIconBadge,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(56, 189, 248, 0.12)"
+                      : "rgba(14, 165, 233, 0.08)",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="receipt-outline"
+                  size={18}
+                  color={isDark ? "#38BDF8" : "#0284C7"}
+                />
+              </View>
+              <View style={{ gap: 2 }}>
+                <Text
+                  style={[
+                    styles.totalBadgeLabel,
+                    { color: isDark ? "#71717A" : theme.textFaint },
+                  ]}
+                >
+                  TOTAL EXPENSES
+                </Text>
+                <Text
+                  style={[
+                    styles.totalSubtext,
+                    { color: isDark ? "#A1A1AA" : theme.textMuted },
+                  ]}
+                >
+                  {activeCount} active categor{activeCount === 1 ? "y" : "ies"} this month
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ alignItems: "flex-end", gap: 1 }}>
+              <Text
+                style={[
+                  styles.totalAmountValue,
+                  { color: isDark ? "#FAFBFD" : theme.text },
+                ]}
+              >
+                {formatINR(grandTotal)}
+              </Text>
+              {totalBudget > 0 ? (
+                <Text
+                  style={[
+                    styles.totalPercentText,
+                    {
+                      color:
+                        grandTotal > totalBudget
+                          ? SEMANTIC.crimson
+                          : isDark
+                          ? "#71717A"
+                          : theme.textMuted,
+                    },
+                  ]}
+                >
+                  {budgetPercent}% of budget
+                </Text>
+              ) : null}
+            </View>
+          </View>
+
+          {totalBudget > 0 ? (
+            <View
+              style={[
+                styles.totalProgressDivider,
+                { borderTopColor: isDark ? "#18181D" : "#f1f5f9" },
+              ]}
+            >
+              <ProgressBar
+                value={budgetPercent}
+                height={5}
+                tone={grandTotal > totalBudget ? SEMANTIC.crimson : SEMANTIC.emerald}
+              />
+              <View style={styles.totalBudgetFooterRow}>
+                <Text
+                  style={[
+                    styles.totalBudgetFooterStatus,
+                    {
+                      color:
+                        grandTotal > totalBudget
+                          ? SEMANTIC.crimson
+                          : isDark
+                          ? "#A1A1AA"
+                          : theme.textMuted,
+                    },
+                  ]}
+                >
+                  {grandTotal > totalBudget
+                    ? `${formatINR(grandTotal - totalBudget)} over limit`
+                    : `${formatINR(totalBudget - grandTotal)} remaining`}
+                </Text>
+                <Text
+                  style={[
+                    styles.totalBudgetFooterCap,
+                    { color: isDark ? "#71717A" : theme.textFaint },
+                  ]}
+                >
+                  Total Budget: {formatINR(totalBudget)}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+
         <View style={styles.footerHintRow}>
           <Ionicons
             name="information-circle-outline"
@@ -178,6 +315,67 @@ const styles = StyleSheet.create({
   },
   envelopeProgressWrapper: {
     marginLeft: 48,
+  },
+  totalCard: {
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  totalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  totalLeftInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  totalIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: radii.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  totalBadgeLabel: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  totalSubtext: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  totalAmountValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  totalPercentText: {
+    fontSize: 11,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  totalProgressDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+    gap: 8,
+  },
+  totalBudgetFooterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  totalBudgetFooterStatus: {
+    fontSize: 11.5,
+    fontWeight: "600",
+  },
+  totalBudgetFooterCap: {
+    fontSize: 11.5,
+    fontWeight: "500",
   },
   footerHintRow: {
     flexDirection: "row",

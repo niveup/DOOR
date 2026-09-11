@@ -26,6 +26,7 @@ import { CategoryDetailModal } from "@/src/components/finance/CategoryDetailModa
 import { AllSpendingModal } from "@/src/components/finance/AllSpendingModal";
 import { AllBillsModal } from "@/src/components/finance/AllBillsModal";
 import { AllActivityModal } from "@/src/components/finance/AllActivityModal";
+import { Ionicons } from "@/src/components/app-icon";
 
 type FormMode = "expense" | "bill" | null;
 type DetailMode = "budget" | "all-spending" | "all-bills" | "all-activity" | null;
@@ -581,12 +582,32 @@ export default function FinanceScreen() {
           <FinanceModalWrapper
             visible={detailMode === "all-spending"}
             title="Spending Breakdown"
-            subtitle={`${formatINR(spent)} total spent across categories this month.`}
             onClose={() => setDetailMode(null)}
             action={
-              <Pressable onPress={() => setDetailMode("budget")} hitSlop={8} style={styles.textActionPill}>
-                <Text style={[styles.textActionLabel, { color: isDark ? "#FAFBFD" : theme.text }]}>
-                  Edit budgets →
+              <Pressable
+                onPress={() => setDetailMode("budget")}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={({ pressed }) => [
+                  styles.editBudgetHeaderButton,
+                  {
+                    backgroundColor: isDark ? "#1C1C24" : "#F1F5F9",
+                    borderColor: isDark ? "#2C2C38" : "#E2E8F0",
+                  },
+                  pressed && { opacity: 0.75, transform: [{ scale: 0.97 }] },
+                ]}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={14}
+                  color={isDark ? "#FAFBFD" : theme.text}
+                />
+                <Text
+                  style={[
+                    styles.editBudgetHeaderButtonText,
+                    { color: isDark ? "#FAFBFD" : theme.text },
+                  ]}
+                >
+                  Edit budgets
                 </Text>
               </Pressable>
             }
@@ -781,6 +802,21 @@ export default function FinanceScreen() {
 }
 
 const styles = StyleSheet.create({
+  editBudgetHeaderButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radii.full,
+    borderWidth: 1,
+  },
+  editBudgetHeaderButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
   textActionPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
