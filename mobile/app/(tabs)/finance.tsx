@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import * as Haptics from "expo-haptics";
@@ -34,6 +34,7 @@ export default function FinanceScreen() {
   const client = useQueryClient();
   const expenseSheetRef = useRef<BottomSheetModal>(null);
   const billSheetRef = useRef<BottomSheetModal>(null);
+  const billScrollRef = useRef<any>(null);
 
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [detailMode, setDetailMode] = useState<DetailMode>(null);
@@ -81,6 +82,31 @@ export default function FinanceScreen() {
     });
     return () => subscription.remove();
   }, [detailMode, formMode, selectedCategory, categoryOrigin]);
+
+  // Auto-extend Add Bill sheet when keyboard opens, and restore to original place when keyboard is gone
+  useEffect(() => {
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        if (formMode === "bill") {
+          billSheetRef.current?.snapToIndex(0);
+          billScrollRef.current?.scrollTo?.({ y: 0, animated: true });
+        }
+      }
+    );
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => {
+        if (formMode === "bill") {
+          billSheetRef.current?.snapToIndex(1);
+        }
+      }
+    );
+    return () => {
+      hideSub.remove();
+      showSub.remove();
+    };
+  }, [formMode]);
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -473,15 +499,15 @@ export default function FinanceScreen() {
             </BottomSheetScrollView>
           </BottomSheetModal>
 
-          {/* Quick Form Bottom Sheet: Add Bill (Dedicated full upward at 94%) */}
+          {/* Quick Form Bottom Sheet: Add Bill (Dedicated with auto-extend and restore to original place) */}
           <BottomSheetModal
             ref={billSheetRef}
-            snapPoints={["94%"]}
+            snapPoints={["72%", "94%"]}
             topInset={insets.top + 16}
             enablePanDownToClose={true}
             backdropComponent={renderBackdrop}
             keyboardBehavior="extend"
-            keyboardBlurBehavior="none"
+            keyboardBlurBehavior="restore"
             android_keyboardInputMode="adjustResize"
             handleComponent={() => null}
             onDismiss={() => {
@@ -494,6 +520,7 @@ export default function FinanceScreen() {
             }}
           >
             <BottomSheetScrollView
+              ref={billScrollRef}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               contentContainerStyle={[
