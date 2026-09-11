@@ -7,6 +7,8 @@ import {
   View,
 } from "react-native";
 import { useSegments } from "expo-router";
+import { BlurView } from "expo-blur";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@/src/components/app-icon";
 import { useTheme } from "@/src/providers/theme-provider";
@@ -45,7 +47,8 @@ const MemoStudyScreen = React.memo(StudyScreen);
 const MemoProfileScreen = React.memo(ProfileScreen);
 
 export function TabPager() {
-  const { theme, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const segments = useSegments();
   const startAt = useRef(initialIndex(segments as unknown as string[])).current;
   const [active, setActive] = useState(startAt);
@@ -70,12 +73,15 @@ export function TabPager() {
     setActive(index);
   };
 
-  const activeColor = isDark ? "#10b981" : "#059669";
-  const inactiveColor = isDark ? "#71717a" : theme.textFaint;
+  // High-contrast monochromatic palette: crisp pure white in dark mode, deep obsidian in light mode
+  const activeColor = isDark ? "#ffffff" : "#09090b";
+  const inactiveColor = isDark ? "#71717a" : "#94a3b8";
+  const bottomPadding = Math.max(insets.bottom, Platform.select({ ios: 20, default: 8 }));
+  const barHeight = 54 + bottomPadding;
 
   return (
     <TabPagerLockContext.Provider value={lockApi}>
-      <View style={[styles.root, { backgroundColor: theme.canvas }]}>
+      <View style={[styles.root, { backgroundColor: isDark ? "#09090b" : "#f8fafc" }]}>
         <View style={styles.flex}>
           <View
             style={[
@@ -115,11 +121,25 @@ export function TabPager() {
           style={[
             styles.tabBar,
             {
-              backgroundColor: isDark ? "#09090b" : "#ffffff",
-              borderTopColor: isDark ? "#18181b" : "#e2e8f0",
+              height: barHeight,
+              paddingBottom: bottomPadding,
+              backgroundColor: isDark
+                ? "rgba(9, 9, 11, 0.92)"
+                : "rgba(255, 255, 255, 0.94)",
+              borderTopColor: isDark
+                ? "rgba(255, 255, 255, 0.06)"
+                : "rgba(0, 0, 0, 0.06)",
             },
           ]}
         >
+          {Platform.OS === "ios" ? (
+            <BlurView
+              intensity={85}
+              tint={isDark ? "dark" : "light"}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
+
           {PAGES.map((page, i) => {
             const focused = i === active;
             const icons = tabIcons[page.key];
@@ -131,25 +151,16 @@ export function TabPager() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: focused }}
                 accessibilityLabel={page.title}
-                style={({ pressed }) => [styles.tabItem, pressed && { opacity: 0.65 }]}
+                style={({ pressed }) => [
+                  styles.tabItem,
+                  pressed && { opacity: 0.7, transform: [{ scale: 0.97 }] },
+                ]}
               >
-                <View
-                  style={[
-                    styles.tabIconBox,
-                    focused && {
-                      backgroundColor: isDark
-                        ? "rgba(16, 185, 129, 0.16)"
-                        : "#ECFDF5",
-                      borderColor: isDark
-                        ? "rgba(16, 185, 129, 0.32)"
-                        : "#A7F3D0",
-                    },
-                  ]}
-                >
+                <View style={styles.tabIconContainer}>
                   <Ionicons
                     name={focused ? icons.active : icons.inactive}
                     color={color}
-                    size={20}
+                    size={23}
                   />
                 </View>
                 <Text
@@ -157,7 +168,7 @@ export function TabPager() {
                     styles.tabLabel,
                     {
                       color,
-                      fontWeight: focused ? "700" : "500",
+                      fontWeight: focused ? "600" : "500",
                     },
                   ]}
                   numberOfLines={1}
@@ -186,27 +197,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: "row",
-    height: Platform.select({ ios: 86, default: 68 }),
-    paddingTop: 7,
-    paddingBottom: Platform.select({ ios: 25, default: 9 }),
     borderTopWidth: 1,
+    overflow: "hidden",
   },
   tabItem: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: 8,
   },
-  tabIconBox: {
-    width: 42,
-    height: 30,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "transparent",
+  tabIconContainer: {
+    width: 28,
+    height: 26,
     alignItems: "center",
     justifyContent: "center",
   },
   tabLabel: {
     fontSize: 10.5,
-    letterSpacing: 0.1,
-    marginTop: 2,
+    letterSpacing: 0.15,
+    marginTop: 3,
   },
 });

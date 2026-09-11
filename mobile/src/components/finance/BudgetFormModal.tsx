@@ -7,7 +7,7 @@ import { useTheme } from "@/src/providers/theme-provider";
 import { useNotify } from "@/src/providers/notification-provider";
 import { formatINR } from "@/src/lib/format";
 import { Budget, financeCategories } from "@/src/types/domain";
-import { SEMANTIC } from "@/src/components/finance/FinanceConstants";
+import { CATEGORY_ALIASES, SEMANTIC } from "@/src/components/finance/FinanceConstants";
 import { CategoryIconBadge } from "@/src/components/finance/CategoryIconBadge";
 import { radii } from "@/src/theme/tokens";
 
@@ -37,7 +37,8 @@ export function BudgetFormModal({
   const [capsText, setCapsText] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     financeCategories.forEach((cat) => {
-      const val = initialBudget?.caps?.[cat];
+      const alias = Object.entries(CATEGORY_ALIASES).find(([, target]) => target === cat)?.[0];
+      const val = initialBudget?.caps?.[cat] ?? (alias ? (initialBudget?.caps as any)?.[alias] : undefined);
       initial[cat] = typeof val === "number" && val > 0 ? String(val) : "";
     });
     return initial;

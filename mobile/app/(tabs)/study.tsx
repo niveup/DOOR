@@ -172,12 +172,28 @@ export default function StudyScreen() {
             accessibilityLabel="Start and log a new study session"
             style={({ pressed }) => [
               styles.primaryStudyButton,
-              { backgroundColor: theme.accent },
-              pressed && { opacity: 0.9, transform: [{ scale: 0.985 }] },
+              {
+                backgroundColor: isDark ? "#ffffff" : "#09090b",
+                borderColor: isDark
+                  ? "rgba(255, 255, 255, 0.2)"
+                  : "rgba(0, 0, 0, 0.15)",
+                shadowColor: isDark ? "#ffffff" : "#000000",
+                shadowOpacity: isDark ? 0.18 : 0.22,
+              },
+              pressed && { opacity: 0.88, transform: [{ scale: 0.985 }] },
             ]}
           >
-            <Ionicons name="play-circle" size={19} color="#09090B" />
-            <Text style={styles.primaryStudyButtonText}>
+            <Ionicons
+              name="play-circle"
+              size={19}
+              color={isDark ? "#09090b" : "#ffffff"}
+            />
+            <Text
+              style={[
+                styles.primaryStudyButtonText,
+                { color: isDark ? "#09090b" : "#ffffff" },
+              ]}
+            >
               Start Study Session
             </Text>
           </Pressable>
@@ -305,13 +321,19 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     height: layout.buttonHeight,
     borderRadius: radii.md,
+    borderWidth: 1,
     paddingHorizontal: spacing.md,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
   },
   primaryStudyButtonText: {
-    color: "#09090B",
+    color: "#ffffff",
     ...typography.button,
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
   textActionPill: {
     paddingHorizontal: 8,

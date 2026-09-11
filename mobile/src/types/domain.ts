@@ -1,8 +1,14 @@
 export type RoutineStatus = "NOT" | "PARTIAL" | "COMPLETED";
 export type FinanceCategory =
-  | "Hostel & utilities"
   | "Food & mess"
   | "Travel & commute"
+  | "Entertainment"
+  | "Shopping"
+  | "Education"
+  | "Bills"
+  | "Personal"
+  | "Other"
+  | "Hostel & utilities"
   | "Academics"
   | "Personal & health"
   | "Subscriptions"
@@ -51,7 +57,14 @@ export type JournalEntry = {
 };
 
 export const financeCategories: FinanceCategory[] = [
-  "Hostel & utilities", "Food & mess", "Travel & commute", "Academics", "Personal & health", "Subscriptions", "Fun & social", "Others",
+  "Food & mess",
+  "Travel & commute",
+  "Entertainment",
+  "Shopping",
+  "Education",
+  "Bills",
+  "Personal",
+  "Other",
 ];
 
 export type ScoreWeights = {

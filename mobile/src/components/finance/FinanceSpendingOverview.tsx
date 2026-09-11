@@ -107,7 +107,7 @@ export function FinanceSpendingOverview({
 
           {/* Top 3 Spending Categories */}
           {top3Spending.map((item, idx) => {
-            const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
+            const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Other || CATEGORY_TOKENS.Others;
             const sharePercent = spent > 0 ? Math.round((item.total / spent) * 100) : 0;
 
             return (

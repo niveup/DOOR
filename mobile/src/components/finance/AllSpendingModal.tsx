@@ -35,25 +35,6 @@ export function AllSpendingModal({
     >
       <View style={{ gap: 12 }}>
         <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 9,
-            backgroundColor: isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)",
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0",
-          }}
-        >
-          <Ionicons name="information-circle-outline" size={15} color={isDark ? "#60A5FA" : "#2563EB"} />
-          <Text style={{ fontSize: 11.5, color: isDark ? "#A1A1AA" : theme.textMuted, fontWeight: "500", flex: 1 }}>
-            Tap any category to inspect its full transaction ledger & budget breakdown.
-          </Text>
-        </View>
-
-        <View
           style={[
             styles.unifiedCard,
             {
@@ -63,7 +44,6 @@ export function AllSpendingModal({
           ]}
         >
           {allStats.map((item, idx) => {
-            const meta = CATEGORY_TOKENS[item.category] || CATEGORY_TOKENS.Others;
             return (
               <Pressable
                 key={item.category}
@@ -80,8 +60,8 @@ export function AllSpendingModal({
                 <View style={styles.envelopeTopRow}>
                   <View style={styles.envelopeLeftBlock}>
                     <CategoryIconBadge category={item.category} isDark={isDark} />
-                    <View style={{ gap: 2 }}>
-                      <Text style={[styles.itemTitle, { color: isDark ? meta.darkIcon : meta.lightIcon }]}>
+                    <View style={{ gap: 2, flex: 1 }}>
+                      <Text style={[styles.itemTitle, { color: isDark ? "#FAFAFA" : theme.text }]}>
                         {item.category}
                       </Text>
                       <Text style={styles.itemSubtext}>
@@ -115,15 +95,34 @@ export function AllSpendingModal({
                 </View>
 
                 {item.cap > 0 ? (
-                  <ProgressBar
-                    value={item.percent}
-                    height={4.5}
-                    tone={item.isOver ? SEMANTIC.crimson : item.percent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
-                  />
+                  <View style={styles.envelopeProgressWrapper}>
+                    <ProgressBar
+                      value={item.percent}
+                      height={4}
+                      tone={item.isOver ? SEMANTIC.crimson : item.percent >= 80 ? SEMANTIC.amber : SEMANTIC.emerald}
+                    />
+                  </View>
                 ) : null}
               </Pressable>
             );
           })}
+        </View>
+
+        <View style={styles.footerHintRow}>
+          <Ionicons
+            name="information-circle-outline"
+            size={13}
+            color={isDark ? "#71717A" : theme.textFaint}
+          />
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.footerHintText,
+              { color: isDark ? "#71717A" : theme.textMuted },
+            ]}
+          >
+            Tap any category to inspect transaction ledger
+          </Text>
         </View>
       </View>
     </Animated.ScrollView>
@@ -166,5 +165,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
+  },
+  envelopeProgressWrapper: {
+    marginLeft: 48,
+  },
+  footerHintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  footerHintText: {
+    fontSize: 11.5,
+    fontWeight: "400",
+    letterSpacing: -0.1,
   },
 });

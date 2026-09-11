@@ -77,7 +77,7 @@ export function Card({ children, style, variant = "default", onPress }: CardProp
 // ============================================================================
 
 export type ButtonVariant = "solid" | "soft" | "subtle" | "outline" | "ghost";
-export type ButtonTone = "emerald" | "cyan" | "amber" | "rose" | "violet" | "ghost" | "default";
+export type ButtonTone = "emerald" | "cyan" | "amber" | "rose" | "violet" | "blue" | "monochrome" | "ghost" | "default";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps {
@@ -129,6 +129,10 @@ export function Button({
         return theme.rose;
       case "violet":
         return theme.violet;
+      case "blue":
+        return theme.blue;
+      case "monochrome":
+        return isDark ? "#ffffff" : "#09090b";
       case "ghost":
         return theme.textMuted;
       default:
@@ -148,6 +152,10 @@ export function Button({
         return isDark ? "rgba(6, 182, 212, 0.14)" : "rgba(2, 132, 199, 0.12)";
       case "violet":
         return isDark ? "rgba(139, 92, 246, 0.14)" : "rgba(124, 58, 237, 0.12)";
+      case "blue":
+        return isDark ? "rgba(59, 130, 246, 0.14)" : "rgba(37, 99, 235, 0.12)";
+      case "monochrome":
+        return isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(0, 0, 0, 0.06)";
       case "ghost":
         return theme.raised;
       default:
@@ -167,14 +175,16 @@ export function Button({
   if (variant === "solid") {
     backgroundColor = toneColor;
     borderColor = toneColor;
-    // High-contrast text on solid emerald/bright tone: deep obsidian dark text (#09090b)
-    textColor = tone === "emerald" || tone === "cyan" || tone === "amber" || tone === "default"
+    // High-contrast text on solid tone
+    textColor = tone === "monochrome"
+      ? (isDark ? "#09090b" : "#ffffff")
+      : tone === "emerald" || tone === "cyan" || tone === "amber" || tone === "default"
       ? theme.solidTextDark
       : "#ffffff";
     shadowStyle = {
-      shadowColor: toneColor,
+      shadowColor: tone === "monochrome" ? (isDark ? "#ffffff" : "#000000") : toneColor,
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.35 : 0.22,
+      shadowOpacity: tone === "monochrome" ? (isDark ? 0.18 : 0.22) : (isDark ? 0.35 : 0.22),
       shadowRadius: 8,
       elevation: 3,
     };

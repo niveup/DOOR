@@ -233,7 +233,7 @@ export function StudyLogForm({ subjects, busy, onSave }: StudyLogFormProps) {
         <ActionButton
           label={busy ? "Saving…" : "Save Study Session"}
           icon="checkmark-circle"
-          tone="emerald"
+          tone="monochrome"
           disabled={busy}
           onPress={handleSave}
         />

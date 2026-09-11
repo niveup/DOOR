@@ -38,7 +38,7 @@ export function CategoryDetailModal({
 }: CategoryDetailModalProps) {
   const { theme, isDark } = useTheme();
   const notify = useNotify();
-  const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Others;
+  const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Other || CATEGORY_TOKENS.Others;
 
   const grouped = useMemo(() => {
     const groups: { dateLabel: string; items: Expense[] }[] = [];

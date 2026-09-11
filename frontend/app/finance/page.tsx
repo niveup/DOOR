@@ -3,13 +3,19 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { toast } from "sonner";
+const toast = { success: () => {}, error: () => {}, info: () => {}, warning: () => {} };
 import { AppShell } from "@/components/AppShell";
 
 type Category =
-  | "Hostel & utilities"
   | "Food & mess"
   | "Travel & commute"
+  | "Entertainment"
+  | "Shopping"
+  | "Education"
+  | "Bills"
+  | "Personal"
+  | "Other"
+  | "Hostel & utilities"
   | "Academics"
   | "Personal & health"
   | "Subscriptions"
@@ -26,17 +32,42 @@ type Expense = {
 };
 
 const categoryMeta: Record<Category, { icon: IconName; color: string; soft: string; budget: number }> = {
-  "Hostel & utilities": { icon: "building", color: "var(--lavender)", soft: "var(--lavender-soft)", budget: 0 },
-  "Food & mess": { icon: "utensils", color: "var(--sun)", soft: "var(--sun-soft)", budget: 0 },
-  "Travel & commute": { icon: "train", color: "var(--teal)", soft: "var(--teal-soft)", budget: 0 },
-  Academics: { icon: "book", color: "var(--mint)", soft: "var(--mint-soft)", budget: 0 },
-  "Personal & health": { icon: "heart", color: "var(--danger)", soft: "var(--danger-soft)", budget: 0 },
-  Subscriptions: { icon: "phone", color: "var(--accent)", soft: "var(--accent-soft)", budget: 0 },
-  "Fun & social": { icon: "users", color: "var(--lavender)", soft: "var(--lavender-soft)", budget: 0 },
-  Others: { icon: "more", color: "var(--text-secondary)", soft: "var(--bg-elevated)", budget: 0 },
+  // 1. Food & mess — Warm muted amber
+  "Food & mess": { icon: "utensils", color: "#D97706", soft: "rgba(217, 119, 6, 0.15)", budget: 0 },
+  // 2. Travel & commute — Slate steel blue
+  "Travel & commute": { icon: "train", color: "#3B82F6", soft: "rgba(59, 130, 246, 0.15)", budget: 0 },
+  // 3. Entertainment — Muted dusty lavender
+  Entertainment: { icon: "sparkles", color: "#8B5CF6", soft: "rgba(139, 92, 246, 0.15)", budget: 0 },
+  // 4. Shopping — Muted rose
+  Shopping: { icon: "wallet", color: "#D94A6E", soft: "rgba(217, 74, 110, 0.15)", budget: 0 },
+  // 5. Education — Muted cyan
+  Education: { icon: "book", color: "#0284C7", soft: "rgba(2, 132, 199, 0.15)", budget: 0 },
+  // 6. Bills — Muted sage teal
+  Bills: { icon: "receipt", color: "#0D9488", soft: "rgba(13, 148, 136, 0.15)", budget: 0 },
+  // 7. Personal — Muted warm gold
+  Personal: { icon: "heart", color: "#B45309", soft: "rgba(180, 83, 9, 0.15)", budget: 0 },
+  // 8. Other — Muted graphite slate
+  Other: { icon: "more", color: "#64748B", soft: "rgba(100, 116, 139, 0.15)", budget: 0 },
+
+  // Backward-compatible aliases
+  "Hostel & utilities": { icon: "building", color: "#0D9488", soft: "rgba(13, 148, 136, 0.15)", budget: 0 },
+  Academics: { icon: "book", color: "#0284C7", soft: "rgba(2, 132, 199, 0.15)", budget: 0 },
+  "Personal & health": { icon: "heart", color: "#B45309", soft: "rgba(180, 83, 9, 0.15)", budget: 0 },
+  Subscriptions: { icon: "phone", color: "#0D9488", soft: "rgba(13, 148, 136, 0.15)", budget: 0 },
+  "Fun & social": { icon: "users", color: "#8B5CF6", soft: "rgba(139, 92, 246, 0.15)", budget: 0 },
+  Others: { icon: "more", color: "#64748B", soft: "rgba(100, 116, 139, 0.15)", budget: 0 },
 };
 
-const categoryOrder = Object.keys(categoryMeta) as Category[];
+const categoryOrder: Category[] = [
+  "Food & mess",
+  "Travel & commute",
+  "Entertainment",
+  "Shopping",
+  "Education",
+  "Bills",
+  "Personal",
+  "Other",
+];
 
 type BudgetPlan = {
   allowance: number;
@@ -55,9 +86,15 @@ type Bill = {
 const defaultBudgetPlan: BudgetPlan = {
   allowance: 0,
   caps: {
-    "Hostel & utilities": 0,
     "Food & mess": 0,
     "Travel & commute": 0,
+    Entertainment: 0,
+    Shopping: 0,
+    Education: 0,
+    Bills: 0,
+    Personal: 0,
+    Other: 0,
+    "Hostel & utilities": 0,
     Academics: 0,
     "Personal & health": 0,
     Subscriptions: 0,
@@ -825,7 +862,10 @@ export default function FinancePage() {
     <AppShell
       eyebrow={currentMonthEyebrow}
       title="Campus Cashflow"
-      subtitle="Hostel allowances, daily runway, category envelopes, and smart ledger—clear and in control."
+      subtitle="Your monthly spending at a glance"
+      titleClassName="text-[36px] font-semibold tracking-tight text-[var(--text-primary)] leading-tight"
+      subtitleClassName="mt-1 text-[16px] font-normal leading-normal text-[var(--text-secondary)]"
+      headerClassName="surface mb-3 flex flex-col justify-between gap-3 px-5 pt-5 pb-3.5 sm:flex-row sm:items-end lg:px-5 lg:pt-5 lg:pb-3.5"
       actions={
         <>
           <button
@@ -899,10 +939,10 @@ export default function FinancePage() {
                       <p className="text-3xl font-semibold tracking-[-0.045em] sm:text-[40px] text-white">
                         {formatINR(remaining)}
                       </p>
-                      <p className="mt-1 text-xs font-medium text-white/70">
+                      <p className="mt-1 text-sm font-medium text-white/70">
                         {remaining < 0
-                          ? `${formatINR(Math.abs(remaining))} over spent from ${formatINR(monthlyAllowance)} allowance`
-                          : `left to spend from ${formatINR(monthlyAllowance)} total allowance`}
+                          ? "over budget this month"
+                          : "remaining this month"}
                       </p>
                     </div>
                   )}

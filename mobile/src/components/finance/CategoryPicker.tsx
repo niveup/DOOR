@@ -27,7 +27,7 @@ export function CategoryPicker({ value, onChange }: CategoryPickerProps) {
     >
       {financeCategories.map((category) => {
         const active = value === category;
-        const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Others;
+        const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Other || CATEGORY_TOKENS.Others;
         const iconColor = isDark ? meta.darkIcon : meta.lightIcon;
         const bgColor = active
           ? isDark

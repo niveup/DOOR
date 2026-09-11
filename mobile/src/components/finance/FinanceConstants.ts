@@ -21,6 +21,7 @@ export const CATEGORY_TOKENS: Record<
     barColor: string;
   }
 > = {
+  // 1. Food & mess — Warm muted amber
   "Food & mess": {
     icon: "restaurant-outline",
     darkIcon: "#C98A3A",
@@ -29,79 +30,164 @@ export const CATEGORY_TOKENS: Record<
     lightIcon: "#9A6218",
     lightBg: "#FDF6EC",
     lightBorder: "#F3E2CC",
-    barColor: "#F59E0B",
+    barColor: "#D97706",
   },
-  Subscriptions: {
-    icon: "tv-outline",
-    darkIcon: "#8B7CF6",
-    darkBg: "#1F1C2B",
-    darkBorder: "#2D283E",
-    lightIcon: "#6355D8",
-    lightBg: "#F4F2FD",
-    lightBorder: "#E2DCFA",
-    barColor: "#A855F7",
-  },
-  "Hostel & utilities": {
-    icon: "home-outline",
-    darkIcon: "#6F8FAF",
-    darkBg: "#1B2025",
-    darkBorder: "#272E36",
-    lightIcon: "#486B8C",
-    lightBg: "#F0F4F8",
-    lightBorder: "#DCE5EE",
-    barColor: "#38BDF8",
-  },
+  // 2. Travel & commute — Slate steel blue
   "Travel & commute": {
     icon: "car-outline",
-    darkIcon: "#4FA39A",
-    darkBg: "#182321",
-    darkBorder: "#233330",
-    lightIcon: "#2E7C74",
-    lightBg: "#EEF7F6",
-    lightBorder: "#D2EBE8",
-    barColor: "#14B8A6",
+    darkIcon: "#5C8BB8",
+    darkBg: "#161D26",
+    darkBorder: "#222D3B",
+    lightIcon: "#2563EB",
+    lightBg: "#EFF6FF",
+    lightBorder: "#BFDBFE",
+    barColor: "#3B82F6",
+  },
+  // 3. Entertainment — Muted dusty lavender
+  Entertainment: {
+    icon: "game-controller-outline",
+    darkIcon: "#8E7CB5",
+    darkBg: "#1E1A27",
+    darkBorder: "#2C263A",
+    lightIcon: "#7C3AED",
+    lightBg: "#FAF5FF",
+    lightBorder: "#E9D5FF",
+    barColor: "#8B5CF6",
+  },
+  // 4. Shopping — Muted rose
+  Shopping: {
+    icon: "cart-outline",
+    darkIcon: "#B5657A",
+    darkBg: "#24161C",
+    darkBorder: "#3A212B",
+    lightIcon: "#BE185D",
+    lightBg: "#FDF2F8",
+    lightBorder: "#FBCFE8",
+    barColor: "#D94A6E",
+  },
+  // 5. Education — Muted cyan
+  Education: {
+    icon: "school-outline",
+    darkIcon: "#5A9AA8",
+    darkBg: "#152024",
+    darkBorder: "#203037",
+    lightIcon: "#0369A1",
+    lightBg: "#ECFEFF",
+    lightBorder: "#A5F3FC",
+    barColor: "#0284C7",
+  },
+  // 6. Bills — Muted sage teal
+  Bills: {
+    icon: "receipt-outline",
+    darkIcon: "#4F9A90",
+    darkBg: "#152220",
+    darkBorder: "#1F3431",
+    lightIcon: "#0F766E",
+    lightBg: "#F0FDFA",
+    lightBorder: "#99F6E4",
+    barColor: "#0D9488",
+  },
+  // 7. Personal — Muted warm gold
+  Personal: {
+    icon: "person-outline",
+    darkIcon: "#A88748",
+    darkBg: "#221E16",
+    darkBorder: "#332D21",
+    lightIcon: "#92400E",
+    lightBg: "#FFFBEB",
+    lightBorder: "#FDE68A",
+    barColor: "#B45309",
+  },
+  // 8. Other — Muted graphite slate
+  Other: {
+    icon: "shapes-outline",
+    darkIcon: "#7C8294",
+    darkBg: "#191B22",
+    darkBorder: "#262934",
+    lightIcon: "#475569",
+    lightBg: "#F1F5F9",
+    lightBorder: "#CBD5E1",
+    barColor: "#64748B",
+  },
+
+  // --- Backward-Compatible Aliases ---
+  "Fun & social": {
+    icon: "game-controller-outline",
+    darkIcon: "#8E7CB5",
+    darkBg: "#1E1A27",
+    darkBorder: "#2C263A",
+    lightIcon: "#7C3AED",
+    lightBg: "#FAF5FF",
+    lightBorder: "#E9D5FF",
+    barColor: "#8B5CF6",
   },
   Academics: {
     icon: "school-outline",
-    darkIcon: "#7180B5",
-    darkBg: "#1C1E27",
-    darkBorder: "#282C3A",
-    lightIcon: "#4E5F97",
-    lightBg: "#F1F3F9",
-    lightBorder: "#DCE1F1",
-    barColor: "#6366F1",
+    darkIcon: "#5A9AA8",
+    darkBg: "#152024",
+    darkBorder: "#203037",
+    lightIcon: "#0369A1",
+    lightBg: "#ECFEFF",
+    lightBorder: "#A5F3FC",
+    barColor: "#0284C7",
+  },
+  "Hostel & utilities": {
+    icon: "receipt-outline",
+    darkIcon: "#4F9A90",
+    darkBg: "#152220",
+    darkBorder: "#1F3431",
+    lightIcon: "#0F766E",
+    lightBg: "#F0FDFA",
+    lightBorder: "#99F6E4",
+    barColor: "#0D9488",
+  },
+  Subscriptions: {
+    icon: "receipt-outline",
+    darkIcon: "#4F9A90",
+    darkBg: "#152220",
+    darkBorder: "#1F3431",
+    lightIcon: "#0F766E",
+    lightBg: "#F0FDFA",
+    lightBorder: "#99F6E4",
+    barColor: "#0D9488",
   },
   "Personal & health": {
-    icon: "fitness-outline",
-    darkIcon: "#FB7185",
-    darkBg: "#2A161E",
-    darkBorder: "#4A2030",
-    lightIcon: "#E11D48",
-    lightBg: "#FFF1F2",
-    lightBorder: "#FECDD3",
-    barColor: "#F43F5E",
-  },
-  "Fun & social": {
-    icon: "game-controller-outline",
-    darkIcon: "#8B78B0",
-    darkBg: "#211D26",
-    darkBorder: "#302A37",
-    lightIcon: "#6E5A93",
-    lightBg: "#F5F2F9",
-    lightBorder: "#E5DEEF",
-    barColor: "#FB923C",
+    icon: "person-outline",
+    darkIcon: "#A88748",
+    darkBg: "#221E16",
+    darkBorder: "#332D21",
+    lightIcon: "#92400E",
+    lightBg: "#FFFBEB",
+    lightBorder: "#FDE68A",
+    barColor: "#B45309",
   },
   Others: {
-    icon: "receipt-outline",
-    darkIcon: "#85858F",
-    darkBg: "#1B1B20",
-    darkBorder: "#26262D",
-    lightIcon: "#5C5C66",
-    lightBg: "#F3F3F6",
-    lightBorder: "#E1E1E6",
-    barColor: "#94A3B8",
+    icon: "shapes-outline",
+    darkIcon: "#7C8294",
+    darkBg: "#191B22",
+    darkBorder: "#262934",
+    lightIcon: "#475569",
+    lightBg: "#F1F5F9",
+    lightBorder: "#CBD5E1",
+    barColor: "#64748B",
   },
 };
+
+export const CATEGORY_ALIASES: Record<string, FinanceCategory> = {
+  "Fun & social": "Entertainment",
+  Academics: "Education",
+  "Hostel & utilities": "Bills",
+  Subscriptions: "Bills",
+  "Personal & health": "Personal",
+  Others: "Other",
+};
+
+export function normalizeCategory(category: string): FinanceCategory {
+  if (CATEGORY_ALIASES[category]) {
+    return CATEGORY_ALIASES[category];
+  }
+  return category as FinanceCategory;
+}
 
 export function getDateLabel(dateStr: string): string {
   const today = todayInKolkata();

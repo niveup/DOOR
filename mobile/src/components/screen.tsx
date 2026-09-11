@@ -1,5 +1,5 @@
 import { PropsWithChildren, ReactNode } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { RefreshControl, ScrollView, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { layout, spacing, typography } from "@/src/theme/tokens";
 import { useTheme } from "@/src/providers/theme-provider";
@@ -12,6 +12,10 @@ type ScreenProps = PropsWithChildren<{
   onRefresh?: () => void;
   overlay?: ReactNode;
   keyboardShouldPersistTaps?: "always" | "never" | "handled";
+  titleStyle?: StyleProp<TextStyle>;
+  subtitleStyle?: StyleProp<TextStyle>;
+  headerCopyStyle?: StyleProp<ViewStyle>;
+  headerStyle?: StyleProp<ViewStyle>;
 }>;
 
 export function AppScreen({
@@ -22,6 +26,10 @@ export function AppScreen({
   onRefresh,
   overlay,
   keyboardShouldPersistTaps = "handled",
+  titleStyle,
+  subtitleStyle,
+  headerCopyStyle,
+  headerStyle,
   children,
 }: ScreenProps) {
   const { theme } = useTheme();
@@ -46,10 +54,14 @@ export function AppScreen({
             ) : undefined
           }
         >
-          <View style={styles.header}>
-            <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-              {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
+          <View style={[styles.header, headerStyle]}>
+            <View style={[styles.headerCopy, headerCopyStyle]}>
+              <Text style={[styles.title, { color: theme.text }, titleStyle]}>{title}</Text>
+              {subtitle ? (
+                <Text style={[styles.subtitle, { color: theme.textMuted }, subtitleStyle]}>
+                  {subtitle}
+                </Text>
+              ) : null}
             </View>
             {action}
           </View>

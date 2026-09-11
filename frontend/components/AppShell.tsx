@@ -446,6 +446,8 @@ export function AppShell({
   subtitle,
   actions,
   titleClassName = "text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl",
+  subtitleClassName = "mt-1.5 max-w-3xl text-xs font-medium leading-5 text-[var(--text-secondary)]",
+  headerClassName,
 }: {
   children: ReactNode;
   eyebrow?: string;
@@ -453,6 +455,8 @@ export function AppShell({
   subtitle?: string;
   actions?: ReactNode;
   titleClassName?: string;
+  subtitleClassName?: string;
+  headerClassName?: string;
 }) {
   const pathname = usePathname();
   const ctx = useContext(AppShellContext);
@@ -466,12 +470,12 @@ export function AppShell({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0.95, y: 2 }}
           transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="surface mb-5 flex flex-col justify-between gap-3 p-5 sm:flex-row sm:items-end lg:p-5"
+          className={headerClassName || "surface mb-5 flex flex-col justify-between gap-3 p-5 sm:flex-row sm:items-end lg:p-5"}
         >
           <div className="min-w-0">
             {eyebrow ? <p className="section-label mb-2">{eyebrow}</p> : null}
             {title ? <h1 className={titleClassName}>{title}</h1> : null}
-            {subtitle ? <p className="mt-1.5 max-w-3xl text-xs font-medium leading-5 text-[var(--text-secondary)]">{subtitle}</p> : null}
+            {subtitle ? <p className={subtitleClassName}>{subtitle}</p> : null}
           </div>
           {actions ? <div className="hidden shrink-0 items-center gap-2 lg:flex">{actions}</div> : null}
         </motion.header>

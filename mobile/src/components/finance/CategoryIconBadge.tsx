@@ -15,7 +15,7 @@ export function CategoryIconBadge({
   isDark,
   customIcon,
 }: CategoryIconBadgeProps) {
-  const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Others;
+  const meta = CATEGORY_TOKENS[category] || CATEGORY_TOKENS.Other || CATEGORY_TOKENS.Others;
   const iconName = customIcon || meta.icon;
   const iconColor = isDark ? "#A1A1AA" : "#64748b";
   const bgColor = isDark ? "#16161A" : "#f1f5f9";

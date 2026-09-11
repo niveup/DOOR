@@ -10,10 +10,9 @@ import { api } from "@/src/services/api";
 import { formatINR, todayInKolkata } from "@/src/lib/format";
 import { Bill, Expense, FinanceCategory, financeCategories } from "@/src/types/domain";
 import { useTheme } from "@/src/providers/theme-provider";
-import { useNotify } from "@/src/providers/notification-provider";
 import { useAuth } from "@/src/providers/auth-provider";
 import { radii, spacing, typography } from "@/src/theme/tokens";
-import { getDateLabel } from "@/src/components/finance/FinanceConstants";
+import { CATEGORY_ALIASES, getDateLabel, normalizeCategory } from "@/src/components/finance/FinanceConstants";
 import { FinanceHeroRunway } from "@/src/components/finance/FinanceHeroRunway";
 import { FinanceActions } from "@/src/components/finance/FinanceActions";
 import { FinanceSpendingOverview } from "@/src/components/finance/FinanceSpendingOverview";
@@ -33,7 +32,6 @@ type DetailMode = "budget" | "all-spending" | "all-bills" | "all-activity" | nul
 
 export default function FinanceScreen() {
   const client = useQueryClient();
-  const notify = useNotify();
   const formSheetRef = useRef<BottomSheetModal>(null);
 
   const [formMode, setFormMode] = useState<FormMode>(null);
@@ -142,12 +140,9 @@ export default function FinanceScreen() {
       );
       return { previous };
     },
-    onSuccess: (res, newExpense) => {
-      notify.success("Expense Recorded", `${newExpense.title} (${formatINR(Number(newExpense.amount))})`);
-    },
+    onSuccess: () => {},
     onError: (_error, _variables, context) => {
       client.setQueryData(["finance"], context?.previous);
-      notify.error("Save Failed", "Could not reach cloud database. Please try again.");
     },
     onSettled: refresh,
   });
@@ -174,12 +169,9 @@ export default function FinanceScreen() {
       });
       return { previous };
     },
-    onSuccess: () => {
-      notify.success("Budget Saved", "Monthly allocation plan updated.");
-    },
+    onSuccess: () => {},
     onError: (_error, _variables, context) => {
       client.setQueryData(["finance"], context?.previous);
-      notify.error("Budget Save Failed", "Could not sync budget with cloud.");
     },
     onSettled: refresh,
   });
@@ -209,12 +201,9 @@ export default function FinanceScreen() {
       );
       return { previous };
     },
-    onSuccess: (res, newBill) => {
-      notify.success("Bill Scheduled", `${newBill.title} (${formatINR(Number(newBill.amount))})`);
-    },
+    onSuccess: () => {},
     onError: (_error, _variables, context) => {
       client.setQueryData(["finance"], context?.previous);
-      notify.error("Bill Save Failed", "Could not save bill to cloud.");
     },
     onSettled: refresh,
   });
@@ -234,12 +223,9 @@ export default function FinanceScreen() {
       });
       return { previous };
     },
-    onSuccess: () => {
-      notify.success("Bill Paid", "Payment recorded in ledger.");
-    },
+    onSuccess: () => {},
     onError: (_error, _variables, context) => {
       client.setQueryData(["finance"], context?.previous);
-      notify.error("Payment Failed", "Could not record payment. Please try again.");
     },
     onSettled: refresh,
   });
@@ -313,9 +299,17 @@ export default function FinanceScreen() {
   const allCategoryStats = useMemo(() => {
     return financeCategories
       .map((category) => {
-        const cap = Number((budgetData.caps as any)?.[category] || 0);
+        const legacyKey = Object.entries(CATEGORY_ALIASES).find(([, target]) => target === category)?.[0];
+        const cap = Number(
+          (budgetData.caps as any)?.[category] ??
+          (legacyKey ? (budgetData.caps as any)?.[legacyKey] : undefined) ??
+          0
+        );
         const total = expensesList
-          .filter((item) => item?.date?.startsWith(month) && item?.category === category)
+          .filter((item) => {
+            if (!item?.date?.startsWith(month)) return false;
+            return item.category === category || normalizeCategory(item.category) === category;
+          })
           .reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
         return {
           category,
@@ -351,9 +345,17 @@ export default function FinanceScreen() {
     if (!selectedCategory) return null;
     const found = allCategoryStats.find((s) => s.category === selectedCategory);
     if (found) return found;
-    const cap = Number((budgetData.caps as any)?.[selectedCategory] || 0);
+    const legacyKey = Object.entries(CATEGORY_ALIASES).find(([, target]) => target === selectedCategory)?.[0];
+    const cap = Number(
+      (budgetData.caps as any)?.[selectedCategory] ??
+      (legacyKey ? (budgetData.caps as any)?.[legacyKey] : undefined) ??
+      0
+    );
     const total = expensesList
-      .filter((item) => item?.date?.startsWith(month) && item?.category === selectedCategory)
+      .filter((item) => {
+        if (!item?.date?.startsWith(month)) return false;
+        return item.category === selectedCategory || normalizeCategory(item.category) === selectedCategory;
+      })
       .reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
     return {
       category: selectedCategory,
@@ -369,6 +371,10 @@ export default function FinanceScreen() {
       .filter((item) => !item?.paid)
       .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   }, [billsList]);
+  const upcomingBillsTotal = useMemo(() => {
+    return unpaidBills.reduce((sum, b) => sum + (Number(b?.amount) || 0), 0);
+  }, [unpaidBills]);
+  const upcomingBillsCount = unpaidBills.length;
   const top2Bills = useMemo(() => unpaidBills.slice(0, 2), [unpaidBills]);
 
   const top5Expenses = useMemo(() => expensesList.slice(0, 5), [expensesList]);
@@ -390,7 +396,11 @@ export default function FinanceScreen() {
   return (
     <AppScreen
       title="Campus Cashflow"
-      subtitle="Student runway & spending ledger"
+      subtitle="Your monthly spending at a glance"
+      titleStyle={styles.screenTitle}
+      subtitleStyle={styles.screenSubtitle}
+      headerCopyStyle={styles.screenHeaderCopy}
+      headerStyle={styles.screenHeader}
       refreshing={finance.isRefetching}
       onRefresh={finance.refetch}
       overlay={
@@ -441,7 +451,7 @@ export default function FinanceScreen() {
                   onSave={(expense) => {
                     const amount = Number(expense.amount);
                     if (!expense.title.trim() || !Number.isFinite(amount) || amount <= 0) {
-                      return notify.warning("Check Expense", "Enter a title and an amount above ₹0.");
+                      return;
                     }
                     expenseMutation.mutate({ ...expense, title: expense.title.trim(), amount });
                   }}
@@ -457,7 +467,7 @@ export default function FinanceScreen() {
                   onSave={(bill) => {
                     const amount = Number(bill.amount);
                     if (!bill.title.trim() || amount <= 0) {
-                      return notify.warning("Check Bill", "Enter a bill title and an amount above ₹0.");
+                      return;
                     }
                     billMutation.mutate({ ...bill, title: bill.title.trim(), amount, paid: false });
                   }}
@@ -603,7 +613,9 @@ export default function FinanceScreen() {
                     isOver: false,
                   }
                 }
-                expenses={expensesList.filter((e) => e.category === selectedCategory)}
+                expenses={expensesList.filter(
+                  (e) => e.category === selectedCategory || normalizeCategory(e.category) === selectedCategory
+                )}
                 onDeleteExpense={(id) => deleteExpense.mutate(id)}
                 onLogExpense={(cat) => {
                   handleCloseCategoryDetail();
@@ -643,6 +655,8 @@ export default function FinanceScreen() {
         allowance={allowance}
         remaining={remaining}
         spent={spent}
+        upcomingBillsTotal={upcomingBillsTotal}
+        upcomingBillsCount={upcomingBillsCount}
         safeDailySpend={safeDailySpend}
         daysLeft={daysLeft}
         rawSpendPercent={rawSpendPercent}
@@ -709,5 +723,23 @@ const styles = StyleSheet.create({
   },
   sheetContent: {
     padding: spacing.md,
+  },
+  screenHeaderCopy: {
+    gap: 5,
+  },
+  screenTitle: {
+    fontSize: 36,
+    lineHeight: 42,
+    fontWeight: "600",
+    letterSpacing: -0.6,
+  },
+  screenSubtitle: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "400",
+    marginTop: 0,
+  },
+  screenHeader: {
+    marginBottom: 10,
   },
 });

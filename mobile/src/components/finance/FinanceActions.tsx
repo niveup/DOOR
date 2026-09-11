@@ -35,14 +35,7 @@ export function FinanceActions({
           pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
         ]}
       >
-        <View
-          style={[
-            styles.actionBtnIconBadge,
-            { backgroundColor: isDark ? "#09090B" : "#FFFFFF" },
-          ]}
-        >
-          <Ionicons name="add" size={13} color={isDark ? "#FFFFFF" : "#0F172A"} />
-        </View>
+        <Ionicons name="add" size={19} color={isDark ? "#09090B" : "#FFFFFF"} />
         <Text style={[styles.primaryButtonText, { color: isDark ? "#09090B" : "#FFFFFF" }]}>
           Log Expense
         </Text>
@@ -57,13 +50,13 @@ export function FinanceActions({
           styles.secondaryButton,
           {
             backgroundColor: isDark ? "#121216" : theme.surface,
-            borderColor: isDark ? "#1F1F25" : theme.border,
+            borderColor: isDark ? "#2D2D36" : theme.border,
           },
           pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
         ]}
       >
-        <Ionicons name="options-outline" size={15} color={isDark ? "#A1A1AA" : theme.textMuted} />
-        <Text style={[styles.secondaryButtonText, { color: isDark ? "#FAFBFD" : theme.text }]}>
+        <Ionicons name="options-outline" size={16} color={isDark ? "#71717A" : theme.textFaint} />
+        <Text style={[styles.secondaryButtonText, { color: isDark ? "#D4D4D8" : theme.textSecondary }]}>
           Plan Budget
         </Text>
       </Pressable>
@@ -77,42 +70,37 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   primaryButton: {
-    flex: 1.2,
+    flex: 1.5,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xs,
-    height: 46,
-    borderRadius: radii.md,
+    gap: 6,
+    height: 50,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
   },
-  actionBtnIconBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: radii.full,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   primaryButtonText: {
     ...typography.bodyMedium,
-    fontSize: 13.5,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: -0.2,
   },
   secondaryButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xs,
-    height: 46,
-    borderRadius: radii.md,
+    gap: 6,
+    height: 50,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: spacing.sm,
   },
   secondaryButtonText: {
     ...typography.bodyMedium,
-    fontSize: 13.5,
-    fontWeight: "600",
+    fontSize: 14.5,
+    fontWeight: "500",
+    letterSpacing: -0.1,
   },
 });

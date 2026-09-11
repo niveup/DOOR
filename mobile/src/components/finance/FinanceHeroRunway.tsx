@@ -14,8 +14,10 @@ export interface FinanceHeroRunwayProps {
   allowance: number;
   remaining: number;
   spent: number;
-  safeDailySpend: number;
-  daysLeft: number;
+  upcomingBillsTotal?: number;
+  upcomingBillsCount?: number;
+  safeDailySpend?: number;
+  daysLeft?: number;
   rawSpendPercent: number;
   onOpenBudget: () => void;
 }
@@ -26,8 +28,10 @@ export function FinanceHeroRunway({
   allowance,
   remaining,
   spent,
-  safeDailySpend,
-  daysLeft,
+  upcomingBillsTotal = 0,
+  upcomingBillsCount = 0,
+  safeDailySpend = 0,
+  daysLeft = 0,
   rawSpendPercent,
   onOpenBudget,
 }: FinanceHeroRunwayProps) {
@@ -81,17 +85,34 @@ export function FinanceHeroRunway({
         },
       ]}
     >
-      {/* 1. Header: Section Tag + Status Pill / Budget Link */}
-      <View style={styles.headerRow}>
-        <View style={styles.tagGroup}>
-          <View
+      {/* 1. Main Balance Metric Row with Status Pill */}
+      <View style={styles.balanceRow}>
+        <View style={styles.balanceBlock}>
+          <Text
             style={[
-              styles.pulseDot,
-              { backgroundColor: statusTone },
+              styles.primaryBalanceValue,
+              {
+                color: isOverBudget
+                  ? SEMANTIC.crimson
+                  : isDark
+                  ? "#fafafa"
+                  : theme.text,
+              },
             ]}
-          />
-          <Text style={[styles.sectionLabel, { color: theme.textFaint }]}>
-            MONTHLY RUNWAY
+          >
+            {isOverBudget
+              ? `- ${formatINR(overBudgetAmount)}`
+              : allowance > 0
+              ? formatINR(remaining)
+              : formatINR(spent)}
+          </Text>
+
+          <Text style={[styles.balanceSubtext, { color: theme.textMuted }]}>
+            {isOverBudget
+              ? "over budget this month"
+              : allowance > 0
+              ? "remaining this month"
+              : "spent this month"}
           </Text>
         </View>
 
@@ -133,38 +154,27 @@ export function FinanceHeroRunway({
         )}
       </View>
 
-      {/* 2. Main Balance Metric Block */}
-      <View style={styles.balanceBlock}>
-        <Text
-          style={[
-            styles.primaryBalanceValue,
-            {
-              color: isOverBudget
-                ? SEMANTIC.crimson
-                : isDark
-                ? "#fafafa"
-                : theme.text,
-            },
-          ]}
-        >
-          {isOverBudget
-            ? `- ${formatINR(overBudgetAmount)}`
-            : allowance > 0
-            ? formatINR(remaining)
-            : formatINR(spent)}
-        </Text>
-
-        <Text style={[styles.balanceSubtext, { color: theme.textMuted }]}>
-          {isOverBudget
-            ? `Exceeded ₹${allowance.toLocaleString("en-IN")} monthly allowance`
-            : allowance > 0
-            ? `remaining of ${formatINR(allowance)} allowance`
-            : "Spent this month · No allowance limit configured"}
-        </Text>
-      </View>
-
-      {/* 3. Progress Meter */}
+      {/* 2. Progress Meter */}
       <View style={styles.progressContainer}>
+        <View style={styles.progressHeaderRow}>
+          <Text style={[styles.progressLabel, { color: theme.textMuted }]}>
+            Allowance used
+          </Text>
+          <Text
+            style={[
+              styles.progressPercent,
+              {
+                color: isOverBudget
+                  ? SEMANTIC.crimson
+                  : isNearLimit
+                  ? SEMANTIC.amber
+                  : theme.textMuted,
+              },
+            ]}
+          >
+            {Math.round(rawSpendPercent)}%
+          </Text>
+        </View>
         <ProgressBar
           value={Math.min(100, Math.max(0, rawSpendPercent))}
           height={6}
@@ -172,49 +182,28 @@ export function FinanceHeroRunway({
         />
       </View>
 
-      {/* 4. Secondary Metrics Split (Safe Daily Spend | Total Spent) */}
-      <View
-        style={[
-          styles.metricsSplitGrid,
-          {
-            backgroundColor: isDark ? theme.surfaceElevated : theme.surfaceSubtle,
-            borderColor: isDark ? theme.borderMuted : theme.border,
-          },
-        ]}
-      >
+      {/* 3. Secondary Metrics Split (Upcoming Bills | Total Spent) */}
+      <View style={styles.metricsSplitGrid}>
         <View style={styles.metricColumn}>
           <Text style={[styles.metricColumnLabel, { color: theme.textFaint }]}>
-            SAFE DAILY SPEND
+            UPCOMING BILLS
           </Text>
           <Text
             style={[
               styles.metricColumnValue,
-              {
-                color: isOverBudget
-                  ? SEMANTIC.crimson
-                  : isDark
-                  ? "#fafafa"
-                  : theme.text,
-              },
+              { color: isDark ? "#fafafa" : theme.text },
             ]}
           >
-            {allowance
-              ? isOverBudget
-                ? "₹0/day"
-                : `${formatINR(safeDailySpend)}/day`
-              : "Not configured"}
+            {formatINR(upcomingBillsTotal)}
           </Text>
           <Text style={[styles.metricColumnSub, { color: theme.textMuted }]}>
-            {daysLeft} {daysLeft === 1 ? "day remaining" : "days remaining"}
+            {upcomingBillsCount === 0
+              ? "No pending bills"
+              : upcomingBillsCount === 1
+              ? "1 bill due this month"
+              : `${upcomingBillsCount} bills due this month`}
           </Text>
         </View>
-
-        <View
-          style={[
-            styles.metricDivider,
-            { backgroundColor: isDark ? theme.borderMuted : theme.border },
-          ]}
-        />
 
         <View style={styles.metricColumn}>
           <Text style={[styles.metricColumnLabel, { color: theme.textFaint }]}>
@@ -233,84 +222,40 @@ export function FinanceHeroRunway({
           </Text>
         </View>
       </View>
-
-      {/* 5. Footer Coaching / Context Row */}
-      <View style={styles.footerRow}>
-        {isOverBudget ? (
-          <Ionicons name="alert-circle" size={13} color={SEMANTIC.crimson} />
-        ) : isNearLimit ? (
-          <Ionicons name="warning-outline" size={13} color={SEMANTIC.amber} />
-        ) : null}
-        <Text
-          style={[
-            styles.footerContextText,
-            {
-              color: isOverBudget
-                ? SEMANTIC.crimson
-                : isNearLimit
-                ? SEMANTIC.amber
-                : theme.textMuted,
-            },
-          ]}
-          numberOfLines={1}
-        >
-          {isOverBudget
-            ? `Pace exceeded budget limit by ${formatINR(overBudgetAmount)}`
-            : isNearLimit
-            ? "Pace is approaching your monthly allowance limit"
-            : isHealthy
-            ? "Spending velocity is healthy for the remaining days"
-            : "Set a monthly target to unlock daily spending guidance"}
-        </Text>
-      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   heroCard: {
-    padding: spacing.md,
-    borderRadius: radii.lg,
+    padding: 24,
+    borderRadius: radii.xl,
     borderWidth: 1,
+  },
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: spacing.sm,
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  tagGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: radii.full,
-  },
-  sectionLabel: {
-    ...typography.label,
-    fontSize: 10,
-    letterSpacing: 0.8,
+  balanceBlock: {
+    flex: 1,
+    gap: 4,
   },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xxs,
     paddingHorizontal: spacing.xs,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: radii.full,
     borderWidth: 1,
+    marginTop: 2,
   },
   statusPillText: {
     ...typography.caption,
     fontSize: 11,
     fontWeight: "700",
-  },
-  balanceBlock: {
-    gap: 2,
-    marginTop: spacing.xxs,
   },
   primaryBalanceValue: {
     ...typography.metricLarge,
@@ -321,53 +266,55 @@ const styles = StyleSheet.create({
   },
   balanceSubtext: {
     ...typography.caption,
-    fontSize: 12.5,
+    fontSize: 13,
     lineHeight: 18,
   },
   progressContainer: {
-    paddingVertical: spacing.xxs,
+    marginTop: 24,
+    gap: 8,
   },
-  metricsSplitGrid: {
+  progressHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    marginTop: spacing.xxs,
+    justifyContent: "space-between",
+  },
+  progressLabel: {
+    ...typography.caption,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  progressPercent: {
+    ...typography.caption,
+    fontSize: 12,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  metricsSplitGrid: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 16,
   },
   metricColumn: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   metricColumnLabel: {
     ...typography.label,
-    fontSize: 9,
+    fontSize: 10,
+    fontWeight: "700",
     letterSpacing: 0.8,
   },
   metricColumnValue: {
     ...typography.metric,
-    fontSize: 15,
-    lineHeight: 19,
+    fontSize: 16,
+    lineHeight: 22,
     fontVariant: ["tabular-nums"],
   },
   metricColumnSub: {
     ...typography.caption,
-    fontSize: 11,
-  },
-  metricDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 32,
-    marginHorizontal: spacing.sm,
-  },
-  footerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    paddingTop: 2,
-  },
-  footerContextText: {
-    ...typography.caption,
-    fontSize: 11.5,
-    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
   },
 });
