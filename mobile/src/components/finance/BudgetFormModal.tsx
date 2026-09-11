@@ -45,13 +45,13 @@ export function BudgetFormModal({
   const notify = useNotify();
   const insets = useSafeAreaInsets();
 
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const currentScrollY = useSharedValue(0);
   const originalScrollY = useRef(0);
   const hasShiftedUp = useRef(false);
   const keyboardHeightRef = useRef(0);
   const focusedFieldRef = useRef<string | null>(null);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Layout positions relative to ScrollView
   const allowanceSectionY = useRef(0);
@@ -60,31 +60,18 @@ export function BudgetFormModal({
   const rowOffsets = useRef<Record<string, number>>({});
   const rowHeights = useRef<Record<string, number>>({});
 
-  // Direct element refs for live coordinate measurement
-  const allowanceBoxRef = useRef<View | null>(null);
-  const rowRefs = useRef<Record<string, View | null>>({});
-
   const windowHeight = Dimensions.get("window").height;
 
-  const scrollTarget = useCallback((y: number) => {
-    const safeY = Math.max(0, Math.round(y));
-    try {
-      if (scrollRef.current) {
-        const refObj = scrollRef.current as any;
-        if (typeof refObj.scrollTo === "function") {
-          refObj.scrollTo({ y: safeY, animated: true });
-        } else if (typeof refObj.getNode === "function" && typeof refObj.getNode().scrollTo === "function") {
-          refObj.getNode().scrollTo({ y: safeY, animated: true });
-        }
-      }
-    } catch {
-      // fallback to worklet
-    }
-    runOnUI(() => {
-      "worklet";
-      scrollTo(scrollRef, 0, safeY, true);
-    })();
-  }, [scrollRef]);
+  const scrollTarget = useCallback(
+    (y: number) => {
+      const safeY = Math.max(0, Math.round(y));
+      runOnUI(() => {
+        "worklet";
+        scrollTo(scrollRef, 0, safeY, true);
+      })();
+    },
+    [scrollRef]
+  );
 
   const combinedScrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -100,64 +87,45 @@ export function BudgetFormModal({
     },
   });
 
-  const adjustScroll = useCallback(
-    (fieldKey: string | null, kbHeight: number) => {
-      if (!fieldKey || kbHeight <= 0) return;
+  const performSmoothScroll = useCallback(
+    (fieldKey: string, customKbHeight?: number) => {
+      if (!fieldKey) return;
 
       const curScroll = currentScrollY.value || 0;
       const modalHeaderHeight = insets.top + 64;
-      const keyboardTopOnScreen = windowHeight - kbHeight;
-      const desiredBottomLimit = keyboardTopOnScreen - 24;
+      const kbH = customKbHeight || (keyboardHeightRef.current > 0 ? keyboardHeightRef.current : 290);
+      const keyboardTopOnScreen = windowHeight - kbH;
+      const desiredBottomLimit = keyboardTopOnScreen - 20;
 
-      const applyShift = (rowBottomOnScreen: number, rowTopOnScreen: number) => {
-        // 1. If row is behind or clipped by the keyboard:
-        if (rowBottomOnScreen > desiredBottomLimit) {
-          const delta = rowBottomOnScreen - desiredBottomLimit;
-          if (!hasShiftedUp.current) {
-            originalScrollY.current = curScroll;
-            hasShiftedUp.current = true;
-          }
-          scrollTarget(curScroll + delta);
-        }
-        // 2. If row was shifted too far up and clipped under header:
-        else if (rowTopOnScreen < modalHeaderHeight + 10 && hasShiftedUp.current) {
-          const delta = modalHeaderHeight + 10 - rowTopOnScreen;
-          const newTarget = Math.max(0, curScroll - delta);
-          scrollTarget(newTarget);
-        }
-        // 3. Otherwise: already fully visible between header and keyboard. Do nothing!
-      };
+      let rowTopInScroll = 0;
+      let rowH = 52;
 
-      const calculateViaLayout = () => {
-        let rowTopInScroll = 0;
-        let rowH = 52;
-
-        if (fieldKey === "allowance") {
-          rowTopInScroll = allowanceSectionY.current;
-          rowH = 56;
-        } else {
-          const rowRelY = rowOffsets.current[fieldKey] ?? 0;
-          rowH = rowHeights.current[fieldKey] ?? 52;
-          rowTopInScroll = categoriesSectionY.current + cardInsideSectionY.current + rowRelY;
-        }
-
-        const rowTopOnScreen = modalHeaderHeight + rowTopInScroll - curScroll;
-        const rowBottomOnScreen = rowTopOnScreen + rowH;
-        applyShift(rowBottomOnScreen, rowTopOnScreen);
-      };
-
-      // Method 1: measureInWindow (with collapsable={false})
-      const targetRef = fieldKey === "allowance" ? allowanceBoxRef.current : rowRefs.current[fieldKey];
-      if (targetRef && typeof targetRef.measureInWindow === "function") {
-        targetRef.measureInWindow((x, y, width, height) => {
-          if (y !== undefined && !isNaN(y) && y > 0) {
-            applyShift(y + height, y);
-          } else {
-            calculateViaLayout();
-          }
-        });
+      if (fieldKey === "allowance") {
+        rowTopInScroll = allowanceSectionY.current;
+        rowH = 56;
       } else {
-        calculateViaLayout();
+        const rowRelY = rowOffsets.current[fieldKey] ?? 0;
+        rowH = rowHeights.current[fieldKey] ?? 52;
+        rowTopInScroll = categoriesSectionY.current + cardInsideSectionY.current + rowRelY;
+      }
+
+      const rowTopOnScreen = modalHeaderHeight + rowTopInScroll - curScroll;
+      const rowBottomOnScreen = rowTopOnScreen + rowH;
+
+      // 1. If row is behind or clipped by keyboard:
+      if (rowBottomOnScreen > desiredBottomLimit) {
+        const delta = rowBottomOnScreen - desiredBottomLimit;
+        if (!hasShiftedUp.current) {
+          originalScrollY.current = curScroll;
+          hasShiftedUp.current = true;
+        }
+        scrollTarget(curScroll + delta);
+      }
+      // 2. If row was shifted too far up and clipped under header:
+      else if (rowTopOnScreen < modalHeaderHeight + 10 && hasShiftedUp.current) {
+        const delta = modalHeaderHeight + 10 - rowTopOnScreen;
+        const newTarget = Math.max(0, curScroll - delta);
+        scrollTarget(newTarget);
       }
     },
     [insets.top, windowHeight, scrollTarget, currentScrollY]
@@ -170,20 +138,17 @@ export function BudgetFormModal({
     const showSub = Keyboard.addListener(showEvent, (e) => {
       const kbH = e.endCoordinates.height;
       keyboardHeightRef.current = kbH;
-      setKeyboardHeight(kbH);
 
-      // Delay slightly so layout re-renders with new paddingBottom
-      setTimeout(() => {
-        if (focusedFieldRef.current) {
-          adjustScroll(focusedFieldRef.current, kbH);
-        }
-      }, Platform.OS === "ios" ? 40 : 90);
+      // Micro-adjust only if actual keyboard height differs significantly from estimated 290px
+      if (focusedFieldRef.current && Math.abs(kbH - 290) > 15) {
+        performSmoothScroll(focusedFieldRef.current, kbH);
+      }
     });
 
     const hideSub = Keyboard.addListener(hideEvent, () => {
       keyboardHeightRef.current = 0;
-      setKeyboardHeight(0);
       focusedFieldRef.current = null;
+      setFocusedField(null);
       if (hasShiftedUp.current) {
         scrollTarget(originalScrollY.current);
         hasShiftedUp.current = false;
@@ -193,18 +158,39 @@ export function BudgetFormModal({
     return () => {
       showSub.remove();
       hideSub.remove();
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
     };
-  }, [adjustScroll, scrollTarget]);
+  }, [performSmoothScroll, scrollTarget]);
 
   const handleCategoryFocus = (category: string) => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
     setFocusedField(category);
     focusedFieldRef.current = category;
 
-    if (keyboardHeightRef.current > 0) {
-      setTimeout(() => {
-        adjustScroll(category, keyboardHeightRef.current);
-      }, 50);
+    // Immediately trigger smooth scroll in parallel with keyboard opening!
+    performSmoothScroll(category);
+  };
+
+  const handleFieldBlur = (fieldKey: string) => {
+    if (focusedFieldRef.current === fieldKey) {
+      focusedFieldRef.current = null;
     }
+    setFocusedField((prev) => (prev === fieldKey ? null : prev));
+
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+    }
+    blurTimeoutRef.current = setTimeout(() => {
+      if (!focusedFieldRef.current && hasShiftedUp.current) {
+        scrollTarget(originalScrollY.current);
+        hasShiftedUp.current = false;
+      }
+    }, 120);
   };
 
   const [allowanceText, setAllowanceText] = useState<string>(
@@ -302,10 +288,7 @@ export function BudgetFormModal({
         contentContainerStyle={[
           contentContainerStyle,
           {
-            paddingBottom:
-              keyboardHeight > 0
-                ? keyboardHeight + 220
-                : Math.max(insets.bottom + 90, 90),
+            paddingBottom: Math.max(insets.bottom + 280, 280),
           },
         ]}
       >
@@ -320,8 +303,6 @@ export function BudgetFormModal({
           </Text>
 
           <View
-            ref={allowanceBoxRef}
-            collapsable={false}
             style={[
               styles.allowanceInputBox,
               {
@@ -342,20 +323,15 @@ export function BudgetFormModal({
               value={allowanceText}
               onChangeText={handleAllowanceTextChange}
               onFocus={() => {
+                if (blurTimeoutRef.current) {
+                  clearTimeout(blurTimeoutRef.current);
+                  blurTimeoutRef.current = null;
+                }
                 setFocusedField("allowance");
                 focusedFieldRef.current = "allowance";
-                if (keyboardHeightRef.current > 0) {
-                  setTimeout(() => {
-                    adjustScroll("allowance", keyboardHeightRef.current);
-                  }, 50);
-                }
+                performSmoothScroll("allowance");
               }}
-              onBlur={() => {
-                if (focusedFieldRef.current === "allowance") {
-                  focusedFieldRef.current = null;
-                }
-                setFocusedField(null);
-              }}
+              onBlur={() => handleFieldBlur("allowance")}
               placeholder="0"
               placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
               keyboardType="numeric"
@@ -434,10 +410,6 @@ export function BudgetFormModal({
               return (
                 <View
                   key={category}
-                  collapsable={false}
-                  ref={(el) => {
-                    rowRefs.current[category] = el;
-                  }}
                   onLayout={(e) => {
                     rowOffsets.current[category] = e.nativeEvent.layout.y;
                     rowHeights.current[category] = e.nativeEvent.layout.height;
@@ -478,12 +450,7 @@ export function BudgetFormModal({
                       value={valStr}
                       onChangeText={(text) => handleCapTextChange(category, text)}
                       onFocus={() => handleCategoryFocus(category)}
-                      onBlur={() => {
-                        if (focusedFieldRef.current === category) {
-                          focusedFieldRef.current = null;
-                        }
-                        setFocusedField(null);
-                      }}
+                      onBlur={() => handleFieldBlur(category)}
                       placeholder="0"
                       placeholderTextColor={isDark ? "#71717A" : theme.textFaint}
                       keyboardType="numeric"
