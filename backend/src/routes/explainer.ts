@@ -22,9 +22,6 @@ export interface ExplainerDeps {
   ): Promise<string>;
 }
 
-export function registerExplainerRoutes(app: Express, deps: ExplainerDeps): void {
-  const { allowAiSpend, loadPrompt, isAiProviderName, aiChat } = deps;
-
 function cleanControlCharacters(aiResponse: string): string {
   return aiResponse
     .replace(/\x0c(rac|orall\b)/g, '\\\\f$1')
@@ -143,7 +140,7 @@ function aggressiveSanitize(jsonStr: string): string {
  *
  * Returns { data, error } â€” data is null only if ALL strategies fail.
  */
-function robustJsonExtract(rawAiOutput: string): { data: any; error: string | null } {
+export function robustJsonExtract(rawAiOutput: string): { data: any; error: string | null } {
   if (!rawAiOutput || rawAiOutput.trim().length === 0) {
     return { data: null, error: "AI returned empty response." };
   }
@@ -233,6 +230,8 @@ function robustJsonExtract(rawAiOutput: string): { data: any; error: string | nu
   }
 }
 
+export function registerExplainerRoutes(app: Express, deps: ExplainerDeps): void {
+  const { allowAiSpend, loadPrompt, isAiProviderName, aiChat } = deps;
 async function explainConcept(req: Request, res: Response) {
   if (!allowAiSpend(req, res)) return;
   const { topic, mode, deep, image, ocrText: providedOcrText, history } = req.body;

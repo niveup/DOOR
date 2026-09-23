@@ -1,12 +1,12 @@
-import crypto from "node:crypto";
 import cors from "cors";
 import dotenv from "dotenv";
 import express, { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { jsonrepair } from "jsonrepair";
 import { createAiProvider, AiProviderName } from "./lib/ai/provider";
-import { decryptApiKey } from "./lib/ai/credentials";
+import { resolveAiConfiguration } from "./lib/ai/boot";
+import { isPasscodeConfigured, verifySharedSecret } from "./lib/auth";
 import { createRateLimiter, clientKey } from "./lib/rate-limit";
+import { robustJsonExtract } from "./routes/explainer";
 
 const authFailureLimiter = createRateLimiter({ windowMs: 5 * 60_000, max: 10 });
 
@@ -23,13 +23,86 @@ app.use(cors({ origin(origin, callback) { if (!origin || allowedOrigins.includes
 app.use(express.raw({ type: () => true, limit: "8mb" }));
 
 type InterviewFeedback = { score: number; dimensions: Array<{ label: string; value: number }>; missing: string[]; improved: string };
-function safeEqual(received: string, expected: string) { return crypto.timingSafeEqual(crypto.createHash("sha256").update(received).digest(), crypto.createHash("sha256").update(expected).digest()); }
-function requirePasscode(req: Request, res: Response) { const key = clientKey(req); const brake = authFailureLimiter.peek(key); if (!brake.allowed) { res.set("Retry-After", String(brake.retryAfterSeconds)); res.status(429).json({ error: "Too many failed attempts. Try again later." }); return false; } const expected = process.env.APP_PASSCODE; if (!expected || expected.length < 8) { res.status(503).json({ error: "Backend authentication is not configured." }); return false; } const received = typeof req.headers["x-passcode"] === "string" ? req.headers["x-passcode"] : ""; if (!safeEqual(received, expected)) { authFailureLimiter.hit(key); res.status(401).json({ error: "Unauthorized" }); return false; } authFailureLimiter.reset(key); return true; }
-function jsonBody(req: Request) { if (!Buffer.isBuffer(req.body)) return req.body || {}; if (!req.body.length) return {}; return JSON.parse(req.body.toString("utf8")); }
-function robustJsonExtract(raw: string): unknown { const clean = raw.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim(); const a = clean.indexOf("{"); const b = clean.lastIndexOf("}"); return JSON.parse(jsonrepair(a >= 0 && b > a ? clean.slice(a, b + 1) : clean)); }
-async function resolveAi() { const credential = await prisma.aiProviderCredential.findFirst({ where: { isActive: true } }); if (!credential || !["openrouter", "nvidia", "cerebras"].includes(credential.provider)) throw new Error("AI is not configured."); return createAiProvider({ provider: credential.provider as AiProviderName, apiKey: decryptApiKey(credential), model: credential.model }); }
-function validateFeedback(value: unknown, labels: string[]): InterviewFeedback { if (!value || typeof value !== "object") throw new Error("AI response is not an object."); const candidate = value as Partial<InterviewFeedback>; if (!Array.isArray(candidate.dimensions) || candidate.dimensions.length !== 5) throw new Error("AI must return five dimensions."); const dimensions = candidate.dimensions.map((item,index) => { const numeric=Number(item?.value); if (!Number.isFinite(numeric)||numeric<0||numeric>2) throw new Error("Invalid score."); return { label: labels[index], value: Math.round(numeric*2)/2 }; }); const missing=Array.isArray(candidate.missing)?candidate.missing.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).slice(0,3):[]; if (!missing.length || typeof candidate.improved !== "string") throw new Error("Incomplete feedback."); return { score: Math.round(dimensions.reduce((sum,item)=>sum+item.value,0)*2)/2, dimensions, missing, improved:candidate.improved.trim() }; }
-function interviewIdentity(body: Record<string, unknown>) { const sessionId=typeof body.sessionId === "string"?body.sessionId.trim():""; const questionIndex=Number(body.questionIndex); const sessionLength=Number(body.sessionLength); if(!/^[a-zA-Z0-9_-]{8,100}$/.test(sessionId)) throw new Error("Invalid interview session."); if(!Number.isInteger(questionIndex)||questionIndex<0||questionIndex>49) throw new Error("Invalid question index."); if(!Number.isInteger(sessionLength)||sessionLength<1||sessionLength>10||questionIndex>=sessionLength) throw new Error("Invalid session length."); return {sessionId,questionIndex,sessionLength}; }
+
+function requirePasscode(req: Request, res: Response) {
+  const key = clientKey(req);
+  const brake = authFailureLimiter.peek(key);
+  if (!brake.allowed) {
+    res.set("Retry-After", String(brake.retryAfterSeconds));
+    res.status(429).json({ error: "Too many failed attempts. Try again later." });
+    return false;
+  }
+  if (!isPasscodeConfigured(process.env.APP_PASSCODE)) {
+    res.status(503).json({ error: "Backend authentication is not configured." });
+    return false;
+  }
+  const expected = process.env.APP_PASSCODE;
+  const received = typeof req.headers["x-passcode"] === "string" ? req.headers["x-passcode"] : "";
+  if (!verifySharedSecret(received, expected)) {
+    authFailureLimiter.hit(key);
+    res.status(401).json({ error: "Unauthorized" });
+    return false;
+  }
+  authFailureLimiter.reset(key);
+  return true;
+}
+
+function jsonBody(req: Request) {
+  if (!Buffer.isBuffer(req.body)) return req.body || {};
+  if (!req.body.length) return {};
+  return JSON.parse(req.body.toString("utf8"));
+}
+
+function extractFeedbackJson(raw: string): unknown {
+  const result = robustJsonExtract(raw);
+  if (result.error || !result.data) {
+    throw new Error(result.error || "AI response did not contain JSON.");
+  }
+  return result.data;
+}
+
+async function resolveAi() {
+  const configuration = await resolveAiConfiguration(prisma);
+  return createAiProvider({
+    provider: configuration.provider as AiProviderName,
+    apiKey: configuration.apiKey,
+    model: configuration.model,
+  });
+}
+function validateFeedback(value: unknown, labels: string[]): InterviewFeedback {
+  if (!value || typeof value !== "object") throw new Error("AI response is not an object.");
+  const candidate = value as Partial<InterviewFeedback>;
+  if (!Array.isArray(candidate.dimensions) || candidate.dimensions.length !== 5) {
+    throw new Error("AI must return five dimensions.");
+  }
+  const dimensions = candidate.dimensions.map((item, index) => {
+    const numeric = Number(item?.value);
+    if (!Number.isFinite(numeric) || numeric < 0 || numeric > 2) throw new Error("Invalid score.");
+    return { label: labels[index], value: Math.round(numeric * 2) / 2 };
+  });
+  const missing = Array.isArray(candidate.missing)
+    ? candidate.missing.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).slice(0, 3)
+    : [];
+  if (!missing.length || typeof candidate.improved !== "string") throw new Error("Incomplete feedback.");
+  return {
+    score: Math.round(dimensions.reduce((sum, item) => sum + item.value, 0) * 2) / 2,
+    dimensions,
+    missing,
+    improved: candidate.improved.trim(),
+  };
+}
+
+function interviewIdentity(body: Record<string, unknown>) {
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : "";
+  const questionIndex = Number(body.questionIndex);
+  const sessionLength = Number(body.sessionLength);
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(sessionId)) throw new Error("Invalid interview session.");
+  if (!Number.isInteger(questionIndex) || questionIndex < 0 || questionIndex > 49) throw new Error("Invalid question index.");
+  if (!Number.isInteger(sessionLength) || sessionLength < 1 || sessionLength > 10 || questionIndex >= sessionLength) {
+    throw new Error("Invalid session length.");
+  }
+  return { sessionId, questionIndex, sessionLength };
+}
 type InMemAttempt = { questionIndex: number; score: number; skipped: boolean };
 const sessionStore = new Map<string, { attempts: Map<number, InMemAttempt>; lastUpdated: number }>();
 
@@ -112,10 +185,10 @@ app.post("/api/interview/evaluate", async (req, res) => {
     let raw = await provider.chat(systemPrompt, userPrompt);
     let feedback: InterviewFeedback;
     try {
-      feedback = validateFeedback(robustJsonExtract(raw), labels);
+      feedback = validateFeedback(extractFeedbackJson(raw), labels);
     } catch {
       raw = await provider.chat(`${systemPrompt}\nYour previous response failed validation. Return valid minified JSON only.`, userPrompt);
-      feedback = validateFeedback(robustJsonExtract(raw), labels);
+      feedback = validateFeedback(extractFeedbackJson(raw), labels);
     }
     recordSessionAttempt(id.sessionId, { questionIndex: id.questionIndex, score: feedback.score, skipped: false });
     const attemptId = `${id.sessionId}_${id.questionIndex}`;
@@ -150,6 +223,31 @@ app.post("/api/interview/skip", async (req, res) => {
   recordSessionAttempt(id.sessionId, { questionIndex: id.questionIndex, score: 0, skipped: true });
   return res.json({ success: true, sessionSummary: getSessionSummary(id.sessionId, id.sessionLength) });
 });
-app.all("*",async(req,res)=>{const target=new URL(req.originalUrl,`http://127.0.0.1:${internalPort}`);const headers=new Headers();for(const[name,value]of Object.entries(req.headers)){if(value===undefined||["host","content-length","connection"].includes(name))continue;headers.set(name,Array.isArray(value)?value.join(","):value)}const body=Buffer.isBuffer(req.body)&&req.body.length?req.body:undefined;try{const upstream=await fetch(target,{method:req.method,headers,body:body as any,redirect:"manual"});upstream.headers.forEach((value,name)=>{if(!["content-encoding","transfer-encoding","connection"].includes(name.toLowerCase()))res.setHeader(name,value)});res.status(upstream.status).send(Buffer.from(await upstream.arrayBuffer()))}catch{res.status(502).json({error:"Backend service is unavailable."})}});
-async function start(){const originalPort=process.env.PORT;process.env.PORT=String(internalPort);await import("./server");if(originalPort===undefined)delete process.env.PORT;else process.env.PORT=originalPort;app.listen(externalPort)}
-start().catch(()=>process.exit(1));
+app.all("*", async (req, res) => {
+  const target = new URL(req.originalUrl, `http://127.0.0.1:${internalPort}`);
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (value === undefined || ["host", "content-length", "connection"].includes(name)) continue;
+    headers.set(name, Array.isArray(value) ? value.join(",") : value);
+  }
+  const body = Buffer.isBuffer(req.body) && req.body.length ? req.body : undefined;
+  try {
+    const upstream = await fetch(target, { method: req.method, headers, body: body as any, redirect: "manual" });
+    upstream.headers.forEach((value, name) => {
+      if (!["content-encoding", "transfer-encoding", "connection"].includes(name.toLowerCase())) res.setHeader(name, value);
+    });
+    res.status(upstream.status).send(Buffer.from(await upstream.arrayBuffer()));
+  } catch {
+    res.status(502).json({ error: "Backend service is unavailable." });
+  }
+});
+
+async function start() {
+  const originalPort = process.env.PORT;
+  process.env.PORT = String(internalPort);
+  await import("./server");
+  if (originalPort === undefined) delete process.env.PORT;
+  else process.env.PORT = originalPort;
+  app.listen(externalPort);
+}
+start().catch(() => process.exit(1));
