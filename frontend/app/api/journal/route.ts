@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hasActiveJournalSession, getSession } from "@/lib/session";
-import {
-  JournalPayload,
-  getJournalFeedback,
-  kolkataJournalDate,
-  listJournalEntries,
-  saveJournalEntry,
-} from "@/lib/journal-store";
+import { appPasscode, backendApiUrl } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Pure session-gated proxy to the Express journal endpoints (audit: journal
+// single-writer). Encryption, validation of content shape, AI feedback, and D1
+// persistence all live in backend/src/routes/journal.ts; this route only
+// enforces the web session + journal-unlock gate, validates the web contract,
+// and translates shapes. It holds no keys and performs no crypto.
+
 const MAX_BODY_BYTES = 24 * 1024;
+const UPSTREAM_TIMEOUT_MS = 110_000;
 const MOODS = new Set(["1", "2", "3", "4", "5"]);
 const TAGS = new Set(["Study", "Exercise", "Reading", "Sleep", "Phone", "Other"]);
 
@@ -38,78 +39,108 @@ function validTags(value: unknown) {
   return tags.length === value.length ? [...new Set(tags)] : null;
 }
 
-function parsePayload(value: unknown): Omit<JournalPayload, "aiFeedback" | "tomorrowTask" | "patternDetected"> | null {
-  if (!value || typeof value !== "object") return null;
-  const body = value as Record<string, unknown>;
-  const entryText = typeof body.entryText === "string" ? body.entryText.trim() : "";
-  const tags = validTags(body.tags);
-  if (entryText.length < 20 || entryText.length > 5000 || !tags || (typeof body.mood !== "string" || !MOODS.has(body.mood))) return null;
+function kolkataDate(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function toWebEntry(entry: Record<string, unknown>): Record<string, unknown> {
+  const rawDate = typeof entry.date === "string" ? entry.date : "";
   return {
-    entryText,
-    mood: body.mood,
-    tags,
-    studyDone: body.studyDone === true,
-    exerciseDone: body.exerciseDone === true,
-    readingDone: body.readingDone === true,
+    journalId: entry.journalId ?? null,
+    date: rawDate.slice(0, 10),
+    entryText: typeof entry.entryText === "string" ? entry.entryText : "",
+    mood: typeof entry.mood === "string" ? entry.mood : null,
+    tags: Array.isArray(entry.tags) ? entry.tags.filter((t): t is string => typeof t === "string") : [],
+    aiFeedback: typeof entry.aiFeedback === "string" ? entry.aiFeedback : null,
+    tomorrowTask: typeof entry.tomorrowTask === "string" ? entry.tomorrowTask : null,
+    patternDetected: typeof entry.patternDetected === "string" ? entry.patternDetected : null,
+    studyDone: entry.studyDone === true,
+    exerciseDone: entry.exerciseDone === true,
+    readingDone: entry.readingDone === true,
   };
+}
+
+async function callBackend(path: string, init?: RequestInit): Promise<{ status: number; payload: any }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${backendApiUrl()}${path}`, {
+      ...init,
+      cache: "no-store",
+      redirect: "manual",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-passcode": appPasscode(),
+        ...(init?.headers || {}),
+      },
+    });
+    const payload = await response.json().catch(() => ({}));
+    return { status: response.status, payload };
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError";
+    return {
+      status: timedOut ? 504 : 502,
+      payload: { error: timedOut ? "Backend request timed out." : "Backend is unavailable." },
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function GET(request: NextRequest) {
   if (!await requireJournalAccess()) return privateJson({ error: "Journal is locked." }, 401);
   const requestedLimit = Number(request.nextUrl.searchParams.get("limit") || 30);
-  try {
-    const entries = await listJournalEntries(requestedLimit);
-    return privateJson({ entries });
-  } catch (error) {
-    console.error("Journal history read failed", error instanceof Error ? error.message : "unknown error");
-    return privateJson({ error: "Private journal storage is unavailable." }, 503);
+  const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 30, 1), 90);
+  const { status, payload } = await callBackend(`/api/journal/history?limit=${limit}`);
+  if (status !== 200 || !Array.isArray(payload.entries)) {
+    return privateJson({ error: payload.error || "Private journal storage is unavailable." }, status === 200 ? 503 : status);
   }
+  return privateJson({ entries: payload.entries.map(toWebEntry) });
 }
 
 export async function POST(request: NextRequest) {
   if (!await requireJournalAccess()) return privateJson({ error: "Journal is locked." }, 401);
-  if (Number(request.headers.get("content-length") || 0) > MAX_BODY_BYTES) return privateJson({ error: "Journal entry is too large." }, 413);
+  if (Number(request.headers.get("content-length") || 0) > MAX_BODY_BYTES) {
+    return privateJson({ error: "Journal entry is too large." }, 413);
+  }
 
-  let submitted: Omit<JournalPayload, "aiFeedback" | "tomorrowTask" | "patternDetected"> | null = null;
-  let aiProvider: string | undefined;
-  let aiModel: string | undefined;
+  let body: Record<string, unknown>;
   try {
-    const body = await request.json() as Record<string, unknown>;
-    submitted = parsePayload(body);
-    aiProvider = typeof body.aiProvider === "string" ? body.aiProvider : undefined;
-    aiModel = typeof body.aiModel === "string" ? body.aiModel : undefined;
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
     return privateJson({ error: "Invalid journal request." }, 400);
   }
-  if (!submitted) return privateJson({ error: "Journal entry must be between 20 and 5000 characters with valid metadata." }, 400);
 
-  const date = kolkataJournalDate();
-  const payload: JournalPayload = { ...submitted, aiFeedback: null, tomorrowTask: null, patternDetected: null };
-  try {
-    // Persist the encrypted writing first: an AI outage must never lose a draft.
-    await saveJournalEntry(date, payload);
-  } catch (error) {
-    const errMessage = error instanceof Error ? error.message : "unknown error";
-    console.error("Encrypted journal save failed", errMessage);
-    return privateJson({
-      error: "Private journal storage is unavailable. Your draft has not been sent.",
-      details: errMessage,
-      help: "Ensure CF_JOURNAL_STORE_URL, CF_JOURNAL_STORE_SECRET, and JOURNAL_ENCRYPTION_KEY are configured in Vercel environment variables.",
-    }, 503);
+  const entryText = typeof body.entryText === "string" ? body.entryText.trim() : "";
+  const mood = typeof body.mood === "string" ? body.mood : "";
+  const tags = validTags(body.tags);
+  if (entryText.length < 20 || entryText.length > 5000 || !tags || !MOODS.has(mood)) {
+    return privateJson({ error: "Journal entry must be between 20 and 5000 characters with valid metadata." }, 400);
   }
 
-  try {
-    const feedback = await getJournalFeedback({ ...submitted, history: [], aiProvider, aiModel });
-    const journal = await saveJournalEntry(date, { ...payload, ...feedback });
-    return privateJson({ success: true, journal });
-  } catch (error) {
-    console.error("Journal feedback failed", error instanceof Error ? error.message : "unknown error");
-    const journal = await saveJournalEntry(date, payload).catch(() => null);
-    return privateJson({
-      success: false,
-      journal,
-      error: "Your encrypted entry was saved, but mentor feedback is temporarily unavailable.",
-      friendlyMessage: "Your writing is safely stored. You can return for feedback later.",
-    });
+  const { status, payload } = await callBackend("/api/journal/entry", {
+    method: "POST",
+    body: JSON.stringify({
+      content: entryText,
+      mood,
+      tags,
+      date: kolkataDate(),
+      studyDone: body.studyDone === true,
+      exerciseDone: body.exerciseDone === true,
+      readingDone: body.readingDone === true,
+    }),
+  });
+
+  if (status !== 200 || !payload.entry) {
+    const message = payload.error || "Journal entry could not be saved.";
+    return privateJson({ success: false, journal: null, error: message, friendlyMessage: message }, status);
   }
+  return privateJson({ success: true, journal: toWebEntry(payload.entry) });
 }

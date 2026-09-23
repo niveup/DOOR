@@ -94,6 +94,9 @@ export function registerJournalRoutes(app: Express, prisma: PrismaClient, deps: 
       ? req.body.tags.filter((tag: unknown): tag is string => typeof tag === "string" && tag.length <= 40).slice(0, 6)
       : [];
     const date = typeof req.body?.date === "string" ? req.body.date : getKolkataDateString();
+    const studyDone = req.body?.studyDone === true;
+    const exerciseDone = req.body?.exerciseDone === true;
+    const readingDone = req.body?.readingDone === true;
     if (content.length < 20 || content.length > 5000 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).set("Cache-Control", "no-store").json({ error: "Journal content must be 20–5000 characters and date must be YYYY-MM-DD." });
     }
@@ -118,9 +121,9 @@ export function registerJournalRoutes(app: Express, prisma: PrismaClient, deps: 
         aiFeedback: feedback,
         tomorrowTask: parts[3] || null,
         patternDetected: parts[2] || null,
-        studyDone: false,
-        exerciseDone: false,
-        readingDone: false,
+        studyDone,
+        exerciseDone,
+        readingDone,
       });
       res.set("Cache-Control", "no-store, private").json({ entry, feedback, tomorrowTask: entry.tomorrowTask });
     } catch (error: any) {
