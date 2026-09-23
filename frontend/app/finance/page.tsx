@@ -3,7 +3,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-const toast = { success: () => {}, error: () => {}, info: () => {}, warning: () => {} };
+import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 
 type Category =
